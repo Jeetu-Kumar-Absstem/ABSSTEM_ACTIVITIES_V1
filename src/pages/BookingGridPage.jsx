@@ -8,10 +8,11 @@ import StatsRow from '../components/common/StatsRow';
 import GameSelector from '../components/booking/GameSelector';
 import DateNavigator from '../components/booking/DateNavigator';
 import CapacitySummary from '../components/booking/CapacitySummary';
+import SlotCell from '../components/booking/SlotCell';
 import BookSlotModal from '../components/modals/BookSlotModal';
 
 const BookingGridPage = () => {
-  const { bookings, currentDate, selectedGame, addBooking, removeBooking, bans } = useApp();
+  const { bookings, currentDate, selectedGame, addBooking, removeBooking, bans, currentUser, games } = useApp();
   const { showToast } = useToast();
   const [showBookModal, setShowBookModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(DAYS[0]);
@@ -28,6 +29,18 @@ const BookingGridPage = () => {
       showToast(`${playerName} is banned from ${selectedGame}!`, 'error');
       return false;
     }
+    
+    // Check if user already has a booking for today
+    const today = new Date();
+    const todayName = DAYS[today.getDay() === 0 ? 6 : today.getDay() - 1];
+    const userBookings = bookings[todayName] ? 
+      Object.values(bookings[todayName]).flat().filter(b => b.user_id === currentUser?.id) : [];
+    
+    if (userBookings.length > 0 && selectedDay === todayName) {
+      showToast('You already have a booking for today!', 'error');
+      return false;
+    }
+
     const success = await addBooking(selectedDay, selectedSlotId, playerName);
     if (success) {
       showToast(`${playerName} booked for ${selectedDay} Slot ${selectedSlotId}`);
@@ -37,31 +50,25 @@ const BookingGridPage = () => {
     return success;
   };
 
-  const handleRemoveBooking = (day, slotId, playerName) => {
-    removeBooking(day, slotId, playerName);
+  const handleRemoveBooking = (day, slotId, playerName, userId) => {
+    // Only allow removal if current user is the owner
+    if (currentUser?.id !== userId) {
+      showToast('You can only remove your own bookings!', 'error');
+      return;
+    }
+    removeBooking(day, slotId, playerName, userId);
     showToast(`${playerName} removed from ${day} Slot ${slotId}`, 'warning');
   };
 
-  const getGameName = () => {
-    const game = games.find(g => g.id === selectedGame);
-    return game ? game.name : 'Carrom';
+  const getSlotPlayers = (day, slotId) => {
+    return bookings[day]?.[slotId] || [];
   };
 
-  // Calculate stats
-  const today = new Date();
-  const todayName = DAYS[today.getDay() === 0 ? 6 : today.getDay() - 1];
-  let todayBookings = 0;
-  let availableSlots = 0;
-  let fullSlots = 0;
-
-  if (bookings[todayName]) {
-    SLOTS.forEach(slot => {
-      const count = bookings[todayName]?.[slot.id]?.length || 0;
-      todayBookings += count;
-      if (count >= MAX_PER_SLOT) fullSlots++;
-      else availableSlots++;
-    });
-  }
+  // Fixed: Use the games from useApp
+  const getMaxPlayers = () => {
+    const game = games.find(g => g.id === selectedGame);
+    return game?.maxPlayers || MAX_PER_SLOT;
+  };
 
   return (
     <div>
@@ -72,7 +79,7 @@ const BookingGridPage = () => {
         </div>
       </div>
 
-      <StatsRow todayBookings={todayBookings} availableSlots={availableSlots} fullSlots={fullSlots} bans={bans} />
+      <StatsRow />
 
       <GameSelector />
 
@@ -97,57 +104,18 @@ const BookingGridPage = () => {
                 <tr key={day} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
                   <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1a3c6e', position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>{day}</td>
                   {SLOTS.map(slot => {
-                    const players = bookings[day]?.[slot.id] || [];
-                    const isFull = players.length >= MAX_PER_SLOT;
+                    const players = getSlotPlayers(day, slot.id);
+                    const maxPlayers = getMaxPlayers();
                     return (
                       <td key={slot.id} style={{ padding: '4px 4px', verticalAlign: 'middle', textAlign: 'center', minWidth: '100px' }}>
-                        <div
-                          style={{
-                            background: isFull ? 'rgba(249,168,37,0.1)' : 'rgba(255,255,255,0.3)',
-                            borderRadius: '16px',
-                            padding: '4px 6px',
-                            minHeight: '32px',
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: '2px',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            cursor: isFull ? 'not-allowed' : 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onClick={() => !isFull && handleBookSlot(day, slot.id)}
-                        >
-                          {players.map(p => {
-                            const banned = isBanned(p, selectedGame, bans);
-                            return (
-                              <span
-                                key={p}
-                                style={{
-                                  background: banned ? 'rgba(229,57,53,0.15)' : 'rgba(26,60,110,0.08)',
-                                  padding: '2px 10px',
-                                  borderRadius: '20px',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 500,
-                                  color: banned ? '#c62828' : '#1a3c6e',
-                                  textDecoration: banned ? 'line-through' : 'none',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!banned) handleRemoveBooking(day, slot.id, p);
-                                }}
-                              >
-                                {p} {banned ? '🚫' : <span style={{ opacity: 0.5, fontSize: '0.5rem' }}>×</span>}
-                              </span>
-                            );
-                          })}
-                          {!isFull && players.length < MAX_PER_SLOT && (
-                            <span style={{ fontSize: '0.6rem', color: '#00897b', opacity: 0.5 }}>+</span>
-                          )}
-                          {isFull && <span style={{ fontSize: '0.5rem', color: '#f9a825' }}>FULL</span>}
-                        </div>
+                        <SlotCell
+                          day={day}
+                          slotId={slot.id}
+                          players={players}
+                          maxPlayers={maxPlayers}
+                          onBook={handleBookSlot}
+                          onRemove={handleRemoveBooking}
+                        />
                       </td>
                     );
                   })}
@@ -167,7 +135,7 @@ const BookingGridPage = () => {
         day={selectedDay}
         slotId={selectedSlotId}
         currentBookings={selectedDay && selectedSlotId ? bookings[selectedDay]?.[selectedSlotId] || [] : []}
-        maxPlayers={MAX_PER_SLOT}
+        maxPlayers={getMaxPlayers()}
         game={selectedGame}
       />
     </div>

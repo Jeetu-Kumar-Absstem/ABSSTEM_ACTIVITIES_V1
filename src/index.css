@@ -33,3 +33,31 @@ body {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-thumb { background: #c0c8d8; border-radius: 20px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* src/index.css - Add at the bottom */
+
+/* Ensure dropdowns appear above everything */
+.dropdown-container {
+  position: relative;
+  z-index: 99999 !important;
+}
+
+/* Fix for claymorphism dropdowns */
+.clay-dropdown {
+  z-index: 99999 !important;
+}
+
+/* Ensure modals appear above dropdowns */
+.modal-overlay {
+  z-index: 100000 !important;
+}
+
+/* Fix for sidebar not overlapping dropdown */
+.sidebar-clay {
+  z-index: 100 !important;
+}
+
+/* Topbar should have high z-index but lower than dropdowns */
+.topbar-clay {
+  z-index: 1000 !important;
+}

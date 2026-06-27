@@ -9,7 +9,7 @@ import RulesPage from './RulesPage';
 import BanManagementPage from './BanManagementPage';
 import ReportsPage from './ReportsPage';
 
-const ActivityPlanner = () => {
+const ActivityPlanner = ({ user, onLogout }) => {
   const { activeTab } = useApp();
 
   const renderTab = () => {
@@ -25,7 +25,7 @@ const ActivityPlanner = () => {
   };
 
   return (
-    <Layout>
+    <Layout user={user} onLogout={onLogout}>
       <div style={{ paddingBottom: '20px' }}>
         {renderTab()}
       </div>

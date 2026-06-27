@@ -3,15 +3,18 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 
 const GameSelector = () => {
-  const { games, selectedGame, setSelectedGame, bookings } = useApp();
+  const { games, selectedGame, setSelectedGame, bookings, getGameStats } = useApp();
+
+  const getGameBookings = (gameId) => {
+    const stats = getGameStats(gameId);
+    return stats.todayBookings;
+  };
 
   return (
     <div className="clay-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
       <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#8888aa' }}>Select Game:</span>
       {games.map(game => {
-        const total = Object.values(bookings).reduce((sum, day) => {
-          return sum + Object.values(day).reduce((s, slot) => s + (slot?.length || 0), 0);
-        }, 0);
+        const bookingCount = getGameBookings(game.id);
         return (
           <div
             key={game.id}
@@ -34,7 +37,7 @@ const GameSelector = () => {
             <span style={{ fontSize: '1rem' }}>{game.icon}</span>
             {game.name}
             <span style={{ fontSize: '0.6rem', opacity: 0.5, background: 'rgba(0,0,0,0.04)', padding: '0 8px', borderRadius: '12px' }}>
-              {total} booked
+              {bookingCount} booked
             </span>
           </div>
         );

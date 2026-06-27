@@ -17,9 +17,10 @@ export const SLOTS = [
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 export const MAX_PER_SLOT = 4;
 
+// Updated games with specific max players
 export const GAMES = [
-  { id: 'carrom', name: 'Carrom', icon: '🎯', location: 'Recreation Room — 2nd Floor', maxPlayers: 4 },
-  { id: 'table-tennis', name: 'Table Tennis', icon: '🏓', location: 'Recreation Room — 2nd Floor', maxPlayers: 4 },
+  { id: 'carrom', name: 'Carrom', icon: '🎯', location: 'Recreation Room — 2nd Floor', maxPlayers: 2 },
+  { id: 'table-tennis', name: 'Table Tennis', icon: '🏓', location: 'Recreation Room — 2nd Floor', maxPlayers: 2 },
   { id: 'chess', name: 'Chess', icon: '♟', location: 'Conference Room — 1st Floor', maxPlayers: 2 },
 ];
 

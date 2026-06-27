@@ -155,3 +155,32 @@
 .clay-badge-red { background: #ffebee; color: #c62828; }
 .clay-badge-purple { background: #f3e5f5; color: #6a1b9a; }
 .clay-badge-grey { background: #f5f5f5; color: #666; }
+
+
+/* src/styles/claymorphism.css - Add at the bottom */
+
+/* Z-index utilities */
+.z-dropdown { z-index: 99999 !important; }
+.z-modal { z-index: 100000 !important; }
+.z-topbar { z-index: 1000 !important; }
+.z-sidebar { z-index: 100 !important; }
+.z-base { z-index: 1 !important; }
+
+/* Fix for dropdown overflow */
+.dropdown-overlay {
+  position: relative;
+  z-index: 99999;
+  overflow: visible !important;
+}
+
+/* Ensure clay cards don't clip dropdowns */
+.clay, .clay-card, .clay-soft {
+  overflow: visible !important;
+}
+
+/* Fix for sidebar clipping */
+.sidebar-container {
+  overflow: visible !important;
+  position: relative;
+  z-index: 100;
+}

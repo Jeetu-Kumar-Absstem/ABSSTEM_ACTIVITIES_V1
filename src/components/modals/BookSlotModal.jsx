@@ -19,11 +19,16 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
 
         <div className="clay-soft" style={{ padding: '10px 14px', borderRadius: '16px', marginBottom: '16px', fontSize: '0.75rem', color: '#1a3c6e' }}>
           📅 Booking for: <strong>{day}, Slot {slotId}</strong> — {slot?.time}
+          <div style={{ fontSize: '0.65rem', color: '#444466', marginTop: '2px' }}>
+            Max {maxPlayers} players per slot
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <label style={{ fontSize: '0.7rem', fontWeight: 500, color: '#444466' }}>Player Name <span style={{ color: '#e53935' }}>*</span></label>
+            <label style={{ fontSize: '0.7rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              Player Name <span style={{ color: '#e53935' }}>*</span>
+            </label>
             <input
               className="clay-input"
               value={playerName}
@@ -36,7 +41,14 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
             <div style={{ fontWeight: 600, color: '#1a3c6e', marginBottom: '4px' }}>Slot Info</div>
             <div>Current players booked: <strong>{currentBookings.length} / {maxPlayers}</strong></div>
             {currentBookings.length > 0 && (
-              <div style={{ marginTop: '4px' }}>Already booked: {currentBookings.map(p => <span key={p} className="clay-tag" style={{ margin: '2px' }}>{p}</span>)}</div>
+              <div style={{ marginTop: '4px' }}>Already booked: {currentBookings.map(p => 
+                <span key={p.name} className="clay-tag" style={{ margin: '2px' }}>{p.name}</span>
+              )}</div>
+            )}
+            {currentBookings.length >= maxPlayers && (
+              <div style={{ marginTop: '4px', color: '#e53935', fontWeight: 600 }}>
+                ⚠️ This slot is FULL!
+              </div>
             )}
           </div>
 
@@ -47,7 +59,21 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
           <button className="clay-btn" onClick={onClose}>Cancel</button>
-          <button className="clay-btn clay-btn-teal" onClick={() => onConfirm(playerName) && onClose()}>
+          <button 
+            className="clay-btn clay-btn-teal" 
+            onClick={() => {
+              if (currentBookings.length >= maxPlayers) {
+                alert('This slot is full!');
+                return;
+              }
+              onConfirm(playerName) && onClose();
+            }}
+            disabled={currentBookings.length >= maxPlayers}
+            style={{
+              opacity: currentBookings.length >= maxPlayers ? 0.5 : 1,
+              cursor: currentBookings.length >= maxPlayers ? 'not-allowed' : 'pointer',
+            }}
+          >
             ✅ Confirm Booking
           </button>
         </div>
