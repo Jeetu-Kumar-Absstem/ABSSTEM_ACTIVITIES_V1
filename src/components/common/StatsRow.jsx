@@ -1,11 +1,24 @@
 // src/components/common/StatsRow.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 
 const StatsRow = () => {
-  const { selectedGame, getGameStats, games } = useApp();
-  const stats = getGameStats(selectedGame);
-  const gameName = games.find(g => g.id === selectedGame)?.name || 'Carrom';
+  const { selectedGame, getGameStats, games, bookings } = useApp();
+  const [stats, setStats] = useState({
+    todayBookings: 0,
+    availableSlots: 0,
+    fullSlots: 0,
+    activeBans: 0,
+    totalGames: 0
+  });
+
+  const gameName = games.find(g => String(g.id) === String(selectedGame))?.name || 'Carrom';
+
+  // Recalculate stats whenever bookings or selected game changes
+  useEffect(() => {
+    const newStats = getGameStats(selectedGame);
+    setStats(newStats);
+  }, [bookings, selectedGame, getGameStats]);
 
   const statItems = [
     { 

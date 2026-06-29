@@ -15,11 +15,10 @@ export const SLOTS = [
 ];
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-export const MAX_PER_SLOT = 4;
 
-// Updated games with specific max players
+// Games with specific max players
 export const GAMES = [
-  { id: 'carrom', name: 'Carrom', icon: '🎯', location: 'Recreation Room — 2nd Floor', maxPlayers: 2 },
+  { id: 'carrom', name: 'Carrom', icon: '🎯', location: 'Recreation Room — 2nd Floor', maxPlayers: 4 },
   { id: 'table-tennis', name: 'Table Tennis', icon: '🏓', location: 'Recreation Room — 2nd Floor', maxPlayers: 2 },
   { id: 'chess', name: 'Chess', icon: '♟', location: 'Conference Room — 1st Floor', maxPlayers: 2 },
 ];
@@ -34,10 +33,10 @@ export const DEPARTMENTS = [
 ];
 
 export const RULES_DATA = [
-  { id: 1, game: 'General', text: 'Bookings are permitted for a maximum of one day at a time.', type: 'standard' },
+  { id: 1, game: 'General', text: 'Bookings are permitted for a maximum of one game per day.', type: 'standard' },
   { id: 2, game: 'General', text: 'If a member fails to utilize their reserved time slot, the booking will be considered forfeited and will not be carried forward.', type: 'standard' },
   { id: 3, game: 'General', text: 'Bookings can be entered or cancelled up to 15 minutes before the scheduled time. The member only enters their own name.', type: 'standard' },
-  { id: 4, game: 'General', text: 'Only one active booking per player per day. If a player fails to show up within 10 minutes of the booked time, the slot may be given to someone else. Players must maintain silence and avoid disturbing others. No use of mobile phones or loud conversations during the game.', type: 'critical' },
+  { id: 4, game: 'General', text: 'Only one active booking per player per game per day. If a player fails to show up within 10 minutes of the booked time, the slot may be given to someone else. Players must maintain silence and avoid disturbing others. No use of mobile phones or loud conversations during the game.', type: 'critical' },
   { id: 5, game: 'General', text: 'Each time slot has a fixed duration. Members must vacate at the end of their session to allow smooth transition for the next user.', type: 'standard' },
   { id: 6, game: 'General', text: 'Members are expected to maintain cleanliness and follow game etiquette. Improper behavior or damage may result in suspension of booking privileges. Report any missing or damaged items to the manager.', type: 'standard' },
   { id: 7, game: 'Carrom', text: 'Please ask for carrom coins from Mr. Abhishek and hand them back at the end of your slot.', type: 'standard' },

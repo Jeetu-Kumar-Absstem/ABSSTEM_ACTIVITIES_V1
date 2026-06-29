@@ -1,20 +1,47 @@
 // src/components/booking/GameSelector.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { SLOTS, DAYS } from '../../utils/constants';
 
 const GameSelector = () => {
-  const { games, selectedGame, setSelectedGame, bookings, getGameStats } = useApp();
+  const { games, selectedGame, setSelectedGame, bookings, currentDate } = useApp();
+  const [gameBookings, setGameBookings] = useState({});
 
-  const getGameBookings = (gameId) => {
-    const stats = getGameStats(gameId);
-    return stats.todayBookings;
-  };
+  useEffect(() => {
+    const calculateGameBookings = () => {
+      const today = currentDate;
+      const dayIndex = today.getDay();
+      let todayName;
+      if (dayIndex === 0 || dayIndex === 6) {
+        todayName = 'Monday';
+      } else {
+        todayName = DAYS[dayIndex - 1] || 'Monday';
+      }
+
+      const counts = {};
+      games.forEach(game => {
+        let total = 0;
+        if (bookings[todayName]) {
+          SLOTS.forEach(slot => {
+            const players = bookings[todayName]?.[slot.id] || [];
+            const gamePlayers = players.filter(p => String(p.game) === String(game.id) || p.game === game.name);
+            total += gamePlayers.length;
+          });
+        }
+        counts[game.id] = total;
+      });
+      setGameBookings(counts);
+    };
+
+    calculateGameBookings();
+  }, [bookings, games, currentDate]);
 
   return (
     <div className="clay-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
       <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#8888aa' }}>Select Game:</span>
       {games.map(game => {
-        const bookingCount = getGameBookings(game.id);
+        const bookingCount = gameBookings[game.id] || 0;
+        const isInactive = game.active === false;
         return (
           <div
             key={game.id}
@@ -22,20 +49,36 @@ const GameSelector = () => {
             style={{
               padding: '6px 16px',
               borderRadius: '40px',
-              cursor: 'pointer',
-              background: selectedGame === game.id ? 'rgba(26,60,110,0.1)' : 'transparent',
+              cursor: isInactive ? 'not-allowed' : 'pointer',
+              background: selectedGame === game.id
+                ? 'rgba(26,60,110,0.1)'
+                : isInactive
+                  ? 'rgba(136,136,170,0.08)'
+                  : 'transparent',
               border: selectedGame === game.id ? '1px solid rgba(26,60,110,0.2)' : '1px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               fontSize: '0.75rem',
               fontWeight: selectedGame === game.id ? 500 : 400,
-              color: selectedGame === game.id ? '#1a3c6e' : '#444466'
+              color: isInactive ? '#8888aa' : selectedGame === game.id ? '#1a3c6e' : '#444466',
+              opacity: isInactive ? 0.65 : 1,
             }}
-            onClick={() => setSelectedGame(game.id)}
+            onClick={() => {
+              if (isInactive) {
+                alert('Currently this is Unavailable');
+                return;
+              }
+              setSelectedGame(game.id);
+            }}
           >
             <span style={{ fontSize: '1rem' }}>{game.icon}</span>
             {game.name}
+            {isInactive && (
+              <span style={{ fontSize: '0.55rem', color: '#c62828', background: 'rgba(198,40,40,0.08)', padding: '0 8px', borderRadius: '12px' }}>
+                Inactive
+              </span>
+            )}
             <span style={{ fontSize: '0.6rem', opacity: 0.5, background: 'rgba(0,0,0,0.04)', padding: '0 8px', borderRadius: '12px' }}>
               {bookingCount} booked
             </span>

@@ -50,7 +50,11 @@ const GameMasterPage = () => {
                 <td style={{ padding: '8px 10px', fontSize: '1.1rem' }}>{game.icon}</td>
                 <td style={{ padding: '8px 10px', color: '#444466' }}>{game.location}</td>
                 <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600 }}>{game.maxPlayers}</td>
-                <td style={{ padding: '8px 10px' }}><span className="clay-badge clay-badge-green">✓ Active</span></td>
+                <td style={{ padding: '8px 10px' }}>
+                  <span className={game.active === false ? 'clay-badge clay-badge-red' : 'clay-badge clay-badge-green'}>
+                    {game.active === false ? '✕ Inactive' : '✓ Active'}
+                  </span>
+                </td>
                 <td style={{ padding: '8px 10px' }}>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button className="clay-btn" style={{ padding: '4px 10px', fontSize: '0.6rem' }}>👁</button>

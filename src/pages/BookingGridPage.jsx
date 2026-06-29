@@ -1,9 +1,9 @@
 // src/pages/BookingGridPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
-import { SLOTS, DAYS, MAX_PER_SLOT } from '../utils/constants';
-import { formatDate, isBanned } from '../utils/helpers';
+import { SLOTS, DAYS } from '../utils/constants';
+import { isBanned } from '../utils/helpers';
 import StatsRow from '../components/common/StatsRow';
 import GameSelector from '../components/booking/GameSelector';
 import DateNavigator from '../components/booking/DateNavigator';
@@ -12,62 +12,103 @@ import SlotCell from '../components/booking/SlotCell';
 import BookSlotModal from '../components/modals/BookSlotModal';
 
 const BookingGridPage = () => {
-  const { bookings, currentDate, selectedGame, addBooking, removeBooking, bans, currentUser, games } = useApp();
+  const { 
+    bookings, 
+    currentDate, 
+    selectedGame, 
+    addBooking, 
+    removeBooking, 
+    bans, 
+    currentUser, 
+    games,
+    loadBookings 
+  } = useApp();
   const { showToast } = useToast();
   const [showBookModal, setShowBookModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(DAYS[0]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
 
+  // Refresh bookings when component mounts
+  useEffect(() => {
+    loadBookings();
+  }, []);
+
   const handleBookSlot = (day, slotId) => {
+    const gameRecord = games.find(game => String(game.id) === String(selectedGame));
+    if (gameRecord && gameRecord.active === false) {
+      showToast('Currently this is Unavailable', 'error');
+      return;
+    }
     setSelectedDay(day);
     setSelectedSlotId(slotId);
     setShowBookModal(true);
   };
 
   const handleAddBooking = async (playerName) => {
-    if (isBanned(playerName, selectedGame, bans)) {
+    const currentEmpId = currentUser?.user_metadata?.emp_id || '';
+    const gameRecord = games.find(game => String(game.id) === String(selectedGame));
+    if (isBanned({ name: playerName, employee_id: currentEmpId }, gameRecord?.name || selectedGame, bans)) {
       showToast(`${playerName} is banned from ${selectedGame}!`, 'error');
       return false;
     }
     
-    // Check if user already has a booking for today
-    const today = new Date();
-    const todayName = DAYS[today.getDay() === 0 ? 6 : today.getDay() - 1];
-    const userBookings = bookings[todayName] ? 
-      Object.values(bookings[todayName]).flat().filter(b => b.user_id === currentUser?.id) : [];
-    
-    if (userBookings.length > 0 && selectedDay === todayName) {
-      showToast('You already have a booking for today!', 'error');
+    if (gameRecord && gameRecord.active === false) {
+      showToast('Currently this is Unavailable', 'error');
       return false;
     }
 
-    const success = await addBooking(selectedDay, selectedSlotId, playerName);
-    if (success) {
-      showToast(`${playerName} booked for ${selectedDay} Slot ${selectedSlotId}`);
-    } else {
-      showToast('Booking failed!', 'error');
+    // Check if user already has a booking for this game on this day
+    const dayBookings = bookings[selectedDay] || {};
+    const allDayBookings = Object.values(dayBookings).flat();
+    const userHasBooking = allDayBookings.some(b => b.user_id === currentUser?.id && (String(b.game) === String(selectedGame) || b.game === gameRecord?.name));
+    
+    if (userHasBooking) {
+      showToast('You already have a booking for this game on this day!', 'error');
+      return false;
     }
-    return success;
+
+    const result = await addBooking(selectedDay, selectedSlotId, playerName);
+    if (result.success) {
+      // Reload bookings to refresh all components
+      await loadBookings();
+      showToast(`${playerName} booked for ${selectedDay} Slot ${selectedSlotId}`);
+      return true;
+    } else {
+      showToast(result.error || 'Booking failed!', 'error');
+      return false;
+    }
   };
 
-  const handleRemoveBooking = (day, slotId, playerName, userId) => {
+  const handleRemoveBooking = async (day, slotId, playerName, userId) => {
     // Only allow removal if current user is the owner
     if (currentUser?.id !== userId) {
       showToast('You can only remove your own bookings!', 'error');
       return;
     }
-    removeBooking(day, slotId, playerName, userId);
-    showToast(`${playerName} removed from ${day} Slot ${slotId}`, 'warning');
+    const result = await removeBooking(day, slotId, playerName, userId);
+    if (result.success) {
+      // Reload bookings to refresh all components
+      await loadBookings();
+      showToast(`${playerName} removed from ${day} Slot ${slotId}`, 'warning');
+    } else {
+      showToast(result.error || 'Failed to remove booking!', 'error');
+    }
   };
 
   const getSlotPlayers = (day, slotId) => {
     return bookings[day]?.[slotId] || [];
   };
 
-  // Fixed: Use the games from useApp
   const getMaxPlayers = () => {
-    const game = games.find(g => g.id === selectedGame);
-    return game?.maxPlayers || MAX_PER_SLOT;
+    const game = games.find(g => String(g.id) === String(selectedGame));
+    return game?.maxPlayers || 4;
+  };
+
+  // Get current day name
+  const getCurrentDay = () => {
+    const dayIndex = currentDate.getDay();
+    if (dayIndex === 0 || dayIndex === 6) return 'Monday';
+    return DAYS[dayIndex - 1] || 'Monday';
   };
 
   return (
@@ -100,33 +141,49 @@ const BookingGridPage = () => {
               </tr>
             </thead>
             <tbody>
-              {DAYS.map(day => (
-                <tr key={day} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-                  <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1a3c6e', position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>{day}</td>
-                  {SLOTS.map(slot => {
-                    const players = getSlotPlayers(day, slot.id);
-                    const maxPlayers = getMaxPlayers();
-                    return (
-                      <td key={slot.id} style={{ padding: '4px 4px', verticalAlign: 'middle', textAlign: 'center', minWidth: '100px' }}>
-                        <SlotCell
-                          day={day}
-                          slotId={slot.id}
-                          players={players}
-                          maxPlayers={maxPlayers}
-                          onBook={handleBookSlot}
-                          onRemove={handleRemoveBooking}
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+              {DAYS.map(day => {
+                const isToday = day === getCurrentDay();
+                return (
+                  <tr key={day} style={{ 
+                    borderBottom: '1px solid rgba(200,210,230,0.2)',
+                    background: isToday ? 'rgba(26,60,110,0.03)' : 'transparent'
+                  }}>
+                    <td style={{ 
+                      padding: '8px 12px', 
+                      fontWeight: 600, 
+                      color: isToday ? '#1a3c6e' : '#1a3c6e',
+                      position: 'sticky', 
+                      left: 0, 
+                      background: isToday ? 'rgba(26,60,110,0.03)' : 'white',
+                      zIndex: 1 
+                    }}>
+                      {day} {isToday && '📍'}
+                    </td>
+                    {SLOTS.map(slot => {
+                      const players = getSlotPlayers(day, slot.id);
+                      const maxPlayers = getMaxPlayers();
+                      return (
+                        <td key={slot.id} style={{ padding: '4px 4px', verticalAlign: 'middle', textAlign: 'center', minWidth: '100px' }}>
+                          <SlotCell
+                            day={day}
+                            slotId={slot.id}
+                            players={players}
+                            maxPlayers={maxPlayers}
+                            onBook={handleBookSlot}
+                            onRemove={handleRemoveBooking}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      <CapacitySummary bookings={bookings} />
+      <CapacitySummary />
 
       <BookSlotModal
         isOpen={showBookModal}

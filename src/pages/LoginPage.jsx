@@ -11,42 +11,71 @@ const LoginPage = ({ onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
+  const [loginError, setLoginError] = useState(''); // inline error state
   const { showToast } = useToast();
 
   const handleEmpIdChange = (e) => {
     const rawValue = e.target.value;
     const formatted = formatEmpId(rawValue);
     setEmpId(formatted);
+    setLoginError(''); // clear error on change
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    
+    setLoginError('');
+
     if (!validateEmpId(empId)) {
-      showToast('Employee ID must be 4 letters followed by 4 digits (e.g., ABCD1234)', 'error');
+      setLoginError('Invalid Employee ID format (e.g., ABCD1234)');
       return;
     }
 
     if (!validatePassword(password)) {
-      showToast('Password must be 8+ chars with uppercase, lowercase, digit, and # or @', 'error');
+      setLoginError('Password must be 8+ chars with uppercase, lowercase, digit, and # or @');
       return;
     }
 
     setLoading(true);
     try {
       const email = `${empId}@absstem.com`;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
 
-      if (error) throw error;
-      
-      showToast('Login successful! Welcome back!', 'success');
+      // Step 1: Check if Employee ID exists
+      const { data: empData, error: empError } = await supabase
+        .from('employees')
+        .select('employee_code')
+        .eq('employee_code', empId)
+        .maybeSingle();
+
+      if (empError) {
+        console.error('Employee lookup error:', empError);
+        // Fall through to auth if lookup fails
+      }
+
+      if (!empData) {
+        setLoginError('Employee ID not found. Please register first.');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Attempt login
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        if (error.message.toLowerCase().includes('invalid login credentials')) {
+          setLoginError('Incorrect password. Please try again.');
+        } else if (error.message.toLowerCase().includes('email not confirmed')) {
+          setLoginError('Please confirm your email before logging in.');
+        } else {
+          setLoginError(error.message || 'Login failed. Please try again.');
+        }
+        return;
+      }
+
+      showToast('Welcome back!', 'success');
       if (onLogin) onLogin(data.user);
-      
+
     } catch (error) {
-      showToast(error.message || 'Login failed. Please try again.', 'error');
+      setLoginError(error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -61,7 +90,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     if (!validateEmpId(empId)) {
-      showToast('Employee ID must be 4 letters followed by 4 digits (e.g., ABCD1234)', 'error');
+      showToast('Employee ID: 4 letters + 4 digits (e.g., ABCD1234)', 'error');
       return;
     }
 
@@ -73,8 +102,7 @@ const LoginPage = ({ onLogin }) => {
     setLoading(true);
     try {
       const email = `${empId}@absstem.com`;
-      
-      // Register user with Supabase Auth
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -89,30 +117,27 @@ const LoginPage = ({ onLogin }) => {
 
       if (error) throw error;
 
-      // Insert into your existing employees table
       try {
         const { error: dbError } = await supabase
           .from('employees')
-          .insert([
-            { 
-              name: name.trim(),
-              email: email,
-              department: department || 'General',
-              employee_code: empId,
-            }
-          ]);
+          .insert([{
+            name: name.trim(),
+            email: email,
+            department: department || 'General',
+            employee_code: empId,
+          }]);
 
         if (dbError) {
           console.error('Error saving to employees table:', dbError);
           if (dbError.code === '23505') {
-            showToast('This Employee ID is already registered. Please login.', 'warning');
+            showToast('Employee ID already registered. Please login.', 'warning');
             setIsRegister(false);
             setLoading(false);
             return;
           }
           showToast('Account created but employee record may need manual setup.', 'warning');
         } else {
-          showToast('Registration successful! Please check your email to confirm.', 'success');
+          showToast('Registered! Check your email to confirm.', 'success');
         }
       } catch (dbError) {
         console.log('Error with employees table:', dbError);
@@ -126,7 +151,7 @@ const LoginPage = ({ onLogin }) => {
 
     } catch (error) {
       if (error.message.includes('User already registered')) {
-        showToast('This Employee ID is already registered. Please login.', 'warning');
+        showToast('Employee ID already registered. Please login.', 'warning');
         setIsRegister(false);
       } else {
         showToast(error.message || 'Registration failed. Please try again.', 'error');
@@ -220,7 +245,7 @@ const LoginPage = ({ onLogin }) => {
               onChange={handleEmpIdChange}
               placeholder="e.g., ABCD1234 (4 letters + 4 digits)"
               maxLength="8"
-              style={{ 
+              style={{
                 padding: '12px 18px',
                 textTransform: 'uppercase',
                 fontFamily: 'monospace',
@@ -228,9 +253,9 @@ const LoginPage = ({ onLogin }) => {
               }}
               required
             />
-            <div style={{ 
-              fontSize: '0.6rem', 
-              color: '#8888aa', 
+            <div style={{
+              fontSize: '0.6rem',
+              color: '#8888aa',
               marginTop: '4px',
               display: 'flex',
               gap: '8px',
@@ -239,7 +264,7 @@ const LoginPage = ({ onLogin }) => {
             }}>
               <span>Format: <strong>4 letters</strong> + <strong>4 digits</strong></span>
               {empId.length > 0 && (
-                <span style={{ 
+                <span style={{
                   display: 'inline-block',
                   padding: '1px 10px',
                   borderRadius: '12px',
@@ -252,16 +277,12 @@ const LoginPage = ({ onLogin }) => {
                 </span>
               )}
             </div>
-            <div style={{ 
-              fontSize: '0.55rem', 
-              color: '#999',
-              marginTop: '2px',
-            }}>
+            <div style={{ fontSize: '0.55rem', color: '#999', marginTop: '2px' }}>
               Example: <strong>ABCD1234</strong> or <strong>XYZW5678</strong>
             </div>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
               Password <span style={{ color: '#e53935' }}>*</span>
             </label>
@@ -269,7 +290,7 @@ const LoginPage = ({ onLogin }) => {
               className="clay-input"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
               placeholder="Enter your password"
               style={{ padding: '12px 18px' }}
               required
@@ -277,14 +298,29 @@ const LoginPage = ({ onLogin }) => {
             <div style={{ fontSize: '0.6rem', color: '#8888aa', marginTop: '4px' }}>
               Min 8 chars: 1 uppercase, 1 lowercase, 1 digit, and # or @
             </div>
-            <div style={{ 
-              fontSize: '0.55rem', 
-              color: '#999',
-              marginTop: '2px',
-            }}>
+            <div style={{ fontSize: '0.55rem', color: '#999', marginTop: '2px' }}>
               Example: <strong>Test@1234</strong> or <strong>Pass#5678</strong>
             </div>
           </div>
+
+          {/* ✅ Inline error — shows right above Login button */}
+          {!isRegister && loginError && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(229, 57, 53, 0.08)',
+              border: '1px solid rgba(229, 57, 53, 0.25)',
+              borderRadius: '12px',
+              padding: '8px 14px',
+              marginBottom: '12px',
+            }}>
+              <span style={{ fontSize: '0.85rem' }}>❌</span>
+              <span style={{ fontSize: '0.75rem', color: '#c62828', fontWeight: 500 }}>
+                {loginError}
+              </span>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -311,6 +347,7 @@ const LoginPage = ({ onLogin }) => {
               setPassword('');
               setName('');
               setDepartment('');
+              setLoginError('');
             }}
             style={{
               background: 'none',
