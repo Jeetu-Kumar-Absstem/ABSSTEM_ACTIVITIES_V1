@@ -1,16 +1,23 @@
 // src/components/booking/SlotCell.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
 import { isBanned } from '../../utils/helpers';
+import RemoveBookingConfirm from '../../ui/RemoveBookingConfirm';
+import BanPlayerConfirm from '../../ui/BanPlayerConfirm';
 
 const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
   const { currentUser, selectedGame, bans, isAdmin, addBan, loadBans, bookings, games } = useApp();
-  const [showBanModal, setShowBanModal] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const { showToast } = useToast();
   const [showPlayerActions, setShowPlayerActions] = useState(false);
   const [actionPlayer, setActionPlayer] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const menuRef = useRef(null);
+
+  // Drives the RemoveBookingConfirm dialog (src/ui)
+  const [removeConfirm, setRemoveConfirm] = useState(null); // { name, userId } | null
+  // Drives the BanPlayerConfirm dialog (src/ui)
+  const [banConfirm, setBanConfirm] = useState(null); // player | null
   
   const selectedGameRecord = games.find(game => String(game.id) === String(selectedGame));
 
@@ -43,30 +50,27 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
       onRemove(day, slotId, player, userId);
       setShowPlayerActions(false);
     } else {
-      alert('❌ You can only remove your own bookings!');
+      showToast('You can only remove your own bookings!', 'error');
     }
   };
 
   // Only admin can ban
   const handleBanPlayer = (player) => {
     if (!isAdmin()) {
-      alert('❌ Only admins can ban players!');
+      showToast('Only admins can ban players!', 'error');
       return;
     }
     if (isBanned(player, selectedGameRecord?.name || selectedGame, bans)) {
-      alert(`🚫 ${player.name} is already banned from ${selectedGame}!`);
+      showToast(`${player.name} is already banned from ${selectedGame}!`, 'error');
       return;
     }
-    setSelectedPlayer(player);
-    setShowBanModal(true);
+    setBanConfirm(player);
     setShowPlayerActions(false);
   };
-
   const handleConfirmBan = async (banData) => {
     if (isBanned({ name: banData.employee, employee_id: banData.employee_id }, selectedGameRecord?.name || selectedGame, bans)) {
-      alert(`🚫 ${banData.employee} is already banned from ${selectedGame}!`);
-      setShowBanModal(false);
-      setSelectedPlayer(null);
+      showToast(`${banData.employee} is already banned from ${selectedGame}!`, 'error');
+      setBanConfirm(null);
       return;
     }
 
@@ -81,11 +85,10 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
 
     if (result.success) {
       await loadBans();
-      alert(`✅ ${banData.employee} has been banned from ${selectedGame}!`);
-      setShowBanModal(false);
-      setSelectedPlayer(null);
+      showToast(`${banData.employee} has been banned from ${selectedGame}!`);
+      setBanConfirm(null);
     } else {
-      alert('❌ Error banning player: ' + result.error);
+      showToast('Error banning player: ' + result.error, 'error');
     }
   };
 
@@ -108,17 +111,17 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
     const banned = isBanned(player, selectedGame, bans);
 
     if (banned) {
-      alert(`🚫 ${player.name} is already banned!`);
+      showToast(`${player.name} is already banned!`, 'error');
       setShowPlayerActions(false);
       return;
     }
 
     if (action === 'remove') {
       if (isOwner) {
-        handleRemove(player.name, player.user_id);
+        setRemoveConfirm({ name: player.name, userId: player.user_id });
         setShowPlayerActions(false);
       } else {
-        alert('❌ You can only remove your own bookings!');
+        showToast('You can only remove your own bookings!', 'error');
         setShowPlayerActions(false);
       }
     } else if (action === 'ban') {
@@ -126,7 +129,7 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
         handleBanPlayer(player);
         setShowPlayerActions(false);
       } else {
-        alert('❌ Only admins can ban players!');
+        showToast('Only admins can ban players!', 'error');
         setShowPlayerActions(false);
       }
     }
@@ -161,7 +164,7 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
   // Handle booking with validation
   const handleBookSlot = () => {
     if (!isGameActive) {
-      alert('Currently this is Unavailable');
+      showToast('Currently this is Unavailable', 'error');
       return;
     }
 
@@ -170,12 +173,12 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
     const userBanned = isBanned({ name: currentUser?.user_metadata?.name || '', employee_id: userEmpId }, selectedGameRecord?.name || selectedGame, bans);
 
     if (userBanned) {
-      alert('🚫 You are banned from this game!');
+      showToast('You are banned from this game!', 'error');
       return;
     }
 
     if (hasUserBookingToday(currentUser?.id)) {
-      alert('⚠️ You already have a booking for this game today!');
+      showToast('You already have a booking for this game today!', 'error');
       return;
     }
 
@@ -243,10 +246,23 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
               onClick={(e) => {
                 e.stopPropagation();
                 if (banned) {
-                  alert(`🚫 ${player.name} is banned from ${selectedGame}!`);
+                  showToast(`${player.name} is banned from ${selectedGame}!`, 'error');
                   return;
                 }
-                showPlayerMenu(player, e);
+                const isOwner = currentUser?.id === player.user_id;
+                const isAdminUser = isAdmin();
+
+                if (isOwner) {
+                  setRemoveConfirm({ name: player.name, userId: player.user_id });
+                  return;
+                }
+
+                if (isAdminUser) {
+                  setBanConfirm(player);
+                  return;
+                }
+
+                showToast(`Booked by ${player.name}`, 'info');
               }}
               onMouseEnter={(e) => {
                 if (!banned) {
@@ -348,128 +364,28 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
         </div>
       )}
 
-      {/* Ban Modal - Only shown to admin */}
-      {showBanModal && selectedPlayer && isAdmin() && (
-        <BanPlayerModal
-          player={selectedPlayer}
-          game={selectedGame}
-          onClose={() => {
-            setShowBanModal(false);
-            setSelectedPlayer(null);
-          }}
-          onConfirm={handleConfirmBan}
-        />
-      )}
+      {/* Remove-my-booking confirmation — fixed to viewport, OK/Cancel always visible without scrolling */}
+      <RemoveBookingConfirm
+        open={!!removeConfirm}
+        playerName={removeConfirm?.name}
+        day={day}
+        slotLabel={`Slot ${slotId}`}
+        onCancel={() => setRemoveConfirm(null)}
+        onConfirm={() => {
+          handleRemove(removeConfirm.name, removeConfirm.userId);
+          setRemoveConfirm(null);
+        }}
+      />
+
+      {/* Ban player dialog — sticky footer keeps Confirm Ban button visible without scrolling */}
+      <BanPlayerConfirm
+        open={!!banConfirm}
+        player={banConfirm}
+        game={selectedGameRecord?.name || selectedGame}
+        onCancel={() => setBanConfirm(null)}
+        onConfirm={handleConfirmBan}
+      />
     </>
-  );
-};
-
-// Ban Player Modal Component
-const BanPlayerModal = ({ player, game, onClose, onConfirm }) => {
-  const [banData, setBanData] = useState({
-    employee: player.name,
-    employee_id: player.employee_id || 'N/A',
-    from_date: new Date().toISOString().split('T')[0],
-    until_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    reason: `Banned from ${game} by admin`
-  });
-
-  const handleConfirm = () => {
-    if (!banData.reason.trim()) {
-      alert('Please enter a reason for the ban!');
-      return;
-    }
-    if (confirm(`⚠️ Are you sure you want to ban ${banData.employee} from ${game}?\n\nFrom: ${banData.from_date}\nUntil: ${banData.until_date}\nReason: ${banData.reason}`)) {
-      onConfirm(banData);
-    }
-  };
-
-  return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0,0,0,0.5)',
-      backdropFilter: 'blur(4px)',
-      zIndex: 10000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    }}>
-      <div className="clay" style={{
-        width: '100%',
-        maxWidth: 480,
-        padding: '24px',
-        borderRadius: '32px',
-        background: 'white',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>🚫 Ban Player</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#8888aa' }}>✕</button>
-        </div>
-
-        <div style={{ marginBottom: '16px', padding: '10px 14px', background: '#ffebee', borderRadius: '12px', borderLeft: '3px solid #e53935' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Player: {player.name}</div>
-          <div style={{ fontSize: '0.7rem', color: '#c62828' }}>Game: {game}</div>
-          <div style={{ fontSize: '0.65rem', color: '#c62828', marginTop: '4px' }}>
-            Employee ID: {player.employee_id || 'N/A'}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-            From Date <span style={{ color: '#e53935' }}>*</span>
-          </label>
-          <input
-            type="date"
-            className="clay-input"
-            value={banData.from_date}
-            onChange={(e) => setBanData({ ...banData, from_date: e.target.value })}
-          />
-        </div>
-
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-            Until Date <span style={{ color: '#e53935' }}>*</span>
-          </label>
-          <input
-            type="date"
-            className="clay-input"
-            value={banData.until_date}
-            onChange={(e) => setBanData({ ...banData, until_date: e.target.value })}
-          />
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-            Reason <span style={{ color: '#e53935' }}>*</span>
-          </label>
-          <textarea
-            className="clay-input"
-            value={banData.reason}
-            onChange={(e) => setBanData({ ...banData, reason: e.target.value })}
-            placeholder="Describe the reason for the ban..."
-            rows="3"
-            required
-            style={{ resize: 'vertical' }}
-          />
-        </div>
-
-        <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff8e1', borderRadius: '8px', fontSize: '0.65rem', color: '#e65100' }}>
-          ⚠️ This action will ban <strong>{player.name}</strong> from <strong>{game}</strong>. 
-          They will not be able to book slots for this game until the ban expires.
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-          <button className="clay-btn" onClick={onClose}>Cancel</button>
-          <button className="clay-btn clay-btn-red" onClick={handleConfirm}>
-            🚫 Confirm Ban
-          </button>
-        </div>
-      </div>
-    </div>
   );
 };
 
