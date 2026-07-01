@@ -1,56 +1,52 @@
 // src/ui/RemoveBookingConfirm.jsx
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 /**
- * Confirmation dialog for removing your own booking.
- * No native alert()/confirm() — fully custom, fixed to viewport,
- * so the OK/Cancel buttons are always visible without scrolling.
+ * Confirmation dialog for removing your own booking, rendered via a Portal
+ * directly into document.body so it can never be trapped by an ancestor's
+ * transform/filter/overflow CSS. No native alert()/confirm() anywhere.
  *
  * Props:
  *  - open: boolean
  *  - playerName: string
  *  - day: string
- *  - slotLabel: string (e.g. "Slot 3" or "12:00–12:30 PM")
+ *  - slotLabel: string (e.g. "Slot 3")
  *  - onConfirm: () => void
  *  - onCancel: () => void
  */
 const RemoveBookingConfirm = ({ open, playerName, day, slotLabel, onConfirm, onCancel }) => {
   if (!open) return null;
 
-  return (
+  const dialog = (
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
         background: 'rgba(0,0,0,0.4)',
-        zIndex: 10002,
+        zIndex: 999999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        boxSizing: 'border-box',
         padding: '20px',
       }}
       onClick={onCancel}
     >
       <div
-        className="clay"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%',
-          maxWidth: 380,
+          width: '380px',
+          maxWidth: 'calc(100vw - 40px)',
           background: 'white',
           borderRadius: '24px',
           padding: '22px 22px 18px',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-          animation: 'rbcPopIn 0.15s ease-out',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
         }}
       >
-        <style>{`
-          @keyframes rbcPopIn {
-            from { opacity: 0; transform: translateY(8px) scale(0.98); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-          }
-        `}</style>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
           <span style={{ fontSize: '1.4rem' }}>✖️</span>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', margin: 0 }}>
@@ -63,27 +59,19 @@ const RemoveBookingConfirm = ({ open, playerName, day, slotLabel, onConfirm, onC
           {slotLabel ? <> at <strong>{slotLabel}</strong></> : null}? This can't be undone.
         </p>
 
-        {/* Footer is always part of the same compact block — never pushed
-            off-screen since this dialog has no scrollable overflow. */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button
-            className="clay-btn"
-            onClick={onCancel}
-            style={{ padding: '8px 18px' }}
-          >
+          <button className="clay-btn" onClick={onCancel} style={{ padding: '8px 18px' }}>
             Cancel
           </button>
-          <button
-            className="clay-btn clay-btn-red"
-            onClick={onConfirm}
-            style={{ padding: '8px 18px' }}
-          >
+          <button className="clay-btn clay-btn-red" onClick={onConfirm} style={{ padding: '8px 18px' }}>
             ✖️ Remove
           </button>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 };
 
 export default RemoveBookingConfirm;

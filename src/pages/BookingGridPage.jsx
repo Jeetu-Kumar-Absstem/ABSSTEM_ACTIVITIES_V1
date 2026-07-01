@@ -115,9 +115,7 @@ const BookingGridPage = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 600, color: '#1e1e2f' }}>Activity Planner</h1>
-        <div style={{ fontSize: '0.7rem', color: '#8888aa' }}>
-          Home › HR › Activities
-        </div>
+       
       </div>
 
       <StatsRow />

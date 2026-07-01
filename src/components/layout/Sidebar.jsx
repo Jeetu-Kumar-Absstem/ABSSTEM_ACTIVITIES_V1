@@ -32,28 +32,7 @@ const Sidebar = () => {
   return (
     <div className="clay" style={{ width: 200, flexShrink: 0, padding: '12px 8px', borderRadius: '32px', minHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
       <SidebarItem icon="📊" label="Dashboard" />
-      {/* <SidebarItem icon="💼" label="Sales">
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Lead</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Quotation</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Sale Order</div>
-      </SidebarItem> */}
-      {/* <SidebarItem icon="🧾" label="Invoice">
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Generate Invoice</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Invoice Report</div>
-      </SidebarItem>
-      <SidebarItem icon="🔧" label="Service">
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Service Tickets</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>AMC Master</div>
-      </SidebarItem>
-      <SidebarItem icon="✅" label="Tasks">
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>My Tasks</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>All Projects</div>
-      </SidebarItem> */}
-      {/* <SidebarItem icon="🎓" label="Training">
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Dashboard</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Training Tracks</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Exam Bank</div>
-      </SidebarItem> */}
+    
       <SidebarItem icon="🎮" label="Activities" defaultOpen={true}>
         {tabs.map(tab => (
           <div
@@ -74,11 +53,6 @@ const Sidebar = () => {
           </div>
         ))}
       </SidebarItem>
-      {/* <SidebarItem icon="👤" label="HR">
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Employee</div>
-        <div style={{ padding: '4px 0 4px 20px', fontSize: '0.7rem', color: '#666' }}>Training</div>
-      </SidebarItem>
-      <SidebarItem icon="⚙" label="Settings" /> */}
     </div>
   );
 };

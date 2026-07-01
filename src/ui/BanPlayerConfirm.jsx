@@ -1,11 +1,17 @@
 // src/ui/BanPlayerConfirm.jsx
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
- * Ban-player dialog. No native confirm() anywhere.
- * Layout is header (fixed) + scrollable body + footer (sticky) so the
- * Confirm Ban button is ALWAYS visible, even on short viewports —
- * the form content scrolls internally instead of pushing the button down.
+ * Ban-player dialog, rendered via a Portal directly into document.body.
+ * This guarantees correct fixed positioning and sizing no matter what CSS
+ * exists on any ancestor in the component tree (transform, filter, overflow,
+ * stacking contexts, etc. on a parent can normally break position:fixed —
+ * a portal sidesteps all of that by moving the DOM node outside the tree).
+ *
+ * Fixed pixel dimensions (not vh) are used so there's no dependency on
+ * viewport-unit quirks either. The Confirm Ban button is in its own
+ * non-scrolling footer row, so it is ALWAYS visible.
  *
  * Props:
  *  - open: boolean
@@ -39,40 +45,45 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
     });
   };
 
-  return (
+  const dialog = (
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
         background: 'rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 10002,
+        zIndex: 999999,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '20px',
+        paddingTop: '40px',
+        boxSizing: 'border-box',
+        overflowY: 'auto',
       }}
       onClick={onCancel}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%',
-          maxWidth: 480,
-          height: '85vh',
-          maxHeight: '600px',
+          width: '440px',
+          maxWidth: 'calc(100vw - 40px)',
+          height: '560px',
+          maxHeight: 'calc(100vh - 80px)',
           background: 'white',
-          borderRadius: '28px',
+          borderRadius: '24px',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.3)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
           overflow: 'hidden',
+          flexShrink: 0,
         }}
       >
-        {/* Header — fixed, never scrolls */}
+        {/* Header — fixed row, never scrolls */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '20px 24px 12px', flexShrink: 0,
+          padding: '18px 22px 10px', flexShrink: 0, flexGrow: 0,
         }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', margin: 0 }}>🚫 Ban Player</h3>
           <button
@@ -83,12 +94,10 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
           </button>
         </div>
 
-        {/* Body — this is the ONLY part that scrolls. minHeight: 0 is required
-            here or flexbox lets this grow past the dialog's maxHeight instead
-            of scrolling internally, which pushes the footer off-screen. */}
-        <div style={{ padding: '0 24px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
+        {/* Body — the only scrollable region. minHeight:0 lets it shrink inside the flex column. */}
+        <div style={{ padding: '0 22px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
           <div style={{
-            marginBottom: '16px', padding: '10px 14px', background: '#ffebee',
+            marginBottom: '14px', padding: '10px 14px', background: '#ffebee',
             borderRadius: '12px', borderLeft: '3px solid #e53935',
           }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Player: {player.name}</div>
@@ -138,17 +147,17 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
           </div>
 
           <div style={{
-            marginBottom: '16px', padding: '10px 14px', background: '#fff8e1',
+            marginBottom: '14px', padding: '10px 14px', background: '#fff8e1',
             borderRadius: '8px', fontSize: '0.65rem', color: '#e65100',
           }}>
             ⚠️ This will ban <strong>{player.name}</strong> from <strong>{game}</strong>. They won't be able to book slots for this game until the ban expires.
           </div>
         </div>
 
-        {/* Footer — sticky, ALWAYS visible regardless of body scroll position */}
+        {/* Footer — fixed row at the bottom of the card, ALWAYS visible, never part of the scroll area */}
         <div style={{
           display: 'flex', gap: '10px', justifyContent: 'flex-end',
-          padding: '14px 24px', flexShrink: 0,
+          padding: '14px 22px', flexShrink: 0, flexGrow: 0,
           borderTop: '1px solid rgba(200,210,230,0.4)',
           background: 'white',
         }}>
@@ -160,6 +169,8 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 };
 
 export default BanPlayerConfirm;
