@@ -15,6 +15,23 @@ alter table if exists public.employees
 alter table if exists public.employees
   add column if not exists updated_at timestamptz not null default now();
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public'
+      and t.relname = 'employees'
+      and c.conname = 'employees_employee_code_key'
+  ) then
+    alter table public.employees
+      add constraint employees_employee_code_key unique (employee_code);
+  end if;
+end;
+$$;
+
 drop trigger if exists set_employees_updated_at on public.employees;
 create trigger set_employees_updated_at
 before update on public.employees

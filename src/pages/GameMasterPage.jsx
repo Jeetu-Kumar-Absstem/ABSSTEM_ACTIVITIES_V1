@@ -3,12 +3,10 @@
 import React from "react";
 import { useApp } from "../context/AppContext";
 import { ChessKing, Disc3, Trophy } from "lucide-react";
-import { GiTennisRacket } from "react-icons/gi";
 
 const gameIcons = {
   chess: <ChessKing size={20} strokeWidth={2} />,
   carrom: <Disc3 size={20} strokeWidth={2} />,
-  tennis: <GiTennisRacket size={20} />,
 };
 
 const GameMasterPage = () => {

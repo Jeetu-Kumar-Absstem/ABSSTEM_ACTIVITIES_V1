@@ -1,40 +1,51 @@
 // src/ui/BanPlayerConfirm.jsx
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
  * Ban-player dialog, rendered via a Portal directly into document.body.
- * This guarantees correct fixed positioning and sizing no matter what CSS
- * exists on any ancestor in the component tree (transform, filter, overflow,
- * stacking contexts, etc. on a parent can normally break position:fixed —
- * a portal sidesteps all of that by moving the DOM node outside the tree).
- *
- * Fixed pixel dimensions (not vh) are used so there's no dependency on
- * viewport-unit quirks either. The Confirm Ban button is in its own
- * non-scrolling footer row, so it is ALWAYS visible.
  *
  * Props:
  *  - open: boolean
  *  - player: { name, employee_id }
  *  - game: string
+ *  - gameOptions: Array<{ value, label }>
  *  - onConfirm: (banData) => void
  *  - onCancel: () => void
  */
-const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
+const BanPlayerConfirm = ({ open, player, game, gameOptions = [], onConfirm, onCancel }) => {
+  const getDefaultUntilDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30);
+    return date.toISOString().split('T')[0];
+  };
+  const defaultScopeValue = gameOptions.find((option) => option.label === game)?.value || game;
   const [fromDate, setFromDate] = useState(new Date().toISOString().split('T')[0]);
-  const [untilDate, setUntilDate] = useState(
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
+  const [untilDate, setUntilDate] = useState(getDefaultUntilDate);
   const [reason, setReason] = useState(`Banned from ${game} by admin`);
+  const [bannedFrom, setBannedFrom] = useState(defaultScopeValue);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!open) return;
+    setReason(`Banned from ${game} by admin`);
+    setBannedFrom(defaultScopeValue);
+    setError('');
+  }, [defaultScopeValue, game, open]);
+
   if (!open || !player) return null;
+
+  const scopeOptions = [
+    { value: 'All Games', label: 'All Games' },
+    ...gameOptions.filter((option) => option.value !== 'All Games'),
+  ];
 
   const handleConfirm = () => {
     if (!reason.trim()) {
       setError('Please enter a reason for the ban.');
       return;
     }
+
     setError('');
     onConfirm({
       employee: player.name,
@@ -42,6 +53,7 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
       from_date: fromDate,
       until_date: untilDate,
       reason: reason.trim(),
+      banned_from: bannedFrom,
     });
   };
 
@@ -69,7 +81,7 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
         style={{
           width: '440px',
           maxWidth: 'calc(100vw - 40px)',
-          height: '560px',
+          height: '600px',
           maxHeight: 'calc(100vh - 80px)',
           background: 'white',
           borderRadius: '24px',
@@ -80,25 +92,30 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
           flexShrink: 0,
         }}
       >
-        {/* Header — fixed row, never scrolls */}
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '18px 22px 10px', flexShrink: 0, flexGrow: 0,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '18px 22px 10px',
+          flexShrink: 0,
+          flexGrow: 0,
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', margin: 0 }}>🚫 Ban Player</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', margin: 0 }}>Ban Player</h3>
           <button
             onClick={onCancel}
             style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#8888aa' }}
           >
-            ✕
+            x
           </button>
         </div>
 
-        {/* Body — the only scrollable region. minHeight:0 lets it shrink inside the flex column. */}
         <div style={{ padding: '0 22px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
           <div style={{
-            marginBottom: '14px', padding: '10px 14px', background: '#ffebee',
-            borderRadius: '12px', borderLeft: '3px solid #e53935',
+            marginBottom: '14px',
+            padding: '10px 14px',
+            background: '#ffebee',
+            borderRadius: '12px',
+            borderLeft: '3px solid #e53935',
           }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Player: {player.name}</div>
             <div style={{ fontSize: '0.7rem', color: '#c62828' }}>Game: {game}</div>
@@ -146,24 +163,48 @@ const BanPlayerConfirm = ({ open, player, game, onConfirm, onCancel }) => {
             {error && <div style={{ color: '#e53935', fontSize: '0.7rem', marginTop: '4px' }}>{error}</div>}
           </div>
 
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              Banned from
+            </label>
+            <select
+              className="clay-select"
+              value={bannedFrom}
+              onChange={(e) => setBannedFrom(e.target.value)}
+            >
+              {scopeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div style={{
-            marginBottom: '14px', padding: '10px 14px', background: '#fff8e1',
-            borderRadius: '8px', fontSize: '0.65rem', color: '#e65100',
+            marginBottom: '14px',
+            padding: '10px 14px',
+            background: '#fff8e1',
+            borderRadius: '8px',
+            fontSize: '0.65rem',
+            color: '#e65100',
           }}>
-            ⚠️ This will ban <strong>{player.name}</strong> from <strong>{game}</strong>. They won't be able to book slots for this game until the ban expires.
+            This will ban <strong>{player.name}</strong> from <strong>{scopeOptions.find((option) => option.value === bannedFrom)?.label || bannedFrom}</strong>.
           </div>
         </div>
 
-        {/* Footer — fixed row at the bottom of the card, ALWAYS visible, never part of the scroll area */}
         <div style={{
-          display: 'flex', gap: '10px', justifyContent: 'flex-end',
-          padding: '14px 22px', flexShrink: 0, flexGrow: 0,
+          display: 'flex',
+          gap: '10px',
+          justifyContent: 'flex-end',
+          padding: '14px 22px',
+          flexShrink: 0,
+          flexGrow: 0,
           borderTop: '1px solid rgba(200,210,230,0.4)',
           background: 'white',
         }}>
           <button className="clay-btn" onClick={onCancel}>Cancel</button>
           <button className="clay-btn clay-btn-red" onClick={handleConfirm}>
-            🚫 Confirm Ban
+            Confirm Ban
           </button>
         </div>
       </div>

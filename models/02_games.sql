@@ -32,8 +32,7 @@ select v.name, v.icon, v.location, v.max_players, v.active, v.sort_order
 from (
   values
     ('Carrom', 'CARROM', 'Recreation Room - 2nd Floor', 4, true, 1),
-    ('Table Tennis', 'TT', 'Recreation Room - 2nd Floor', 2, true, 2),
-    ('Chess', 'CHESS', 'Conference Room - 1st Floor', 2, true, 3)
+    ('Chess', 'CHESS', 'Conference Room - 1st Floor', 2, true, 2)
 ) as v(name, icon, location, max_players, active, sort_order)
 where not exists (
   select 1

@@ -1,26 +1,25 @@
 // src/utils/constants.js
 export const SLOTS = [
-  { id: 1, label: 'Slot 1', time: '11:00–11:30 AM' },
-  { id: 2, label: 'Slot 2', time: '11:30–12:00 PM' },
-  { id: 3, label: 'Slot 3', time: '12:00–12:30 PM' },
-  { id: 4, label: 'Slot 4', time: '12:30–1:00 PM' },
-  { id: 5, label: 'Slot 5', time: '1:30–2:00 PM' },
-  { id: 6, label: 'Slot 6', time: '2:00–2:30 PM' },
-  { id: 7, label: 'Slot 7', time: '2:30–3:00 PM' },
-  { id: 8, label: 'Slot 8', time: '3:00–3:30 PM' },
-  { id: 9, label: 'Slot 9', time: '3:30–4:00 PM' },
-  { id: 10, label: 'Slot 10', time: '4:00–4:30 PM' },
-  { id: 11, label: 'Slot 11', time: '4:30–5:00 PM' },
-  { id: 12, label: 'Slot 12', time: '5:00–5:30 PM' },
+  { id: 1, label: 'Slot 1', startTime: '11:00', endTime: '11:30', time: '11:00 AM - 11:30 AM' },
+  { id: 2, label: 'Slot 2', startTime: '11:30', endTime: '12:00', time: '11:30 AM - 12:00 PM' },
+  { id: 3, label: 'Slot 3', startTime: '12:00', endTime: '12:30', time: '12:00 PM - 12:30 PM' },
+  { id: 4, label: 'Slot 4', startTime: '12:30', endTime: '13:00', time: '12:30 PM - 1:00 PM' },
+  { id: 5, label: 'Slot 5', startTime: '13:00', endTime: '13:30', time: '1:00 PM - 1:30 PM' },
+  { id: 6, label: 'Slot 6', startTime: '13:30', endTime: '14:00', time: '1:30 PM - 2:00 PM' },
+  { id: 7, label: 'Slot 7', startTime: '14:00', endTime: '14:30', time: '2:00 PM - 2:30 PM' },
+  { id: 8, label: 'Slot 8', startTime: '14:30', endTime: '15:00', time: '2:30 PM - 3:00 PM' },
+  { id: 9, label: 'Slot 9', startTime: '15:00', endTime: '15:30', time: '3:00 PM - 3:30 PM' },
+  { id: 10, label: 'Slot 10', startTime: '15:30', endTime: '16:00', time: '3:30 PM - 4:00 PM' },
+  { id: 11, label: 'Slot 11', startTime: '16:00', endTime: '16:30', time: '4:00 PM - 4:30 PM' },
+  { id: 12, label: 'Slot 12', startTime: '16:30', endTime: '17:00', time: '4:30 PM - 5:00 PM' },
 ];
 
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 // Games with specific max players
 export const GAMES = [
-  { id: 'carrom', name: 'Carrom', icon: '🎯', location: 'Recreation Room — 2nd Floor', maxPlayers: 4 },
-  { id: 'table-tennis', name: 'Table Tennis', icon: '🏓', location: 'Recreation Room — 2nd Floor', maxPlayers: 2 },
-  { id: 'chess', name: 'Chess', icon: '♟', location: 'Conference Room — 1st Floor', maxPlayers: 2 },
+  { id: 'carrom', name: 'Carrom', icon: 'CARROM', location: 'Recreation Room - 2nd Floor', maxPlayers: 4 },
+  { id: 'chess', name: 'Chess', icon: 'CHESS', location: 'Conference Room - 1st Floor', maxPlayers: 2 },
 ];
 
 export const DEPARTMENTS = [

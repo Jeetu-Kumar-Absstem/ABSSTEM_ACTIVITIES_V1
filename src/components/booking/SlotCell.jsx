@@ -1,23 +1,32 @@
 // src/components/booking/SlotCell.jsx
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
-import { isBanned } from '../../utils/helpers';
+import { SLOTS } from '../../utils/constants';
+import { isBanned, isSlotFinished } from '../../utils/helpers';
 import RemoveBookingConfirm from '../../ui/RemoveBookingConfirm';
 import BanPlayerConfirm from '../../ui/BanPlayerConfirm';
+import MatchResultConfirm from '../../ui/MatchResultConfirm';
 
 const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
-  const { currentUser, selectedGame, bans, isAdmin, addBan, loadBans, bookings, games } = useApp();
+  const { currentUser, selectedGame, bans, isAdmin, addBan, loadBans, bookings, games, currentDate, getSlotMatchResult, submitMatchResult } = useApp();
   const { showToast } = useToast();
   const [showPlayerActions, setShowPlayerActions] = useState(false);
   const [actionPlayer, setActionPlayer] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const menuRef = useRef(null);
+  const getDefaultBanUntilDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30);
+    return date.toISOString().split('T')[0];
+  };
 
   // Drives the RemoveBookingConfirm dialog (src/ui)
   const [removeConfirm, setRemoveConfirm] = useState(null); // { name, userId } | null
   // Drives the BanPlayerConfirm dialog (src/ui)
   const [banConfirm, setBanConfirm] = useState(null); // player | null
+  // Drives the MatchResultConfirm dialog (src/ui)
+  const [resultConfirm, setResultConfirm] = useState(false);
   
   const selectedGameRecord = games.find(game => String(game.id) === String(selectedGame));
 
@@ -25,6 +34,11 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
   const gamePlayers = players.filter(p => String(p.game) === String(selectedGame) || p.game === selectedGameRecord?.name);
   const isFull = gamePlayers.length >= maxPlayers;
   const isGameActive = selectedGameRecord ? selectedGameRecord.active !== false : true;
+  const slotRecord = SLOTS.find((slot) => String(slot.id) === String(slotId));
+  const slotFinished = isSlotFinished(day, slotRecord, currentDate, new Date());
+  const slotResult = getSlotMatchResult(selectedGameRecord?.id || selectedGame, day, slotId);
+  const isSlotParticipant = gamePlayers.some((player) => player.user_id === currentUser?.id);
+  const canSubmitResult = slotFinished && isFull && isSlotParticipant;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -68,8 +82,10 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
     setShowPlayerActions(false);
   };
   const handleConfirmBan = async (banData) => {
-    if (isBanned({ name: banData.employee, employee_id: banData.employee_id }, selectedGameRecord?.name || selectedGame, bans)) {
-      showToast(`${banData.employee} is already banned from ${selectedGame}!`, 'error');
+    const bannedScope = banData.banned_from || selectedGameRecord?.name || selectedGame;
+
+    if (isBanned({ name: banData.employee, employee_id: banData.employee_id }, bannedScope, bans)) {
+      showToast(`${banData.employee} is already banned from ${bannedScope}!`, 'error');
       setBanConfirm(null);
       return;
     }
@@ -77,31 +93,19 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
     const result = await addBan({
       employee: banData.employee,
       employee_id: banData.employee_id || 'N/A',
-      game: selectedGame,
+      game: bannedScope,
       from_date: banData.from_date || new Date().toISOString().split('T')[0],
-      until_date: banData.until_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      until_date: banData.until_date || getDefaultBanUntilDate(),
       reason: banData.reason || `Banned from ${selectedGame} by admin`
     });
 
     if (result.success) {
       await loadBans();
-      showToast(`${banData.employee} has been banned from ${selectedGame}!`);
+      showToast(`${banData.employee} has been banned from ${bannedScope}!`);
       setBanConfirm(null);
     } else {
       showToast('Error banning player: ' + result.error, 'error');
     }
-  };
-
-  // Show player action menu
-  const showPlayerMenu = (player, event) => {
-    event.stopPropagation();
-    const rect = event.currentTarget.getBoundingClientRect();
-    setMenuPosition({
-      x: rect.left,
-      y: rect.bottom + 5
-    });
-    setActionPlayer(player);
-    setShowPlayerActions(true);
   };
 
   // Handle player action
@@ -185,6 +189,19 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
     onBook(day, slotId);
   };
 
+  const handleSubmitResult = async (resultData) => {
+    const gameKey = selectedGameRecord?.id || selectedGame;
+    const result = await submitMatchResult(gameKey, resultData);
+
+    if (result.success) {
+      showToast(`${selectedGameRecord?.name || selectedGame} result saved for ${day} ${slotRecord?.label || slotId}.`);
+      setResultConfirm(false);
+      return;
+    }
+
+    showToast(result.error || 'Unable to save result.', 'error');
+  };
+
   return (
     <>
       <div
@@ -208,20 +225,18 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
           const banned = isBanned(player, selectedGameRecord?.name || selectedGame, bans);
           const isOwner = currentUser?.id === player.user_id;
           const isAdminUser = isAdmin();
-          
-          // Colors: Dark Green for own entry, Dark Black for others
-          let bgColor = 'rgba(26,60,110,0.08)';
-          let textColor = '#1a1a1a'; // Dark black for others
-          
+
+          let bgColor;
+          let textColor;
           if (banned) {
             bgColor = 'rgba(229,57,53,0.15)';
             textColor = '#c62828';
           } else if (isOwner) {
-            bgColor = 'rgba(27,94,32,0.15)'; // Dark green background
-            textColor = '#1b5e20'; // Dark green text
+            bgColor = 'rgba(27,94,32,0.15)';
+            textColor = '#1b5e20';
           } else {
-            bgColor = 'rgba(26,26,26,0.08)'; // Dark black background
-            textColor = '#1a1a1a'; // Dark black text
+            bgColor = 'rgba(26,26,26,0.08)';
+            textColor = '#1a1a1a';
           }
           
           return (
@@ -294,6 +309,39 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
           <span style={{ fontSize: '0.4rem', color: '#8888aa', opacity: 0.5 }}>
             ({gamePlayers.length}/{maxPlayers})
           </span>
+        )}
+        {slotResult && (
+          <span
+            style={{
+              fontSize: '0.48rem',
+              color: slotResult.result === 'draw' ? '#b26a00' : '#1a3c6e',
+              background: slotResult.result === 'draw' ? 'rgba(249,168,37,0.12)' : 'rgba(26,60,110,0.08)',
+              borderRadius: '999px',
+              padding: '2px 6px',
+            }}
+          >
+            Result: {slotResult.result === 'draw' ? 'Draw' : slotResult.result === 'team_a' ? 'Team A Won' : 'Team B Won'}
+          </span>
+        )}
+        {canSubmitResult && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setResultConfirm(true);
+            }}
+            style={{
+              border: 'none',
+              background: 'rgba(26,60,110,0.1)',
+              color: '#1a3c6e',
+              borderRadius: '999px',
+              padding: '3px 8px',
+              fontSize: '0.48rem',
+              cursor: 'pointer',
+            }}
+          >
+            {slotResult ? 'Edit Result' : 'Add Result'}
+          </button>
         )}
       </div>
 
@@ -382,8 +430,24 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
         open={!!banConfirm}
         player={banConfirm}
         game={selectedGameRecord?.name || selectedGame}
+        gameOptions={[
+          { value: 'All Games', label: 'All Games' },
+          ...games.map((game) => ({ value: game.id, label: game.name })),
+        ]}
         onCancel={() => setBanConfirm(null)}
         onConfirm={handleConfirmBan}
+      />
+
+      <MatchResultConfirm
+        open={resultConfirm}
+        game={selectedGameRecord?.id || selectedGame}
+        day={day}
+        slotId={slotId}
+        slotLabel={slotRecord?.label || `Slot ${slotId}`}
+        players={gamePlayers}
+        existingResult={slotResult}
+        onCancel={() => setResultConfirm(false)}
+        onConfirm={handleSubmitResult}
       />
     </>
   );

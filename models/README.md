@@ -10,6 +10,7 @@ Recommended apply order:
 1. `04_bans.sql`
 1. `05_rules.sql`
 1. `06_bookings.sql`
+1. `07_match_results.sql`
 1. `07_violations.sql`
 1. `08_views.sql`
 1. `09_rls.sql`

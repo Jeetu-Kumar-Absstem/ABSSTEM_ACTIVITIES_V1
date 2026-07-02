@@ -4,6 +4,8 @@ alter table public.slots enable row level security;
 alter table public.bans enable row level security;
 alter table public.rules enable row level security;
 alter table public.bookings enable row level security;
+alter table public.carrom_match_results enable row level security;
+alter table public.chess_match_results enable row level security;
 alter table public.violations enable row level security;
 
 drop policy if exists employees_select_all on public.employees;
@@ -107,6 +109,56 @@ create policy bookings_delete_owner_or_admin
 on public.bookings
 for delete
 using (app_is_admin() or user_id = auth.uid());
+
+drop policy if exists carrom_match_results_select_authenticated on public.carrom_match_results;
+create policy carrom_match_results_select_authenticated
+on public.carrom_match_results
+for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists carrom_match_results_participant_write on public.carrom_match_results;
+create policy carrom_match_results_participant_write
+on public.carrom_match_results
+for all
+using (
+  auth.uid() is not null and (
+    submitted_by_user_id = auth.uid()
+    or public.match_result_contains_user(team_a_players, auth.uid())
+    or public.match_result_contains_user(team_b_players, auth.uid())
+  )
+)
+with check (
+  auth.uid() is not null and (
+    submitted_by_user_id = auth.uid()
+    or public.match_result_contains_user(team_a_players, auth.uid())
+    or public.match_result_contains_user(team_b_players, auth.uid())
+  )
+);
+
+drop policy if exists chess_match_results_select_authenticated on public.chess_match_results;
+create policy chess_match_results_select_authenticated
+on public.chess_match_results
+for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists chess_match_results_participant_write on public.chess_match_results;
+create policy chess_match_results_participant_write
+on public.chess_match_results
+for all
+using (
+  auth.uid() is not null and (
+    submitted_by_user_id = auth.uid()
+    or public.match_result_contains_user(team_a_players, auth.uid())
+    or public.match_result_contains_user(team_b_players, auth.uid())
+  )
+)
+with check (
+  auth.uid() is not null and (
+    submitted_by_user_id = auth.uid()
+    or public.match_result_contains_user(team_a_players, auth.uid())
+    or public.match_result_contains_user(team_b_players, auth.uid())
+  )
+);
 
 drop policy if exists violations_select_authenticated on public.violations;
 create policy violations_select_authenticated

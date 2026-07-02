@@ -2,12 +2,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabase';
 import { useToast } from '../../context/ToastContext';
+import { useApp } from '../../context/AppContext';
+import { LogOut } from 'lucide-react';
 
 const ProfileIcon = ({ user, onLogout }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [userName, setUserName] = useState('');
   const dropdownRef = useRef(null);
   const { showToast } = useToast();
+  const { setActiveTab } = useApp();
 
   useEffect(() => {
     if (user) {
@@ -103,7 +106,7 @@ const ProfileIcon = ({ user, onLogout }) => {
             <div
               onClick={() => {
                 setShowDropdown(false);
-                showToast('Profile page coming soon!', 'info');
+                setActiveTab('profile');
               }}
               style={{
                 padding: '8px 16px',
@@ -143,23 +146,24 @@ const ProfileIcon = ({ user, onLogout }) => {
           </div>
 
           <div style={{ borderTop: '1px solid rgba(200,210,230,0.3)', padding: '4px 0', marginTop: '4px' }}>
-            <div
-              onClick={handleLogout}
-              style={{
-                padding: '8px 16px',
-                fontSize: '0.8rem',
-                color: '#e53935',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'background 0.15s ease',
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(229,57,53,0.05)'}
-              onMouseLeave={(e) => e.target.style.background = 'transparent'}
-            >
-              🚪 Logout
-            </div>
+           <div
+  onClick={handleLogout}
+  style={{
+    padding: '8px 16px',
+    fontSize: '0.8rem',
+    color: '#e53935',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'background 0.15s ease',
+  }}
+  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(229,57,53,0.05)')}
+  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+>
+  <LogOut size={16} strokeWidth={2} />
+  <span>Logout</span>
+</div>
           </div>
         </div>
       )}

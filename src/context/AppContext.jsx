@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { GAMES, SLOTS, DAYS } from '../utils/constants';
 import { isAdminId } from '../utils/admin';
+import { getPlayerStatsFromResults } from '../utils/helpers';
 
 const AppContext = createContext();
 
@@ -12,6 +13,7 @@ export const AppProvider = ({ children }) => {
   const [games, setGames] = useState(GAMES);
   const [slots, setSlots] = useState(SLOTS);
   const [bookings, setBookings] = useState({});
+  const [matchResults, setMatchResults] = useState({ carrom: [], chess: [] });
   const [bans, setBans] = useState([]);
   const [rules, setRules] = useState([]);
   const [violations, setViolations] = useState([]);
@@ -41,6 +43,32 @@ export const AppProvider = ({ children }) => {
     sort_order: game.sort_order ?? 0,
   });
 
+  const normalizeGameKey = (value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const resolveGameKey = (value) => {
+    const normalized = normalizeGameKey(value);
+    const matchedGame = games.find((game) => {
+      const gameId = normalizeGameKey(game.id);
+      const gameName = normalizeGameKey(game.name);
+      return gameId === normalized || gameName === normalized;
+    });
+    if (matchedGame) {
+      return normalizeGameKey(matchedGame.name);
+    }
+    return normalized;
+  };
+
+  const isVisibleGame = (game) => {
+    const gameId = String(game?.id ?? '').toLowerCase();
+    const gameName = String(game?.name ?? '').toLowerCase();
+    return !['table-tennis', 'tennis'].includes(gameId) && !['table tennis', 'tennis'].includes(gameName);
+  };
+
   const loadGames = async () => {
     try {
       const { data, error } = await supabase
@@ -50,7 +78,7 @@ export const AppProvider = ({ children }) => {
         .order('name', { ascending: true });
       if (error) throw error;
 
-      const mappedGames = data && data.length > 0 ? data.map(mapGameRow) : GAMES.map(g => ({
+      const mappedGames = data && data.length > 0 ? data.filter(isVisibleGame).map(mapGameRow) : GAMES.map(g => ({
         ...g,
         maxPlayers: g.maxPlayers,
         active: true,
@@ -107,6 +135,38 @@ export const AppProvider = ({ children }) => {
       setBookings(mockBookings);
     }
     setLoading(false);
+  };
+
+  const loadMatchResults = async () => {
+    try {
+      const loadTable = async (tableName) => {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+      };
+
+      const [carromResults, chessResults] = await Promise.all([
+        loadTable('carrom_match_results').catch((err) => {
+          console.error('Error loading carrom match results:', err);
+          return [];
+        }),
+        loadTable('chess_match_results').catch((err) => {
+          console.error('Error loading chess match results:', err);
+          return [];
+        }),
+      ]);
+
+      setMatchResults({
+        carrom: carromResults,
+        chess: chessResults,
+      });
+    } catch (err) {
+      console.error('Error loading match results:', err);
+      setMatchResults({ carrom: [], chess: [] });
+    }
   };
 
   const loadBans = async () => {
@@ -169,6 +229,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     loadGames();
     loadBookings();
+    loadMatchResults();
     loadBans();
     loadRules();
     loadViolations();
@@ -432,6 +493,76 @@ export const AppProvider = ({ children }) => {
     );
   };
 
+  const getResultTableName = (gameId) => {
+    const normalizedGame = resolveGameKey(gameId);
+    if (normalizedGame === 'carrom') return 'carrom_match_results';
+    if (normalizedGame === 'chess') return 'chess_match_results';
+    return null;
+  };
+
+  const getSlotMatchResult = (gameId, day, slotId) => {
+    const normalizedGame = resolveGameKey(gameId);
+    return (matchResults[normalizedGame] || []).find((row) => row.day === day && String(row.slot_id) === String(slotId)) || null;
+  };
+
+  const submitMatchResult = async (gameId, resultData) => {
+    try {
+      const tableName = getResultTableName(gameId);
+      if (!tableName) {
+        return { success: false, error: 'Results are only enabled for Carrom and Chess.' };
+      }
+
+      const user = await supabase.auth.getUser();
+      const authUser = user.data.user;
+      const userId = authUser?.id;
+      const empId =
+        authUser?.user_metadata?.emp_id ||
+        authUser?.user_metadata?.employee_code ||
+        authUser?.user_metadata?.empId ||
+        currentUser?.user_metadata?.emp_id ||
+        '';
+      const submitterName =
+        authUser?.user_metadata?.name ||
+        currentUser?.user_metadata?.name ||
+        currentUser?.email?.split('@')[0] ||
+        'Player';
+
+      if (!userId || !empId) {
+        return { success: false, error: 'Your profile is missing employee details.' };
+      }
+
+      const payload = {
+        day: resultData.day,
+        slot_id: resultData.slotId,
+        submitted_by_user_id: userId,
+        submitted_by_employee_id: empId,
+        submitted_by_name: submitterName,
+        team_a_players: resultData.teamAPlayers,
+        team_b_players: resultData.teamBPlayers,
+        result: resultData.result,
+      };
+
+      const { data, error } = await supabase
+        .from(tableName)
+        .upsert([payload], { onConflict: 'day,slot_id' })
+        .select();
+
+      if (error) throw error;
+
+      await loadMatchResults();
+      return { success: true, data: data?.[0] || null };
+    } catch (err) {
+      console.error('Error saving match result:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const getPlayerGameStats = (gameId, employeeId) => {
+    const normalizedGame = resolveGameKey(gameId);
+    const gameResults = matchResults[normalizedGame] || [];
+    return getPlayerStatsFromResults(gameResults, employeeId);
+  };
+
   // Check if player is banned
   const isPlayerBanned = (playerName, game) => {
     return getPlayerBans(playerName, game).length > 0;
@@ -498,6 +629,7 @@ export const AppProvider = ({ children }) => {
     addBooking,
     removeBooking,
     loadBookings,
+    loadMatchResults,
     loadBans,
     loadRules,
     loadViolations,
@@ -510,6 +642,11 @@ export const AppProvider = ({ children }) => {
     getPlayerBans,
     isPlayerBanned,
     getGameStats,
+    matchResults,
+    submitMatchResult,
+    getSlotMatchResult,
+    getPlayerGameStats,
+    resolveGameKey,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

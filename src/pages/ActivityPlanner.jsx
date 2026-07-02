@@ -8,6 +8,7 @@ import SlotMasterPage from './SlotMasterPage';
 import RulesPage from './RulesPage';
 import BanManagementPage from './BanManagementPage';
 import ReportsPage from './ReportsPage';
+import ProfilePage from './ProfilePage';
 
 const ActivityPlanner = ({ user, onLogout }) => {
   const { activeTab } = useApp();
@@ -20,6 +21,7 @@ const ActivityPlanner = ({ user, onLogout }) => {
       case 'rules': return <RulesPage />;
       case 'bans': return <BanManagementPage />;
       case 'reports': return <ReportsPage />;
+      case 'profile': return <ProfilePage />;
       default: return <BookingGridPage />;
     }
   };

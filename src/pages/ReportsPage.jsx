@@ -37,7 +37,7 @@ const ReportsPage = () => {
               <tr style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
                 <td style={{ padding: '6px 8px' }}>28-Apr-26</td>
                 <td style={{ padding: '6px 8px' }}>Priya Mehta</td>
-                <td style={{ padding: '6px 8px' }}>🏓 Table Tennis</td>
+                <td style={{ padding: '6px 8px' }}>♟ Chess</td>
                 <td style={{ padding: '6px 8px' }}>Slot 9</td>
                 <td style={{ padding: '6px 8px' }}><span className="clay-badge clay-badge-green">Played</span></td>
               </tr>
