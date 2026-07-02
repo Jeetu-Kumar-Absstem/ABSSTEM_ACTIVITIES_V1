@@ -76,8 +76,9 @@ export const isSlotFinished = (day, slot, referenceDate = new Date(), now = new 
   return getSlotDateTime(day, slot.endTime, referenceDate) <= now;
 };
 
-export const getPlayerStatsFromResults = (results = [], employeeId = '') => {
+export const getPlayerStatsFromResults = (results = [], employeeId = '', employeeName = '') => {
   const normalizedEmployeeId = String(employeeId || '').trim().toUpperCase();
+  const normalizedEmployeeName = String(employeeName || '').trim().toLowerCase();
   const orderedResults = [...results].sort((a, b) => {
     const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
     const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
@@ -89,9 +90,14 @@ export const getPlayerStatsFromResults = (results = [], employeeId = '') => {
       const teamA = Array.isArray(result.team_a_players) ? result.team_a_players : [];
       const teamB = Array.isArray(result.team_b_players) ? result.team_b_players : [];
       const flattenedPlayers = [...teamA, ...teamB];
-      const playerTeam = teamA.some((player) => String(player.employee_id || '').toUpperCase() === normalizedEmployeeId)
+      const matchesPlayer = (player) =>
+        String(player.employee_id || '').toUpperCase() === normalizedEmployeeId ||
+        String(player.name || '').trim().toLowerCase() === normalizedEmployeeName ||
+        String(player.employee || '').trim().toLowerCase() === normalizedEmployeeName;
+
+      const playerTeam = teamA.some(matchesPlayer)
         ? 'team_a'
-        : teamB.some((player) => String(player.employee_id || '').toUpperCase() === normalizedEmployeeId)
+        : teamB.some(matchesPlayer)
           ? 'team_b'
           : null;
 

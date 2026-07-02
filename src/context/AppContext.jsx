@@ -560,7 +560,11 @@ export const AppProvider = ({ children }) => {
   const getPlayerGameStats = (gameId, employeeId) => {
     const normalizedGame = resolveGameKey(gameId);
     const gameResults = matchResults[normalizedGame] || [];
-    return getPlayerStatsFromResults(gameResults, employeeId);
+    const employeeName =
+      currentUser?.user_metadata?.name ||
+      currentUser?.email?.split('@')[0] ||
+      '';
+    return getPlayerStatsFromResults(gameResults, employeeId, employeeName);
   };
 
   // Check if player is banned

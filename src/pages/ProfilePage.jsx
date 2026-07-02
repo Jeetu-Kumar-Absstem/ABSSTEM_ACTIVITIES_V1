@@ -1,6 +1,7 @@
 // src/pages/ProfilePage.jsx
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { GAMES } from '../utils/constants';
 
 const StatCard = ({ title, value, caption, accent = '#1a3c6e' }) => (
   <div
@@ -26,13 +27,13 @@ const StatCard = ({ title, value, caption, accent = '#1a3c6e' }) => (
 );
 
 const ProfilePage = () => {
-  const { currentUser, setActiveTab, games, getPlayerGameStats } = useApp();
+  const { currentUser, setActiveTab, getPlayerGameStats } = useApp();
   const [selectedGame, setSelectedGame] = useState('carrom');
 
   const userName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User';
   const empId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.user_metadata?.empId || '';
   const department = currentUser?.user_metadata?.department || 'General';
-  const visibleGames = games.filter((game) => ['carrom', 'chess'].includes(String(game.id)));
+  const visibleGames = GAMES.filter((game) => ['carrom', 'chess'].includes(String(game.id)));
   const activeGameId = visibleGames.some((game) => game.id === selectedGame) ? selectedGame : (visibleGames[0]?.id || 'carrom');
 
   const stats = getPlayerGameStats(activeGameId, empId);
@@ -92,7 +93,7 @@ const ProfilePage = () => {
             className="clay-select"
             value={activeGameId}
             onChange={(e) => setSelectedGame(e.target.value)}
-            style={{ minWidth: '220px' }}
+            style={{ width: '180px', minWidth: '180px', maxWidth: '180px', alignSelf: 'flex-start' }}
           >
             {visibleGames.map((game) => (
               <option key={game.id} value={game.id}>
