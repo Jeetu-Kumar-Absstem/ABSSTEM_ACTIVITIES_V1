@@ -38,7 +38,7 @@ const Topbar = ({ user, onLogout }) => {
         position: 'relative',
         zIndex: 1001,
       }}>
-        <span style={{ opacity: 0.7 }}>View Rating</span>
+        {/* <span style={{ opacity: 0.7 }}>View Rating</span> */}
         <span style={{ 
           position: 'relative', 
           fontSize: '1.1rem', 

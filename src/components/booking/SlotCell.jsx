@@ -207,7 +207,7 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
       <div
         style={{
           background: isFull ? 'rgba(249,168,37,0.1)' : 'rgba(255,255,255,0.3)',
-          borderRadius: '16px',
+          borderRadius: '18px',
           padding: '4px 6px',
           minHeight: '32px',
           display: 'flex',
