@@ -47,7 +47,7 @@ const CapacitySummary = () => {
 
   return (
     <div className="clay-card" style={{ marginTop: '12px' }}>
-      <div style={{ fontWeight: 600, fontSize: '0.7rem', color: '#1a3c6e', marginBottom: '10px' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.7rem', color: '#01070f', marginBottom: '10px' }}>
         Slot Capacity Overview — {game?.name || 'All Games'} (Max {maxPerSlot} players per slot) - {currentDay}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '8px' }}>
