@@ -82,7 +82,7 @@ const GameSelector = () => {
       </span>
 
       {games.map(game => {
-        const isSelected = selectedGame === game.id;
+        const isSelected = String(selectedGame) === String(game.id) || String(selectedGame).toLowerCase() === String(game.name).toLowerCase();
         const isDisabled = game.active === false;
         const bookingCount = gameBookings[game.id] || 0;
         const icon = getGameIcon(game);
@@ -98,7 +98,7 @@ const GameSelector = () => {
             key={game.id}
             onClick={() => {
               if (isDisabled) { alert('Currently this is Unavailable'); return; }
-              setSelectedGame(game.id);
+              setSelectedGame(String(game.id));
             }}
             style={{
               display: 'inline-flex',

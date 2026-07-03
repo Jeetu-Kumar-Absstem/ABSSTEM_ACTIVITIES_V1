@@ -53,7 +53,7 @@ function App() {
 
   return (
     <div style={{ position: 'relative', zIndex: 1 }}>
-      <AppProvider>
+      <AppProvider key={user?.id || 'guest'}>
         <ToastProvider>
           {user ? (
             <ActivityPlanner user={user} onLogout={handleLogout} />

@@ -6,7 +6,7 @@ import { filterBookingsToWeek, getDayName } from '../../utils/helpers';
 
 const CapacitySummary = () => {
   const { selectedGame, bookings, games, currentDate } = useApp();
-  const game = games.find(g => String(g.id) === String(selectedGame));
+  const game = games.find(g => String(g.id) === String(selectedGame) || String(g.name).toLowerCase() === String(selectedGame).toLowerCase());
   const maxPerSlot = game?.maxPlayers || 4;
   const [slotData, setSlotData] = useState([]);
 
@@ -16,7 +16,7 @@ const CapacitySummary = () => {
     
     const data = SLOTS.map(slot => {
       const players = weekBookings[currentDay]?.[slot.id] || [];
-      const gamePlayers = players.filter(p => String(p.game) === String(selectedGame) || p.game === game?.name);
+      const gamePlayers = players.filter(p => String(p.game) === String(selectedGame) || p.game === game?.name || String(p.game).toLowerCase() === String(game?.name || '').toLowerCase());
       const total = gamePlayers.length;
       const pct = Math.min(Math.round((total / maxPerSlot) * 100), 100);
       const isFull = total >= maxPerSlot;

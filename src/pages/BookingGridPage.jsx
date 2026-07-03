@@ -36,7 +36,7 @@ const BookingGridPage = () => {
   }, []);
 
   const handleBookSlot = (day, slotId) => {
-    const gameRecord = games.find(game => String(game.id) === String(selectedGame));
+    const gameRecord = games.find(game => String(game.id) === String(selectedGame) || String(game.name).toLowerCase() === String(selectedGame).toLowerCase());
     if (gameRecord && gameRecord.active === false) {
       showToast('Currently this is Unavailable', 'error');
       return;
@@ -48,7 +48,7 @@ const BookingGridPage = () => {
 
   const handleAddBooking = async (playerName) => {
     const currentEmpId = currentUser?.user_metadata?.emp_id || '';
-    const gameRecord = games.find(game => String(game.id) === String(selectedGame));
+    const gameRecord = games.find(game => String(game.id) === String(selectedGame) || String(game.name).toLowerCase() === String(selectedGame).toLowerCase());
     if (isBanned({ name: playerName, employee_id: currentEmpId }, gameRecord?.name || selectedGame, bans)) {
       showToast(`${playerName} is banned from ${selectedGame}!`, 'error');
       return false;
@@ -102,7 +102,7 @@ const BookingGridPage = () => {
   };
 
   const getMaxPlayers = () => {
-    const game = games.find(g => String(g.id) === String(selectedGame));
+    const game = games.find(g => String(g.id) === String(selectedGame) || String(g.name).toLowerCase() === String(selectedGame).toLowerCase());
     return game?.maxPlayers || 4;
   };
 

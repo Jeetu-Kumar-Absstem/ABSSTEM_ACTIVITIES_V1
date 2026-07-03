@@ -25,8 +25,9 @@ export const AppProvider = ({ children }) => {
   const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [gamesLoaded, setGamesLoaded] = useState(false); // track if Supabase games have loaded
   const [selectedGame, setSelectedGame] = useState('carrom');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('booking');
   const [currentUser, setCurrentUser] = useState(null);
 
   // Check if current user is admin using the utils
@@ -91,18 +92,26 @@ export const AppProvider = ({ children }) => {
       }));
 
       setGames(mappedGames);
+      setGamesLoaded(true);
 
-      const nextActiveGame = mappedGames.find(g => String(g.id) === String(selectedGame) && g.active);
-      if (!nextActiveGame) {
+      // Always set selectedGame from real Supabase data.
+      // We cannot trust the stale GAMES constant IDs that useState initialised with,
+      // so we always pick the correct ID here on first load.
+      if (mappedGames.length > 0) {
+        const carromGame = mappedGames.find(g => g.name?.toLowerCase() === 'carrom');
         const firstActiveGame = mappedGames.find(g => g.active !== false);
-        if (firstActiveGame) {
-          setSelectedGame(firstActiveGame.id);
-        }
+        const defaultGame = carromGame || firstActiveGame || mappedGames[0];
+        setSelectedGame(String(defaultGame.id));
       }
     } catch (err) {
       console.error('Error loading games:', err);
       const fallbackGames = GAMES.map(g => ({ ...g, maxPlayers: g.maxPlayers, active: true }));
       setGames(fallbackGames);
+      setGamesLoaded(true);
+      const carromFallback = fallbackGames.find(g => g.name?.toLowerCase() === 'carrom');
+      const firstActiveFallback = fallbackGames.find(g => g.active !== false);
+      const defaultFallback = carromFallback || firstActiveFallback || fallbackGames[0];
+      setSelectedGame(String(defaultFallback.id));
     }
   };
 

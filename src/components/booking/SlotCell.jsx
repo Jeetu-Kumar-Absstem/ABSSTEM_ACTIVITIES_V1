@@ -86,8 +86,8 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
   const [banConfirm, setBanConfirm] = useState(null);
   const [resultConfirm, setResultConfirm] = useState(false);
 
-  const selectedGameRecord = games.find(game => String(game.id) === String(selectedGame));
-  const gamePlayers = players.filter(p => String(p.game) === String(selectedGame) || p.game === selectedGameRecord?.name);
+  const selectedGameRecord = games.find(game => String(game.id) === String(selectedGame) || String(game.name).toLowerCase() === String(selectedGame).toLowerCase());
+  const gamePlayers = players.filter(p => String(p.game) === String(selectedGame) || p.game === selectedGameRecord?.name || String(p.game).toLowerCase() === String(selectedGameRecord?.name || '').toLowerCase());
   const isFull = gamePlayers.length >= maxPlayers;
   const isGameActive = selectedGameRecord ? selectedGameRecord.active !== false : true;
   const slotRecord = SLOTS.find((slot) => String(slot.id) === String(slotId));
@@ -393,7 +393,7 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
       />
       <MatchResultConfirm
         open={resultConfirm}
-        game={selectedGameRecord?.id || selectedGame}
+        game={selectedGameRecord?.name || selectedGame}
         day={day}
         slotId={slotId}
         slotLabel={slotRecord?.label || `Slot ${slotId}`}

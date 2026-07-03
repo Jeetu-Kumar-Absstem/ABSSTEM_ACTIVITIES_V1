@@ -1,2 +1,3 @@
 react-router-dom
 date-fns
+lucide-react //@lucide/lab

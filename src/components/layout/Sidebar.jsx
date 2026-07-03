@@ -240,7 +240,7 @@ const Sidebar = () => {
     { id: 'slots',   label: 'Slot Master'  },
     { id: 'rules',   label: 'Rules'        },
     { id: 'bans',    label: 'Ban Management' },
-    { id: 'reports', label: 'Reports'      },
+    // { id: 'reports', label: 'Reports'      },
   ];
 
   return (

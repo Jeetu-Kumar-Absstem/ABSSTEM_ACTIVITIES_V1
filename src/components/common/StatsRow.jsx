@@ -12,7 +12,7 @@ const StatsRow = () => {
     totalGames: 0
   });
 
-  const gameName = games.find(g => String(g.id) === String(selectedGame))?.name || 'Carrom';
+  const gameName = games.find(g => String(g.id) === String(selectedGame) || String(g.name).toLowerCase() === String(selectedGame).toLowerCase())?.name || 'Carrom';
 
   // Recalculate stats whenever bookings or selected game changes
   useEffect(() => {

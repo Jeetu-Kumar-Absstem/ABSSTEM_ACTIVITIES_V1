@@ -11,7 +11,10 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
 
   const slot = SLOTS.find(s => s.id === slotId);
   // Filter bookings for the selected game
-  const gameBookings = currentBookings.filter(b => String(b.game) === String(game));
+  const gameBookings = currentBookings.filter(b =>
+    String(b.game) === String(game) ||
+    String(b.game).toLowerCase() === String(game).toLowerCase()
+  );
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>

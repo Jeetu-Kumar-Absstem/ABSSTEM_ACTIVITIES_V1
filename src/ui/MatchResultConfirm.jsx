@@ -53,44 +53,124 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
     return map;
   }, [players]);
 
+  const teamASet = useMemo(() => new Set(teamA.filter(Boolean)), [teamA]);
+  const teamBSet = useMemo(() => new Set(teamB.filter(Boolean)), [teamB]);
+
   if (!open) return null;
 
-  const updateTeam = (setter, index, value) => {
-    setter((current) => {
-      const next = [...current];
-      next[index] = value;
-      return next;
-    });
+  const syncTeams = (nextTeamA, nextTeamB, nextError = '') => {
+    setTeamA(nextTeamA);
+    setTeamB(nextTeamB);
+    setError(nextError);
   };
 
-  const renderTeamSelect = (teamName, values, setter) => (
-    <div style={{ display: 'grid', gap: '8px' }}>
-      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1a3c6e' }}>{teamName}</div>
-      {Array.from({ length: teamSize }).map((_, index) => {
-        const currentValue = values[index] || '';
-        const usedByOtherTeam = values === teamA ? teamB : teamA;
-        const options = players.filter((player) => {
-          const playerKey = getPlayerKey(player);
-          return playerKey === currentValue || !usedByOtherTeam.includes(playerKey);
-        });
+  const togglePlayer = (playerKey, teamName, checked) => {
+    setError('');
+
+    if (teamName === 'team_a') {
+      if (checked && teamASet.size >= teamSize && !teamASet.has(playerKey)) {
+        setError(`Team A can have at most ${teamSize} player(s).`);
+        return;
+      }
+
+      const nextTeamA = checked
+        ? Array.from(new Set([...teamA.filter((key) => key !== playerKey), playerKey]))
+        : teamA.filter((key) => key !== playerKey);
+      const nextTeamB = teamB.filter((key) => key !== playerKey);
+      syncTeams(nextTeamA, nextTeamB);
+      return;
+    }
+
+    if (checked && teamBSet.size >= teamSize && !teamBSet.has(playerKey)) {
+      setError(`Team B can have at most ${teamSize} player(s).`);
+      return;
+    }
+
+    const nextTeamB = checked
+      ? Array.from(new Set([...teamB.filter((key) => key !== playerKey), playerKey]))
+      : teamB.filter((key) => key !== playerKey);
+    const nextTeamA = teamA.filter((key) => key !== playerKey);
+    syncTeams(nextTeamA, nextTeamB);
+  };
+
+  const renderPlayerRows = () => (
+    <div style={{ display: 'grid', gap: '10px' }}>
+      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1a3c6e' }}>
+        Players
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 120px 120px',
+          gap: '8px',
+          padding: '8px 10px',
+          borderRadius: '14px',
+          background: 'rgba(26,60,110,0.04)',
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          color: '#445',
+        }}
+      >
+        <div>Player</div>
+        <div style={{ textAlign: 'center' }}>Team A</div>
+        <div style={{ textAlign: 'center' }}>Team B</div>
+      </div>
+
+      {players.map((player) => {
+        const playerKey = getPlayerKey(player);
+        const inTeamA = teamASet.has(playerKey);
+        const inTeamB = teamBSet.has(playerKey);
+        const disabledForA = inTeamB || (!inTeamA && teamASet.size >= teamSize);
+        const disabledForB = inTeamA || (!inTeamB && teamBSet.size >= teamSize);
 
         return (
-          <select
-            key={`${teamName}-${index}`}
-            className="clay-select"
-            value={currentValue}
-            onChange={(e) => updateTeam(setter, index, e.target.value)}
+          <div
+            key={playerKey}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 120px 120px',
+              gap: '8px',
+              alignItems: 'center',
+              padding: '10px 12px',
+              borderRadius: '16px',
+              background: 'rgba(255,255,255,0.95)',
+              border: '1px solid rgba(200,210,230,0.45)',
+            }}
           >
-            <option value="">Select player</option>
-            {options.map((player) => {
-              const playerKey = getPlayerKey(player);
-              return (
-                <option key={playerKey} value={playerKey}>
-                  {player.name}
-                </option>
-              );
-            })}
-          </select>
+            <div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1e2f' }}>
+                {player.name}
+              </div>
+              <div style={{ fontSize: '0.64rem', color: '#8888aa' }}>
+                {player.employee_id || player.employee || 'N/A'}
+              </div>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={inTeamA}
+                disabled={disabledForA && !inTeamA}
+                onChange={(e) => togglePlayer(playerKey, 'team_a', e.target.checked)}
+              />
+              <span style={{ fontSize: '0.72rem', color: disabledForA && !inTeamA ? '#aaa' : '#1a3c6e' }}>
+                Select
+              </span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={inTeamB}
+                disabled={disabledForB && !inTeamB}
+                onChange={(e) => togglePlayer(playerKey, 'team_b', e.target.checked)}
+              />
+              <span style={{ fontSize: '0.72rem', color: disabledForB && !inTeamB ? '#aaa' : '#1a3c6e' }}>
+                Select
+              </span>
+            </label>
+          </div>
         );
       })}
     </div>
@@ -165,7 +245,7 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 12px' }}>
           <div>
             <div style={{ fontSize: '0.72rem', color: '#8888aa' }}>Submit match result</div>
-            <h3 style={{ margin: '4px 0 0', fontSize: '1.1rem', color: '#1e1e2f' }}>{game.toUpperCase()} - {day} / {slotLabel}</h3>
+            <h3 style={{ margin: '4px 0 0', fontSize: '1.1rem', color: '#1e1e2f' }}>{String(game || '').toUpperCase()} - {day} / {slotLabel}</h3>
           </div>
           <button className="clay-btn" onClick={onCancel}>x</button>
         </div>
@@ -185,9 +265,15 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            {renderTeamSelect('Team A', teamA, setTeamA)}
-            {renderTeamSelect('Team B', teamB, setTeamB)}
+          {renderPlayerRows()}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="clay-soft" style={{ padding: '10px 12px', borderRadius: '14px', fontSize: '0.75rem', color: '#1a3c6e' }}>
+              Team A: <strong>{teamA.filter(Boolean).length}</strong> / {teamSize}
+            </div>
+            <div className="clay-soft" style={{ padding: '10px 12px', borderRadius: '14px', fontSize: '0.75rem', color: '#1a3c6e' }}>
+              Team B: <strong>{teamB.filter(Boolean).length}</strong> / {teamSize}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gap: '8px' }}>
