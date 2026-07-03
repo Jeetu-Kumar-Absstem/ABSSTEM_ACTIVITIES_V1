@@ -5,9 +5,55 @@ import { useToast } from '../context/ToastContext';
 import { supabase } from '../utils/supabase';
 import { GAMES } from '../utils/constants';
 
+const normalizeGameValue = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const resolveGameRecord = (value, games = GAMES) => {
+  const normalized = normalizeGameValue(value);
+  if (!normalized || normalized === 'all' || normalized === 'all games') return null;
+
+  const exact = games.find((game) => {
+    const gameId = normalizeGameValue(game.id);
+    const gameName = normalizeGameValue(game.name);
+    return gameId === normalized || gameName === normalized;
+  });
+  if (exact) return exact;
+
+  if (/^\d+$/.test(normalized)) {
+    const numeric = Number(normalized);
+    const byId = games.find((game) => Number(game.id) === numeric);
+    if (byId) return byId;
+  }
+
+  return null;
+};
+
+const resolveGameLabel = (value, games = GAMES) => {
+  if (!value || normalizeGameValue(value) === 'all' || normalizeGameValue(value) === 'all games') {
+    return 'All Games';
+  }
+  return resolveGameRecord(value, games)?.name || String(value);
+};
+
+const isSameGame = (left, right, games = GAMES) => {
+  const leftResolved = resolveGameRecord(left, games);
+  const rightResolved = resolveGameRecord(right, games);
+  if (leftResolved && rightResolved) {
+    return normalizeGameValue(leftResolved.id) === normalizeGameValue(rightResolved.id)
+      || normalizeGameValue(leftResolved.name) === normalizeGameValue(rightResolved.name);
+  }
+
+  const normalizedLeft = normalizeGameValue(left);
+  const normalizedRight = normalizeGameValue(right);
+  return normalizedLeft === normalizedRight;
+};
+
 const BanManagementPage = () => {
-  const { bans, currentUser, isAdmin, addBan, liftBan, deleteBan, loadBans } = useApp();
+  const { bans, currentUser, isAdmin, addBan, liftBan, deleteBan, loadBans, games } = useApp();
   const { showToast } = useToast();
+  const availableGames = games?.length > 0 ? games : GAMES;
   const [loading, setLoading] = useState(false);
   const [showBanModal, setShowBanModal] = useState(false);
   const [filterGame, setFilterGame] = useState('all');
@@ -45,7 +91,7 @@ const BanManagementPage = () => {
   // Filter bans by game
   const getFilteredBans = () => {
     if (filterGame === 'all') return bans;
-    return bans.filter(b => b.game === filterGame || b.game === 'All Games');
+    return bans.filter((b) => isSameGame(b.game, filterGame, availableGames) || normalizeGameValue(b.game) === 'all games');
   };
 
   const filteredBans = getFilteredBans();
@@ -121,6 +167,14 @@ const BanManagementPage = () => {
 
   // Check employee ban status
   const checkBanStatus = () => {
+    if (!isAdmin()) {
+      setCheckResult({
+        type: 'info',
+        message: 'Quick Ban Check is available to admins only.',
+      });
+      return;
+    }
+
     const empSelect = document.getElementById('ban-check-employee');
     const gameSelect = document.getElementById('ban-check-game');
     
@@ -141,7 +195,7 @@ const BanManagementPage = () => {
     // Check ban by employee_code
     const activeBan = bans.find(b => 
       b.employee_id === employee.employee_code &&
-      (b.game === game || b.game === 'All Games') &&
+      (isSameGame(b.game, game, availableGames) || normalizeGameValue(b.game) === 'all games') &&
       b.active !== false &&
       new Date(b.until_date) > new Date()
     );
@@ -149,13 +203,13 @@ const BanManagementPage = () => {
     if (activeBan) {
       setCheckResult({
         type: 'banned',
-        message: `🚫 ${employee.name} is BANNED from ${game}`,
+        message: `🚫 ${employee.name} is BANNED from ${resolveGameLabel(game, availableGames)}`,
         details: `Employee ID: ${employee.employee_code}\nFrom: ${new Date(activeBan.from_date).toLocaleDateString()}\nUntil: ${new Date(activeBan.until_date).toLocaleDateString()}\nReason: ${activeBan.reason}`
       });
     } else {
       setCheckResult({
         type: 'allowed',
-        message: `✅ ${employee.name} is ALLOWED to play ${game}`,
+        message: `✅ ${employee.name} is ALLOWED to play ${resolveGameLabel(game, availableGames)}`,
         details: 'No active bans found for this employee and game.'
       });
     }
@@ -167,7 +221,7 @@ const BanManagementPage = () => {
       b.employee_id === empId &&
       b.active !== false &&
       new Date(b.until_date) > new Date() &&
-      (b.game === game || b.game === 'All Games')
+      (isSameGame(b.game, game, availableGames) || normalizeGameValue(b.game) === 'all games')
     );
   };
 
@@ -221,8 +275,8 @@ const BanManagementPage = () => {
               >
                 <option value="all">All Games</option>
                 <option value="All Games">🚫 All Games</option>
-                {GAMES.map(game => (
-                  <option key={game.id} value={game.name}>{game.icon} {game.name}</option>
+                {availableGames.map(game => (
+                  <option key={game.id} value={game.id}>{game.icon} {game.name}</option>
                 ))}
               </select>
             </label>
@@ -247,7 +301,7 @@ const BanManagementPage = () => {
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{ban.employee}</div>
                     <div style={{ fontSize: '0.6rem', color: '#8888aa' }}>
-                      ID: {ban.employee_id} · Game: {ban.game}
+                      ID: {ban.employee_id} · Game: {resolveGameLabel(ban.game, availableGames)}
                     </div>
                     <div style={{ fontSize: '0.6rem', color: '#8888aa' }}>
                       📅 {new Date(ban.from_date).toLocaleDateString()} → {new Date(ban.until_date).toLocaleDateString()}
@@ -319,7 +373,7 @@ const BanManagementPage = () => {
                   expiredBans.map(ban => (
                     <tr key={ban.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
                       <td style={{ padding: '6px 8px' }}>{ban.employee}</td>
-                      <td style={{ padding: '6px 8px' }}>{ban.game}</td>
+                      <td style={{ padding: '6px 8px' }}>{resolveGameLabel(ban.game, availableGames)}</td>
                       <td style={{ padding: '6px 8px' }}>{new Date(ban.until_date).toLocaleDateString()}</td>
                       <td style={{ padding: '6px 8px' }}>
                         {getBanStatusBadge(ban)}
@@ -333,80 +387,87 @@ const BanManagementPage = () => {
         </div>
       </div>
 
-      {/* Ban Check Tool */}
-      <div className="clay-card">
-        <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px' }}>
-          🔍 Quick Ban Check
-        </h3>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: '160px' }}>
-            <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'block', marginBottom: '4px' }}>
-              Employee
-            </label>
-            <select 
-              id="ban-check-employee"
-              className="clay-select" 
-              style={{ padding: '8px 14px' }}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-            >
-              <option value="">-- Select Employee --</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_code})</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: '120px' }}>
-            <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'block', marginBottom: '4px' }}>
-              Game
-            </label>
-            <select 
-              id="ban-check-game"
-              className="clay-select" 
-              style={{ padding: '8px 14px' }}
-              onChange={(e) => setSelectedGameCheck(e.target.value)}
-            >
-              <option value="">-- Select Game --</option>
-              <option value="All Games">🚫 All Games</option>
-              {GAMES.map(game => (
-                <option key={game.id} value={game.name}>{game.icon} {game.name}</option>
-              ))}
-            </select>
-          </div>
-          <button 
-            className="clay-btn clay-btn-primary" 
-            onClick={checkBanStatus}
-            disabled={!selectedEmployee || !selectedGameCheck}
-          >
-            🔍 Check Status
-          </button>
-        </div>
-        
-        {checkResult && (
-          <div style={{ marginTop: '12px' }}>
-            <div className="clay-soft" style={{ 
-              padding: '12px 16px', 
-              borderRadius: '16px', 
-              borderLeft: `4px solid ${checkResult.type === 'banned' ? '#e53935' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa'}`,
-              background: checkResult.type === 'banned' ? 'rgba(229,57,53,0.03)' : checkResult.type === 'allowed' ? 'rgba(56,142,60,0.03)' : 'transparent'
-            }}>
-              <div style={{ 
-                fontWeight: 600, 
-                color: checkResult.type === 'banned' ? '#c62828' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa' 
-              }}>
-                {checkResult.type === 'banned' ? '🚫 BANNED' : checkResult.type === 'allowed' ? '✅ ALLOWED' : 'ℹ️ INFO'}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#444466', marginTop: '4px' }}>
-                {checkResult.message}
-              </div>
-              {checkResult.details && (
-                <div style={{ fontSize: '0.65rem', color: '#8888aa', marginTop: '4px', whiteSpace: 'pre-line' }}>
-                  {checkResult.details}
-                </div>
-              )}
+      {isAdmin() ? (
+        <div className="clay-card">
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px' }}>
+            🔍 Quick Ban Check
+          </h3>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: '160px' }}>
+              <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'block', marginBottom: '4px' }}>
+                Employee
+              </label>
+              <select 
+                id="ban-check-employee"
+                className="clay-select" 
+                style={{ padding: '8px 14px' }}
+                value={selectedEmployee}
+                onChange={(e) => setSelectedEmployee(e.target.value)}
+              >
+                <option value="">-- Select Employee --</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_code})</option>
+                ))}
+              </select>
             </div>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+              <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'block', marginBottom: '4px' }}>
+                Game
+              </label>
+              <select 
+                id="ban-check-game"
+                className="clay-select" 
+                style={{ padding: '8px 14px' }}
+                value={selectedGameCheck}
+                onChange={(e) => setSelectedGameCheck(e.target.value)}
+              >
+                <option value="">-- Select Game --</option>
+                <option value="All Games">🚫 All Games</option>
+                {availableGames.map(game => (
+                  <option key={game.id} value={game.id}>{game.icon} {game.name}</option>
+                ))}
+              </select>
+            </div>
+            <button 
+              className="clay-btn clay-btn-primary" 
+              onClick={checkBanStatus}
+              disabled={!selectedEmployee || !selectedGameCheck}
+            >
+              🔍 Check Status
+            </button>
           </div>
-        )}
-      </div>
+          
+          {checkResult && (
+            <div style={{ marginTop: '12px' }}>
+              <div className="clay-soft" style={{ 
+                padding: '12px 16px', 
+                borderRadius: '16px', 
+                borderLeft: `4px solid ${checkResult.type === 'banned' ? '#e53935' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa'}`,
+                background: checkResult.type === 'banned' ? 'rgba(229,57,53,0.03)' : checkResult.type === 'allowed' ? 'rgba(56,142,60,0.03)' : 'transparent'
+              }}>
+                <div style={{ 
+                  fontWeight: 600, 
+                  color: checkResult.type === 'banned' ? '#c62828' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa' 
+                }}>
+                  {checkResult.type === 'banned' ? '🚫 BANNED' : checkResult.type === 'allowed' ? '✅ ALLOWED' : 'ℹ️ INFO'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#444466', marginTop: '4px' }}>
+                  {checkResult.message}
+                </div>
+                {checkResult.details && (
+                  <div style={{ fontSize: '0.65rem', color: '#8888aa', marginTop: '4px', whiteSpace: 'pre-line' }}>
+                    {checkResult.details}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="clay-card" style={{ padding: '18px', color: '#666' }}>
+          Quick Ban Check is available to admins only.
+        </div>
+      )}
 
       {/* Issue Ban Modal */}
       {showBanModal && (

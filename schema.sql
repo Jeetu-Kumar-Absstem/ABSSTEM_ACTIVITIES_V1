@@ -601,14 +601,14 @@ values
   (2, 'Slot 2', '11:30', '12:00', '30 min', 'all', 'all', 4, true),
   (3, 'Slot 3', '12:00', '12:30', '30 min', 'all', 'all', 4, true),
   (4, 'Slot 4', '12:30', '13:00', '30 min', 'all', 'all', 4, true),
-  (5, 'Slot 5', '13:00', '13:30', '30 min', 'all', 'all', 4, true),
-  (6, 'Slot 6', '13:30', '14:00', '30 min', 'all', 'all', 4, true),
-  (7, 'Slot 7', '14:00', '14:30', '30 min', 'all', 'all', 4, true),
-  (8, 'Slot 8', '14:30', '15:00', '30 min', 'all', 'all', 4, true),
-  (9, 'Slot 9', '15:00', '15:30', '30 min', 'all', 'all', 4, true),
-  (10, 'Slot 10', '15:30', '16:00', '30 min', 'all', 'all', 4, true),
-  (11, 'Slot 11', '16:00', '16:30', '30 min', 'all', 'all', 4, true),
-  (12, 'Slot 12', '16:30', '17:00', '30 min', 'all', 'all', 4, true)
+  (5, 'Slot 5', '13:30', '14:00', '30 min', 'all', 'all', 4, true),
+  (6, 'Slot 6', '14:00', '14:30', '30 min', 'all', 'all', 4, true),
+  (7, 'Slot 7', '14:30', '15:00', '30 min', 'all', 'all', 4, true),
+  (8, 'Slot 8', '15:00', '15:30', '30 min', 'all', 'all', 4, true),
+  (9, 'Slot 9', '15:30', '16:00', '30 min', 'all', 'all', 4, true),
+  (10, 'Slot 10', '16:00', '16:30', '30 min', 'all', 'all', 4, true),
+  (11, 'Slot 11', '16:30', '17:00', '30 min', 'all', 'all', 4, true),
+  (12, 'Slot 12', '17:00', '17:30', '30 min', 'all', 'all', 4, true)
 on conflict (id) do nothing;
 
 insert into public.rules (rule_description, created_at, created_by, game, active)

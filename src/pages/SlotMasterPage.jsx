@@ -3,8 +3,26 @@ import React, { useState, useEffect } from 'react';
 import { SLOTS, GAMES } from '../utils/constants';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../utils/supabase';
-import {Disc,ChessKing} from "lucide-react";
-import { GiTennisRacket } from "react-icons/gi"; 
+
+const isVisibleGame = (game) => {
+  const gameId = String(game?.id ?? '').toLowerCase();
+  const gameName = String(game?.name ?? '').toLowerCase();
+  return !['table-tennis', 'tennis'].includes(gameId) && !['table tennis', 'tennis'].includes(gameName);
+};
+
+const normalizeGameRow = (game) => ({
+  ...game,
+  id: String(game.id),
+  maxPlayers: game.max_players ?? game.maxPlayers ?? (String(game.name || '').toLowerCase() === 'chess' ? 2 : 4),
+  active: game.active !== false,
+});
+
+const getDefaultMaxPlayers = (gameId, games) => {
+  const game = games.find((item) => String(item.id) === String(gameId));
+  if (String(game?.name || '').toLowerCase() === 'chess') return 2;
+  return game?.maxPlayers || 4;
+};
+
 const SlotMasterPage = () => {
   const [slots, setSlots] = useState(SLOTS);
   const [games, setGames] = useState(GAMES);
@@ -49,11 +67,11 @@ const SlotMasterPage = () => {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        setGames(data);
+        setGames(data.filter(isVisibleGame).map(normalizeGameRow));
       }
     } catch (err) {
       console.error('Error loading games:', err);
-      setGames(GAMES);
+      setGames(GAMES.map(normalizeGameRow).filter(isVisibleGame));
     }
   };
 
@@ -65,6 +83,12 @@ const SlotMasterPage = () => {
   // Filter slots based on selected game and day
   const getFilteredSlots = () => {
     let filtered = slots;
+
+    filtered = filtered.filter((slot) => {
+      const start = String(slot.start_time || slot.startTime || '');
+      const end = String(slot.end_time || slot.endTime || '');
+      return !(start === '13:00' && end === '13:30');
+    });
     
     if (selectedGame !== 'all') {
       filtered = filtered.filter(slot => 
@@ -82,6 +106,7 @@ const SlotMasterPage = () => {
   };
 
   const filteredSlots = getFilteredSlots();
+  const selectedGameMaxPlayers = selectedGame !== 'all' ? getDefaultMaxPlayers(selectedGame, games) : null;
 
   // Handle delete slot
   const handleDeleteSlot = async (slotId) => {
@@ -276,7 +301,7 @@ const SlotMasterPage = () => {
                     </span>
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#1e1e2f' }}>
-                    {slot.max_players || 4}
+                    {selectedGameMaxPlayers || slot.max_players || 4}
                   </td>
                   <td style={{ padding: '8px 10px' }}>
                     <span className={slot.active === false ? 'clay-badge clay-badge-red' : 'clay-badge clay-badge-green'}>
@@ -336,10 +361,18 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
     duration: slot?.duration || '30 min',
     game: slot?.game || 'all',
     day: slot?.day || 'all',
-    max_players: slot?.max_players || 4,
+    max_players: slot?.max_players || getDefaultMaxPlayers(slot?.game || 'all', games),
     active: slot?.active !== false,
     
   });
+
+  useEffect(() => {
+    const defaultMaxPlayers = getDefaultMaxPlayers(formData.game, games);
+    setFormData((current) => ({
+      ...current,
+      max_players: current.game === 'all' ? current.max_players : defaultMaxPlayers,
+    }));
+  }, [formData.game, games]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -433,7 +466,14 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
             <select
               className="clay-select"
               value={formData.game}
-              onChange={(e) => setFormData({ ...formData, game: e.target.value })}
+              onChange={(e) => {
+                const nextGame = e.target.value;
+                setFormData((current) => ({
+                  ...current,
+                  game: nextGame,
+                  max_players: nextGame === 'all' ? current.max_players : getDefaultMaxPlayers(nextGame, games),
+                }));
+              }}
             >
               <option value="all">All Games</option>
               {games.map(game => (
@@ -469,10 +509,16 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
                 type="number"
                 className="clay-input"
                 value={formData.max_players}
-                onChange={(e) => setFormData({ ...formData, max_players: parseInt(e.target.value) || 4 })}
+                onChange={(e) => setFormData({ ...formData, max_players: parseInt(e.target.value, 10) || getDefaultMaxPlayers(formData.game, games) })}
                 min="1"
                 max="10"
+                disabled={String(formData.game).toLowerCase() === 'chess'}
               />
+              {String(formData.game).toLowerCase() === 'chess' && (
+                <div style={{ marginTop: '4px', fontSize: '0.65rem', color: '#8888aa' }}>
+                  Chess is fixed to 2 players.
+                </div>
+              )}
             </div>
             <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
