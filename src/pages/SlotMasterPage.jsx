@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { SLOTS, GAMES } from '../utils/constants';
 import { useToast } from '../context/ToastContext';
+import { useApp } from '../context/AppContext';
 import { supabase } from '../utils/supabase';
 
 const isVisibleGame = (game) => {
@@ -32,6 +33,8 @@ const SlotMasterPage = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSlot, setEditingSlot] = useState(null);
   const { showToast } = useToast();
+  const { isAdmin } = useApp();
+  const canManageSlots = isAdmin();
 
   // Load slots from database
   const loadSlots = async () => {
@@ -110,6 +113,10 @@ const SlotMasterPage = () => {
 
   // Handle delete slot
   const handleDeleteSlot = async (slotId) => {
+    if (!canManageSlots) {
+      showToast('Only admins can edit slots.', 'error');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this slot?')) return;
     
     try {
@@ -129,6 +136,10 @@ const SlotMasterPage = () => {
 
   // Handle add/edit slot
   const handleSaveSlot = async (slotData) => {
+    if (!canManageSlots) {
+      showToast('Only admins can edit slots.', 'error');
+      return;
+    }
     try {
       if (editingSlot) {
         const { error } = await supabase
@@ -174,15 +185,21 @@ const SlotMasterPage = () => {
         <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>
           Slot Master — Time Slot Configuration
         </h2>
-        <button 
-          className="clay-btn clay-btn-primary" 
-          onClick={() => {
-            setEditingSlot(null);
-            setShowAddModal(true);
-          }}
-        >
-          + Add Slot
-        </button>
+        {canManageSlots ? (
+          <button 
+            className="clay-btn clay-btn-primary" 
+            onClick={() => {
+              setEditingSlot(null);
+              setShowAddModal(true);
+            }}
+          >
+            + Add Slot
+          </button>
+        ) : (
+          <span style={{ fontSize: '0.72rem', color: '#8888aa', fontStyle: 'italic' }}>
+            View only
+          </span>
+        )}
       </div>
 
       {/* Filters */}
@@ -310,23 +327,29 @@ const SlotMasterPage = () => {
                   </td>
                   <td style={{ padding: '8px 10px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        className="clay-btn" 
-                        style={{ padding: '4px 10px', fontSize: '0.6rem' }}
-                        onClick={() => {
-                          setEditingSlot(slot);
-                          setShowAddModal(true);
-                        }}
-                      >
-                        ✏️
-                      </button>
-                      <button 
-                        className="clay-btn" 
-                        style={{ padding: '4px 10px', fontSize: '0.6rem', color: '#e53935' }}
-                        onClick={() => handleDeleteSlot(slot.id)}
-                      >
-                        🗑️
-                      </button>
+                      {canManageSlots ? (
+                        <>
+                          <button 
+                            className="clay-btn" 
+                            style={{ padding: '4px 10px', fontSize: '0.6rem' }}
+                            onClick={() => {
+                              setEditingSlot(slot);
+                              setShowAddModal(true);
+                            }}
+                          >
+                            ✏️
+                          </button>
+                          <button 
+                            className="clay-btn" 
+                            style={{ padding: '4px 10px', fontSize: '0.6rem', color: '#e53935' }}
+                            onClick={() => handleDeleteSlot(slot.id)}
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', color: '#8888aa' }}>Read only</span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -337,7 +360,7 @@ const SlotMasterPage = () => {
       </div>
 
       {/* Add/Edit Slot Modal */}
-      {showAddModal && (
+      {showAddModal && canManageSlots && (
         <AddEditSlotModal
           slot={editingSlot}
           games={games}
