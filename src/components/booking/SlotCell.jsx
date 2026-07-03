@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { SLOTS } from '../../utils/constants';
-import { isBanned, isSlotFinished } from '../../utils/helpers';
+import { filterBookingsToWeek, isBanned, isSlotFinished } from '../../utils/helpers';
 import RemoveBookingConfirm from '../../ui/RemoveBookingConfirm';
 import BanPlayerConfirm from '../../ui/BanPlayerConfirm';
 import MatchResultConfirm from '../../ui/MatchResultConfirm';
@@ -107,7 +107,8 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
   }, []);
 
   const hasUserBookingToday = (userId) => {
-    const dayBookings = bookings[day] || {};
+    const weekBookings = filterBookingsToWeek(bookings, currentDate);
+    const dayBookings = weekBookings[day] || {};
     const allDayBookings = Object.values(dayBookings).flat();
     return allDayBookings.some(b => b.user_id === userId && (String(b.game) === String(selectedGame) || b.game === selectedGameRecord?.name));
   };

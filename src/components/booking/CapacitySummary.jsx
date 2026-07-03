@@ -1,7 +1,8 @@
 // src/components/booking/CapacitySummary.jsx
 import React, { useState, useEffect } from 'react';
-import { SLOTS, DAYS } from '../../utils/constants';
+import { SLOTS } from '../../utils/constants';
 import { useApp } from '../../context/AppContext';
+import { filterBookingsToWeek, getDayName } from '../../utils/helpers';
 
 const CapacitySummary = () => {
   const { selectedGame, bookings, games, currentDate } = useApp();
@@ -10,16 +11,11 @@ const CapacitySummary = () => {
   const [slotData, setSlotData] = useState([]);
 
   useEffect(() => {
-    const getCurrentDay = () => {
-      const dayIndex = currentDate.getDay();
-      if (dayIndex === 0 || dayIndex === 6) return 'Monday';
-      return DAYS[dayIndex - 1] || 'Monday';
-    };
-
-    const currentDay = getCurrentDay();
+    const weekBookings = filterBookingsToWeek(bookings, currentDate);
+    const currentDay = getDayName(currentDate);
     
     const data = SLOTS.map(slot => {
-      const players = bookings[currentDay]?.[slot.id] || [];
+      const players = weekBookings[currentDay]?.[slot.id] || [];
       const gamePlayers = players.filter(p => String(p.game) === String(selectedGame) || p.game === game?.name);
       const total = gamePlayers.length;
       const pct = Math.min(Math.round((total / maxPerSlot) * 100), 100);
@@ -37,13 +33,7 @@ const CapacitySummary = () => {
     setSlotData(data);
   }, [bookings, selectedGame, currentDate, maxPerSlot]);
 
-  const getCurrentDay = () => {
-    const dayIndex = currentDate.getDay();
-    if (dayIndex === 0 || dayIndex === 6) return 'Monday';
-    return DAYS[dayIndex - 1] || 'Monday';
-  };
-
-  const currentDay = getCurrentDay();
+  const currentDay = getDayName(currentDate);
 
   return (
     <div className="clay-card" style={{ marginTop: '12px' }}>

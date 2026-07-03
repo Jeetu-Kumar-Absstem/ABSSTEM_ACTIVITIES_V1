@@ -249,7 +249,7 @@ const Sidebar = () => {
       borderRadius: '32px', minHeight: 'calc(100vh - 120px)', overflowY: 'auto',
       display: 'flex', flexDirection: 'column', gap: '4px',
     }}>
-      <SidebarItem colorId="dashboard"  icon="📊" label="Dashboard" />
+      <SidebarItem colorId="dashboard"  icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
       <SidebarItem colorId="activities" icon="🎮" label="Activities" defaultOpen={true}>
         {tabs.map(tab => (
           <PillButton

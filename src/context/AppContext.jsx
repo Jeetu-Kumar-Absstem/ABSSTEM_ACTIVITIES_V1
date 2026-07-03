@@ -3,7 +3,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import { GAMES, SLOTS, DAYS } from '../utils/constants';
 import { isAdminId } from '../utils/admin';
-import { getPlayerStatsFromResults } from '../utils/helpers';
+import {
+  getDayName,
+  getPlayerStatsFromResults,
+  getWeekRange,
+  isBookingInWeek,
+} from '../utils/helpers';
 
 const AppContext = createContext();
 
@@ -14,13 +19,14 @@ export const AppProvider = ({ children }) => {
   const [slots, setSlots] = useState(SLOTS);
   const [bookings, setBookings] = useState({});
   const [matchResults, setMatchResults] = useState({ carrom: [], chess: [] });
+  const [employees, setEmployees] = useState([]);
   const [bans, setBans] = useState([]);
   const [rules, setRules] = useState([]);
   const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedGame, setSelectedGame] = useState('carrom');
-  const [activeTab, setActiveTab] = useState('booking');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
 
   // Check if current user is admin using the utils
@@ -100,6 +106,29 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (err) {
+      console.error('Error loading employees:', err);
+      const fallbackEmployees = [];
+      if (currentUser?.user_metadata?.name || currentUser?.user_metadata?.emp_id) {
+        fallbackEmployees.push({
+          id: currentUser.id,
+          name: currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'User',
+          employee_code: currentUser.user_metadata?.emp_id || currentUser.user_metadata?.employee_code || '',
+          department: currentUser.user_metadata?.department || 'General',
+        });
+      }
+      setEmployees(fallbackEmployees);
+    }
+  };
+
   // Load bookings from Supabase
   const loadBookings = async () => {
     setLoading(true);
@@ -135,6 +164,19 @@ export const AppProvider = ({ children }) => {
       setBookings(mockBookings);
     }
     setLoading(false);
+  };
+
+  const cleanupOldBookings = async () => {
+    try {
+      const { start } = getWeekRange(currentDate);
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .lt('booked_at', start.toISOString());
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error cleaning up old bookings:', err);
+    }
   };
 
   const loadMatchResults = async () => {
@@ -228,6 +270,8 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     loadGames();
+    loadEmployees();
+    cleanupOldBookings();
     loadBookings();
     loadMatchResults();
     loadBans();
@@ -250,6 +294,7 @@ export const AppProvider = ({ children }) => {
   // Add booking function
   const addBooking = async (day, slotId, playerName) => {
     try {
+      await cleanupOldBookings();
       const user = await supabase.auth.getUser();
       const userId = user.data.user?.id;
       const empId = user.data.user?.user_metadata?.emp_id || user.data.user?.user_metadata?.employee_code || currentUser?.user_metadata?.emp_id || '';
@@ -260,7 +305,9 @@ export const AppProvider = ({ children }) => {
       }
       
       const dayBookings = bookings[day] || {};
-      const allDayBookings = Object.values(dayBookings).flat();
+      const allDayBookings = Object.values(dayBookings)
+        .flat()
+        .filter((booking) => isBookingInWeek(booking, currentDate));
       const userHasBooking = allDayBookings.some(b => b.user_id === userId && (String(b.game) === String(selectedGame) || b.game === gameRecord?.name));
       
       if (userHasBooking) {
@@ -322,10 +369,16 @@ export const AppProvider = ({ children }) => {
         return { success: false, error: 'You can only remove your own bookings' };
       }
 
+      const { start, end } = getWeekRange(currentDate);
       const { error } = await supabase
         .from('bookings')
         .delete()
-        .match({ day, slot_id: slotId, player_name: playerName, user_id: userId });
+        .eq('day', day)
+        .eq('slot_id', slotId)
+        .eq('player_name', playerName)
+        .eq('user_id', userId)
+        .gte('booked_at', start.toISOString())
+        .lte('booked_at', end.toISOString());
       
       if (error) throw error;
       
@@ -574,8 +627,8 @@ export const AppProvider = ({ children }) => {
 
   // Get game stats
   const getGameStats = (gameId) => {
-    const today = new Date();
-    const todayName = DAYS[today.getDay() === 0 ? 6 : today.getDay() - 1];
+    const today = currentDate;
+    const todayName = getDayName(today);
     let todayBookings = 0;
     let availableSlots = 0;
     let fullSlots = 0;
@@ -585,7 +638,7 @@ export const AppProvider = ({ children }) => {
 
     if (bookings[todayName]) {
       SLOTS.forEach(slot => {
-        const players = bookings[todayName]?.[slot.id] || [];
+        const players = (bookings[todayName]?.[slot.id] || []).filter((booking) => isBookingInWeek(booking, currentDate));
         const gamePlayers = players.filter(p => String(p.game) === normalizedGameId || p.game === resolvedGame?.name);
         const count = gamePlayers.length;
         todayBookings += count;
@@ -629,6 +682,7 @@ export const AppProvider = ({ children }) => {
     activeTab,
     setActiveTab,
     currentUser,
+    employees,
     isAdmin,
     addBooking,
     removeBooking,
@@ -637,6 +691,7 @@ export const AppProvider = ({ children }) => {
     loadBans,
     loadRules,
     loadViolations,
+    loadEmployees,
     addBan,
     liftBan,
     deleteBan,

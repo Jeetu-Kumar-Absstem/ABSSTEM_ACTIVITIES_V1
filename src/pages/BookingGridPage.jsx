@@ -10,6 +10,7 @@ import DateNavigator from '../components/booking/DateNavigator';
 import CapacitySummary from '../components/booking/CapacitySummary';
 import SlotCell from '../components/booking/SlotCell';
 import BookSlotModal from '../components/modals/BookSlotModal';
+import { filterBookingsToWeek, getDayName } from '../utils/helpers';
 
 const BookingGridPage = () => {
   const { 
@@ -27,6 +28,7 @@ const BookingGridPage = () => {
   const [showBookModal, setShowBookModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(DAYS[0]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
+  const weekBookings = filterBookingsToWeek(bookings, currentDate);
 
   // Refresh bookings when component mounts
   useEffect(() => {
@@ -58,7 +60,7 @@ const BookingGridPage = () => {
     }
 
     // Check if user already has a booking for this game on this day
-    const dayBookings = bookings[selectedDay] || {};
+    const dayBookings = weekBookings[selectedDay] || {};
     const allDayBookings = Object.values(dayBookings).flat();
     const userHasBooking = allDayBookings.some(b => b.user_id === currentUser?.id && (String(b.game) === String(selectedGame) || b.game === gameRecord?.name));
     
@@ -96,7 +98,7 @@ const BookingGridPage = () => {
   };
 
   const getSlotPlayers = (day, slotId) => {
-    return bookings[day]?.[slotId] || [];
+    return weekBookings[day]?.[slotId] || [];
   };
 
   const getMaxPlayers = () => {
@@ -106,9 +108,7 @@ const BookingGridPage = () => {
 
   // Get current day name
   const getCurrentDay = () => {
-    const dayIndex = currentDate.getDay();
-    if (dayIndex === 0 || dayIndex === 6) return 'Monday';
-    return DAYS[dayIndex - 1] || 'Monday';
+    return getDayName(currentDate);
   };
 
   return (
@@ -204,7 +204,7 @@ const BookingGridPage = () => {
         onConfirm={handleAddBooking}
         day={selectedDay}
         slotId={selectedSlotId}
-        currentBookings={selectedDay && selectedSlotId ? bookings[selectedDay]?.[selectedSlotId] || [] : []}
+        currentBookings={selectedDay && selectedSlotId ? weekBookings[selectedDay]?.[selectedSlotId] || [] : []}
         maxPlayers={getMaxPlayers()}
         game={selectedGame}
       />

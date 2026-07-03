@@ -2,6 +2,7 @@
 import React from 'react';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../context/AppContext';
+import DashboardPage from './DashboardPage';
 import BookingGridPage from './BookingGridPage';
 import GameMasterPage from './GameMasterPage';
 import SlotMasterPage from './SlotMasterPage';
@@ -15,6 +16,7 @@ const ActivityPlanner = ({ user, onLogout }) => {
 
   const renderTab = () => {
     switch(activeTab) {
+      case 'dashboard': return <DashboardPage />;
       case 'booking': return <BookingGridPage />;
       case 'master': return <GameMasterPage />;
       case 'slots': return <SlotMasterPage />;
@@ -22,7 +24,7 @@ const ActivityPlanner = ({ user, onLogout }) => {
       case 'bans': return <BanManagementPage />;
       case 'reports': return <ReportsPage />;
       case 'profile': return <ProfilePage />;
-      default: return <BookingGridPage />;
+      default: return <DashboardPage />;
     }
   };
 

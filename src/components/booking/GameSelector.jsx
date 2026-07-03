@@ -1,7 +1,8 @@
 // src/components/booking/GameSelector.jsx
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { SLOTS, DAYS } from '../../utils/constants';
+import { SLOTS } from '../../utils/constants';
+import { filterBookingsToWeek, getDayName } from '../../utils/helpers';
 
 // Static icon map — add more game ids/names as needed
 const GAME_ICONS = {
@@ -46,16 +47,15 @@ const GameSelector = () => {
 
   useEffect(() => {
     const today    = currentDate;
-    const dayIndex = today.getDay();
-    const todayName =
-      dayIndex === 0 || dayIndex === 6 ? 'Monday' : DAYS[dayIndex - 1] || 'Monday';
+    const todayName = getDayName(today);
+    const weekBookings = filterBookingsToWeek(bookings, currentDate);
 
     const counts = {};
     games.forEach(game => {
       let total = 0;
-      if (bookings[todayName]) {
+      if (weekBookings[todayName]) {
         SLOTS.forEach(slot => {
-          const players = bookings[todayName]?.[slot.id] || [];
+          const players = weekBookings[todayName]?.[slot.id] || [];
           total += players.filter(
             p => String(p.game) === String(game.id) || p.game === game.name
           ).length;

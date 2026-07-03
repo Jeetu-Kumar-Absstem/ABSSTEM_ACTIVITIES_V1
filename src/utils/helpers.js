@@ -7,6 +7,16 @@ export const formatDate = (date) => {
   return date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 };
 
+export const normalizeText = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+export const normalizeEmployeeId = (value) =>
+  String(value || '')
+    .trim()
+    .toUpperCase();
+
 export const getSlotCapacity = (bookings, day, slotId) => {
   return bookings?.[day]?.[slotId]?.length || 0;
 };
@@ -24,7 +34,7 @@ export const isBanned = (employee, game, bans) => {
   const normalizedGame = (value) => `${value || ''}`.trim().toLowerCase();
   const selectedGame = normalizedGame(game);
 
-  return bans.some(b => {
+  return bans.some((b) => {
     const bannedEmployeeName = normalizedGame(b.employee);
     const bannedEmployeeId = normalizedGame(b.employee_id);
     const bannedGame = normalizedGame(b.game);
@@ -37,7 +47,7 @@ export const isBanned = (employee, game, bans) => {
       || bannedGame === 'all'
       || bannedGame === selectedGame;
 
-    return employeeMatches && gameMatches && untilDate && new Date(untilDate) > new Date();
+    return (b.active !== false) && employeeMatches && gameMatches && untilDate && new Date(untilDate) > new Date();
   });
 };
 
@@ -56,6 +66,41 @@ export const getWeekStartDate = (referenceDate = new Date()) => {
   date.setDate(date.getDate() + diffToMonday);
   date.setHours(0, 0, 0, 0);
   return date;
+};
+
+export const getWeekEndDate = (referenceDate = new Date()) => {
+  const date = getWeekStartDate(referenceDate);
+  date.setDate(date.getDate() + 4);
+  date.setHours(23, 59, 59, 999);
+  return date;
+};
+
+export const getWeekRange = (referenceDate = new Date()) => ({
+  start: getWeekStartDate(referenceDate),
+  end: getWeekEndDate(referenceDate),
+});
+
+export const isDateInWeek = (dateValue, referenceDate = new Date()) => {
+  if (!dateValue) return true;
+  const { start, end } = getWeekRange(referenceDate);
+  const date = new Date(dateValue);
+  return date >= start && date <= end;
+};
+
+export const isBookingInWeek = (booking, referenceDate = new Date()) => {
+  if (!booking) return false;
+  return isDateInWeek(booking.booked_at || booking.created_at || booking.updated_at, referenceDate);
+};
+
+export const filterBookingsToWeek = (bookings = {}, referenceDate = new Date()) => {
+  const filtered = {};
+  Object.entries(bookings || {}).forEach(([day, slots]) => {
+    filtered[day] = {};
+    Object.entries(slots || {}).forEach(([slotId, slotBookings]) => {
+      filtered[day][slotId] = (slotBookings || []).filter((booking) => isBookingInWeek(booking, referenceDate));
+    });
+  });
+  return filtered;
 };
 
 export const getSlotDateTime = (day, time, referenceDate = new Date()) => {
@@ -146,4 +191,114 @@ export const getPlayerStatsFromResults = (results = [], employeeId = '', employe
       participations: [],
     }
   );
+};
+
+export const buildEmployeeLeaderboard = (employees = [], matchResults = {}) => {
+  const leaderboard = new Map();
+  const byEmployeeId = new Map();
+  const byName = new Map();
+
+  const getEmployeeKey = (employee = {}) => {
+    const empId = normalizeEmployeeId(employee.employee_code || employee.employee_id || employee.emp_id || '');
+    if (empId) return `id:${empId}`;
+    const name = normalizeText(employee.name || employee.employee_name || '');
+    return name ? `name:${name}` : null;
+  };
+
+  const getOrCreateRow = (employee = {}, fallbackPlayer = {}) => {
+    const employeeId = normalizeEmployeeId(
+      employee.employee_code || employee.employee_id || employee.emp_id || fallbackPlayer.employee_id || ''
+    );
+    const name = employee.name || employee.employee_name || fallbackPlayer.name || fallbackPlayer.employee || 'Employee';
+    const department = employee.department || fallbackPlayer.department || 'General';
+    const key = getEmployeeKey(employee) || getEmployeeKey(fallbackPlayer) || `name:${normalizeText(name)}`;
+
+    if (!leaderboard.has(key)) {
+      leaderboard.set(key, {
+        rank: 0,
+        employee_id: employeeId,
+        name,
+        department,
+        points: 0,
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+      });
+    }
+
+    const row = leaderboard.get(key);
+    row.employee_id = row.employee_id || employeeId;
+    row.name = row.name || name;
+    row.department = row.department || department;
+    if (employeeId) byEmployeeId.set(employeeId, row);
+    if (row.name) byName.set(normalizeText(row.name), row);
+    return row;
+  };
+
+  employees.forEach((employee) => {
+    getOrCreateRow(employee);
+  });
+
+  const resultRows = [
+    ...(matchResults.carrom || []).map((row) => ({ ...row, game: 'carrom' })),
+    ...(matchResults.chess || []).map((row) => ({ ...row, game: 'chess' })),
+  ].sort((a, b) => new Date(a.created_at || a.updated_at || 0).getTime() - new Date(b.created_at || b.updated_at || 0).getTime());
+
+  const resolvePlayerRow = (player = {}) => {
+    const empId = normalizeEmployeeId(player.employee_id || player.emp_id || '');
+    const name = normalizeText(player.name || player.employee || '');
+    if (empId && byEmployeeId.has(empId)) return byEmployeeId.get(empId);
+    if (name && byName.has(name)) return byName.get(name);
+    return getOrCreateRow({}, player);
+  };
+
+  resultRows.forEach((result) => {
+    const teamA = Array.isArray(result.team_a_players) ? result.team_a_players : [];
+    const teamB = Array.isArray(result.team_b_players) ? result.team_b_players : [];
+    const resultKey = normalizeText(result.result);
+    const isDraw = resultKey === 'draw';
+
+    teamA.forEach((player) => {
+      const row = resolvePlayerRow(player);
+      row.gamesPlayed += 1;
+      if (isDraw) {
+        row.draws += 1;
+        row.points += 2;
+      } else if (resultKey === 'team_a') {
+        row.wins += 1;
+        row.points += 4;
+      } else {
+        row.losses += 1;
+        row.points += 1;
+      }
+    });
+
+    teamB.forEach((player) => {
+      const row = resolvePlayerRow(player);
+      row.gamesPlayed += 1;
+      if (isDraw) {
+        row.draws += 1;
+        row.points += 2;
+      } else if (resultKey === 'team_b') {
+        row.wins += 1;
+        row.points += 4;
+      } else {
+        row.losses += 1;
+        row.points += 1;
+      }
+    });
+  });
+
+  return [...leaderboard.values()]
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      if (b.gamesPlayed !== a.gamesPlayed) return b.gamesPlayed - a.gamesPlayed;
+      return a.name.localeCompare(b.name);
+    })
+    .map((row, index) => ({
+      ...row,
+      rank: index + 1,
+    }));
 };
