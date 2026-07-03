@@ -114,7 +114,7 @@ const BookingGridPage = () => {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 600, color: '#1e1e2f' }}>Activity Planner</h1>
+        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e1e2f' }}>Activity Planner</h1>
        
       </div>
 
@@ -126,12 +126,24 @@ const BookingGridPage = () => {
 
       <div className="clay-card" style={{ overflow: 'hidden', padding: 0, borderRadius: '28px' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem' }}>
+          <table style={{
+              width: '100%',
+              borderCollapse: 'separate',
+              borderSpacing: '0',
+              fontSize: '0.7rem',
+              background: '#d0cece'
+            }}>
             <thead>
-              <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#1a3c6e', position: 'sticky', left: 0, background: 'white', zIndex: 2, minWidth: '90px' }}>Day / Time</th>
+              <tr
+                style={{
+                  background: '#cacdd2'
+                }}>
+                <th style={{ padding: '14px', textAlign: 'center', fontWeight: 600, color: '#fff', position: 'sticky', left: 0, background: '#1e3a8a', zIndex: 2, minWidth: '120px',
+                      border: '1px solid #bfdbfe' }}>Day / Time</th>
                 {SLOTS.map(s => (
-                  <th key={s.id} style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 500, fontSize: '0.6rem', color: '#444466', minWidth: '100px' }}>
+                  <th key={s.id} style={{ padding: '12px', textAlign: 'center', fontWeight: 700, fontSize: '0.6rem', color: '#1e3a8a', minWidth: '110px',
+                    background: '#c1f6bc',
+                    border: '1px solid #bfdbfe' }}>
                     {s.label}
                     <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.6 }}>{s.time}</span>
                   </th>
@@ -147,13 +159,14 @@ const BookingGridPage = () => {
                     background: isToday ? 'rgba(26,60,110,0.03)' : 'transparent'
                   }}>
                     <td style={{ 
-                      padding: '8px 12px', 
+                      padding: '14px', 
                       fontWeight: 600, 
                       color: isToday ? '#1a3c6e' : '#1a3c6e',
                       position: 'sticky', 
                       left: 0, 
-                      background: isToday ? 'rgba(26,60,110,0.03)' : 'white',
-                      zIndex: 1 
+                      background: isToday ? '#f7ee86' : '#f8fbff',
+                      zIndex: 4,
+                      border: '1px solid #bfdbfe' 
                     }}>
                       {day} {isToday && '📍'}
                     </td>
@@ -161,7 +174,9 @@ const BookingGridPage = () => {
                       const players = getSlotPlayers(day, slot.id);
                       const maxPlayers = getMaxPlayers();
                       return (
-                        <td key={slot.id} style={{ padding: '4px 4px', verticalAlign: 'middle', textAlign: 'center', minWidth: '100px' }}>
+                        <td key={slot.id} style={{ padding: '4px 4px', verticalAlign: 'middle', textAlign: 'center', minWidth: '110px',
+                    background: '#e0ffe0',
+                    border: '1px solid #bfdbfe' }}>
                           <SlotCell
                             day={day}
                             slotId={slot.id}

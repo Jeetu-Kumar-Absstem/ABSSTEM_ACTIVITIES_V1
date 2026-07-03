@@ -47,14 +47,14 @@ const CapacitySummary = () => {
 
   return (
     <div className="clay-card" style={{ marginTop: '12px' }}>
-      <div style={{ fontWeight: 600, fontSize: '0.7rem', color: '#01070f', marginBottom: '10px' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.7rem', color: '#013a0a', marginBottom: '10px' }}>
         Slot Capacity Overview — {game?.name || 'All Games'} (Max {maxPerSlot} players per slot) - {currentDay}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '8px' }}>
         {slotData.map(slot => (
           <div key={slot.id} className="clay-soft" style={{ padding: '8px 6px', textAlign: 'center', borderRadius: '16px' }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 600, color: '#1a3c6e' }}>{slot.label}</div>
-            <div style={{ fontSize: '0.5rem', color: '#8888aa' }}>{slot.time}</div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 600, color: '#080c12' }}>{slot.label}</div>
+            <div style={{ fontSize: '0.5rem', color: '#6045c5' }}>{slot.time}</div>
             <div style={{ width: '100%', height: '4px', background: '#e0e4ec', borderRadius: '4px', margin: '4px 0' }}>
               <div style={{ 
                 width: `${slot.pct}%`, 

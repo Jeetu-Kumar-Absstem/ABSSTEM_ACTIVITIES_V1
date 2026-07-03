@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { SLOTS, GAMES } from '../utils/constants';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../utils/supabase';
-
+import {Disc,ChessKing} from "lucide-react";
+import { GiTennisRacket } from "react-icons/gi"; 
 const SlotMasterPage = () => {
   const [slots, setSlots] = useState(SLOTS);
   const [games, setGames] = useState(GAMES);
@@ -337,6 +338,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
     day: slot?.day || 'all',
     max_players: slot?.max_players || 4,
     active: slot?.active !== false,
+    
   });
 
   const handleSubmit = (e) => {
