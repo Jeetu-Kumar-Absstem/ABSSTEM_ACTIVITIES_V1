@@ -18,7 +18,7 @@ const Topbar = ({ user, onLogout }) => {
       }}
     >
       <div>
-        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a3c6e' }}>absstem</div>
+        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a3c6e' }}>Absstem</div>
         {/* <div style={{ fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.15em', opacity: 0.6 }}>CLAN · ERP SYSTEM</div> */}
       </div>
   
@@ -33,7 +33,7 @@ const Topbar = ({ user, onLogout }) => {
         zIndex: 1001,
       }}>
         {/* <span style={{ opacity: 0.7 }}>View Rating</span> */}
-        <span style={{ 
+        {/* <span style={{ 
           position: 'relative', 
           fontSize: '1.1rem', 
           cursor: 'pointer',
@@ -53,7 +53,7 @@ const Topbar = ({ user, onLogout }) => {
             alignItems: 'center', 
             justifyContent: 'center' 
           }}>2</span>
-        </span>
+        </span> */}
         {user && (
           <div style={{ position: 'relative', zIndex: 9999 }}>
             <ProfileIcon user={user} onLogout={onLogout} />
