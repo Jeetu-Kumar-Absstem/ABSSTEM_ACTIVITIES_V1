@@ -242,7 +242,6 @@ const LoginPage = ({ onLogin }) => {
     setIsForgotPassword(false);
     setForgotEmpId('');
     setForgotEmail('');
-    setForgotEmailError('');
     setForgotSuccess(false);
     setLoginError('');
   };
