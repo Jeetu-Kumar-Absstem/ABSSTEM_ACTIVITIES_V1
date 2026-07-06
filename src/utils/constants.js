@@ -23,12 +23,15 @@ export const GAMES = [
 ];
 
 export const DEPARTMENTS = [
-  { id: 'svc', label: 'Service', class: 'dt-svc' },
   { id: 'sls', label: 'Sales', class: 'dt-sls' },
-  { id: 'acc', label: 'Accounts', class: 'dt-acc' },
   { id: 'hr', label: 'HR', class: 'dt-hr' },
+  { id: 'acc', label: 'Accounts', class: 'dt-acc' },
+  { id: 'svc', label: 'Service', class: 'dt-svc' },
   { id: 'rd', label: 'R&D', class: 'dt-rd' },
-  { id: 'ops', label: 'Operations', class: 'dt-ops' },
+  { id: 'mkt', label: 'Marketing', class: 'dt-mkt' },
+  { id: 'lgs', label: 'Logistics', class: 'dt-lgs' },
+  { id: 'dsg', label: 'Design', class: 'dt-dsg' },
+  { id: 'gen', label: 'General', class: 'dt-gen' },
 ];
 
 export const RULES_DATA = [

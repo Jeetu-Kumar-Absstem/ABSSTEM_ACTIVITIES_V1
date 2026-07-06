@@ -484,13 +484,14 @@ const LoginPage = ({ onLogin }) => {
                   style={{ padding: '12px 18px' }}
                 >
                   <option value="">Select Department (Optional)</option>
-                  <option value="Engineering">Engineering</option>
                   <option value="Sales">Sales</option>
                   <option value="HR">HR</option>
                   <option value="Accounts">Accounts</option>
                   <option value="Service">Service</option>
                   <option value="R&D">R&D</option>
-                  <option value="Operations">Operations</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Logistics">Logistics</option>
+                  <option value="Design">Design</option>
                   <option value="General">General</option>
                 </select>
               </div>
