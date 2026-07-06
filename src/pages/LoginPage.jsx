@@ -4,21 +4,51 @@ import { supabase } from '../utils/supabase';
 import { useToast } from '../context/ToastContext';
 import { validateEmpId, formatEmpId, validatePassword } from '../utils/validators';
 
+// Eye icons as inline SVG components
+const EyeIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+const EyeOffIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+    <line x1="1" y1="1" x2="23" y2="23"/>
+  </svg>
+);
+
+const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+
 const LoginPage = ({ onLogin }) => {
   const [empId, setEmpId] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [name, setName] = useState('');
+  const [personalEmail, setPersonalEmail] = useState('');
   const [department, setDepartment] = useState('');
-  const [loginError, setLoginError] = useState(''); // inline error state
+  const [loginError, setLoginError] = useState('');
+  const [forgotEmpId, setForgotEmpId] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  // Show/hide password toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const { showToast } = useToast();
 
   const handleEmpIdChange = (e) => {
     const rawValue = e.target.value;
     const formatted = formatEmpId(rawValue);
     setEmpId(formatted);
-    setLoginError(''); // clear error on change
+    setLoginError('');
   };
 
   const handleLogin = async (e) => {
@@ -37,18 +67,15 @@ const LoginPage = ({ onLogin }) => {
 
     setLoading(true);
     try {
-      const email = `${empId}@absstem.com`;
-
-      // Step 1: Check if Employee ID exists
+      // Look up real email by employee_code
       const { data: empData, error: empError } = await supabase
         .from('employees')
-        .select('employee_code')
+        .select('email, employee_code')
         .eq('employee_code', empId)
         .maybeSingle();
 
       if (empError) {
         console.error('Employee lookup error:', empError);
-        // Fall through to auth if lookup fails
       }
 
       if (!empData) {
@@ -57,17 +84,25 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
 
-      // Step 2: Attempt login
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: empData.email,
+        password,
+      });
 
       if (error) {
         if (error.message.toLowerCase().includes('invalid login credentials')) {
           setLoginError('Incorrect password. Please try again.');
         } else if (error.message.toLowerCase().includes('email not confirmed')) {
-          setLoginError('Please confirm your email before logging in.');
+          setLoginError('Email not confirmed. Please check your inbox and confirm your account before logging in.');
         } else {
           setLoginError(error.message || 'Login failed. Please try again.');
         }
+        return;
+      }
+
+      if (!data?.user?.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setLoginError('Please confirm your email address before logging in.');
         return;
       }
 
@@ -94,19 +129,31 @@ const LoginPage = ({ onLogin }) => {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!personalEmail || !emailRegex.test(personalEmail.trim())) {
+      showToast('Please enter a valid personal email address', 'error');
+      return;
+    }
+
     if (!validatePassword(password)) {
       showToast('Password must be 8+ chars with uppercase, lowercase, digit, and # or @', 'error');
       return;
     }
 
+    if (password !== confirmPassword) {
+      showToast('Passwords do not match', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
-      const email = `${empId}@absstem.com`;
+      const email = personalEmail.trim().toLowerCase();
 
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${APP_URL}/`,
           data: {
             name: name.trim(),
             emp_id: empId,
@@ -117,36 +164,16 @@ const LoginPage = ({ onLogin }) => {
 
       if (error) throw error;
 
-      try {
-        const { error: dbError } = await supabase
-          .from('employees')
-          .insert([{
-            name: name.trim(),
-            email: email,
-            department: department || 'General',
-            employee_code: empId,
-          }]);
-
-        if (dbError) {
-          console.error('Error saving to employees table:', dbError);
-          if (dbError.code === '23505') {
-            showToast('Employee ID already registered. Please login.', 'warning');
-            setIsRegister(false);
-            setLoading(false);
-            return;
-          }
-          showToast('Account created but employee record may need manual setup.', 'warning');
-        } else {
-          showToast('Registered! Check your email to confirm.', 'success');
-        }
-      } catch (dbError) {
-        console.log('Error with employees table:', dbError);
-      }
+      // Sign out immediately — prevent auto-login before email is confirmed
+      await supabase.auth.signOut();
+      showToast('We sent a confirmation email. Please confirm it before logging in.', 'success');
 
       setIsRegister(false);
       setName('');
       setEmpId('');
       setPassword('');
+      setConfirmPassword('');
+      setPersonalEmail('');
       setDepartment('');
 
     } catch (error) {
@@ -161,27 +188,236 @@ const LoginPage = ({ onLogin }) => {
     }
   };
 
+  // Forgot Password
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+
+    const trimmedId = forgotEmpId.trim().toUpperCase();
+
+    if (!validateEmpId(trimmedId)) {
+      showToast('Please enter a valid Employee ID (e.g., ABCD1234)', 'error');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const { data: empData, error: empError } = await supabase
+        .from('employees')
+        .select('name, email, employee_code')
+        .eq('employee_code', trimmedId)
+        .maybeSingle();
+
+      if (empError) throw empError;
+
+      if (!empData) {
+        showToast('No account found for this Employee ID.', 'error');
+        return;
+      }
+
+      if (!empData.email) {
+        showToast('No email is linked to this Employee ID.', 'error');
+        return;
+      }
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        empData.email,
+        { redirectTo: APP_URL + '/reset-password' }
+      );
+
+      if (resetError) throw resetError;
+
+      setForgotEmail(empData.email);
+      setForgotSuccess(true);
+      showToast('Reset link sent to ' + empData.email, 'success');
+    } catch (error) {
+      showToast(error.message || 'Something went wrong. Please try again.', 'error');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const resetToLogin = () => {
+    setIsForgotPassword(false);
+    setForgotEmpId('');
+    setForgotEmail('');
+    setForgotEmailError('');
+    setForgotSuccess(false);
+    setLoginError('');
+  };
+
+  // ── Shared styles ─────────────────────────────────────────────────────────────
+  const passwordWrapStyle = {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  };
+
+  const eyeBtnStyle = {
+    position: 'absolute',
+    right: '14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#8888aa',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0',
+    lineHeight: 1,
+  };
+
+  const containerStyle = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #eef0f4 0%, #d5dbe8 100%)',
+    padding: '20px',
+    position: 'relative',
+    zIndex: 1,
+  };
+
+  const cardStyle = {
+    maxWidth: '440px',
+    width: '100%',
+    padding: '40px 36px',
+    borderRadius: '48px',
+    background: 'rgba(255, 255, 255, 0.85)',
+    backdropFilter: 'blur(12px)',
+    position: 'relative',
+    zIndex: 2,
+  };
+
+  // ── Forgot Password Screen ────────────────────────────────────────────────────
+  if (isForgotPassword) {
+    return (
+      <div style={containerStyle}>
+        <div className="clay" style={cardStyle}>
+          {forgotSuccess ? (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📬</div>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '8px' }}>
+                Check Your Email
+              </h1>
+              <p style={{ fontSize: '0.82rem', color: '#555', lineHeight: 1.6, marginBottom: '8px' }}>
+                A password reset link has been sent to:
+              </p>
+              <div style={{
+                background: 'rgba(26,60,110,0.07)',
+                borderRadius: '10px',
+                padding: '8px 16px',
+                marginBottom: '16px',
+                fontWeight: 600,
+                color: '#1a3c6e',
+                fontSize: '0.85rem',
+                wordBreak: 'break-all',
+                textAlign: 'center',
+              }}>
+                {forgotEmail.trim().toLowerCase()}
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#888', lineHeight: 1.6, marginBottom: '24px' }}>
+                The link expires in 1 hour. Check your spam folder if you don't see it.
+              </p>
+              <button
+                onClick={resetToLogin}
+                className="clay-btn clay-btn-primary"
+                style={{ width: '100%', padding: '14px', fontSize: '0.9rem', justifyContent: 'center' }}
+              >
+                ← Back to Login
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🔑</div>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a3c6e' }}>Forgot Password?</h1>
+                <p style={{ fontSize: '0.8rem', color: '#8888aa', marginTop: '4px' }}>
+                  Enter your Employee ID and we'll send the reset link to your registered email.
+                </p>
+              </div>
+
+              <form onSubmit={handleForgotPassword}>
+                {/* Employee ID */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+                    Employee ID <span style={{ color: '#e53935' }}>*</span>
+                  </label>
+                  <input
+                    className="clay-input"
+                    type="text"
+                    value={forgotEmpId}
+                    onChange={(e) => setForgotEmpId(formatEmpId(e.target.value))}
+                    placeholder="e.g., ABCD1234"
+                    maxLength="8"
+                    style={{
+                      padding: '12px 18px',
+                      textTransform: 'uppercase',
+                      fontFamily: 'monospace',
+                      letterSpacing: '1px',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                    required
+                  />
+                </div>
+
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  background: 'rgba(26,60,110,0.06)',
+                  color: '#44506b',
+                  fontSize: '0.72rem',
+                  lineHeight: 1.6,
+                }}>
+                  We will look up the email linked to this Employee ID and send the reset link there.
+                </div>
+
+                <button
+                  type="submit"
+                  className="clay-btn clay-btn-primary"
+                  disabled={forgotLoading}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    fontSize: '0.9rem',
+                    justifyContent: 'center',
+                    opacity: forgotLoading ? 0.7 : 1,
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {forgotLoading ? '⏳ Sending...' : '📧 Send Reset Link'}
+                </button>
+              </form>
+
+              <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                <button
+                  onClick={resetToLogin}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#1a3c6e',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  ← Back to Login
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main Login / Register Screen ──────────────────────────────────────────────
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #eef0f4 0%, #d5dbe8 100%)',
-      padding: '20px',
-      position: 'relative',
-      zIndex: 1,
-    }}>
-      <div className="clay" style={{
-        maxWidth: '440px',
-        width: '100%',
-        padding: '40px 36px',
-        borderRadius: '48px',
-        background: 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(12px)',
-        position: 'relative',
-        zIndex: 2,
-      }}>
+    <div style={containerStyle}>
+      <div className="clay" style={cardStyle}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎮</div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a3c6e' }}>
@@ -208,6 +444,34 @@ const LoginPage = ({ onLogin }) => {
                   style={{ padding: '12px 18px' }}
                   required
                 />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+                  Email <span style={{ color: '#e53935' }}>*</span>
+                </label>
+                <input
+                  className="clay-input"
+                  type="text"
+                  value={personalEmail}
+                  onChange={(e) => setPersonalEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  style={{ padding: '12px 18px' }}
+                  required
+                />
+                {personalEmail.length > 0 && (
+                  <div style={{
+                    fontSize: '0.6rem', marginTop: '4px', fontWeight: 500,
+                    color: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail.trim()) ? '#2e7d32' : '#c62828',
+                  }}>
+                    {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail.trim())
+                      ? '✅ Valid email'
+                      : '⚠️ Must include @'}
+                  </div>
+                )}
+                <div style={{ fontSize: '0.55rem', color: '#999', marginTop: '2px' }}>
+                  A confirmation link will be sent to this email
+                </div>
               </div>
 
               <div style={{ marginBottom: '16px' }}>
@@ -282,19 +546,30 @@ const LoginPage = ({ onLogin }) => {
             </div>
           </div>
 
+          {/* Password with eye toggle */}
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
               Password <span style={{ color: '#e53935' }}>*</span>
             </label>
-            <input
-              className="clay-input"
-              type="password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
-              placeholder="Enter your password"
-              style={{ padding: '12px 18px' }}
-              required
-            />
+            <div style={passwordWrapStyle}>
+              <input
+                className="clay-input"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
+                placeholder="Enter your password"
+                style={{ padding: '12px 44px 12px 18px', width: '100%', boxSizing: 'border-box' }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={eyeBtnStyle}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
             <div style={{ fontSize: '0.6rem', color: '#8888aa', marginTop: '4px' }}>
               Min 8 chars: 1 uppercase, 1 lowercase, 1 digit, and # or @
             </div>
@@ -303,7 +578,45 @@ const LoginPage = ({ onLogin }) => {
             </div>
           </div>
 
-          {/* ✅ Inline error — shows right above Login button */}
+          {/* Confirm Password — register only */}
+          {isRegister && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+                Confirm Password <span style={{ color: '#e53935' }}>*</span>
+              </label>
+              <div style={passwordWrapStyle}>
+                <input
+                  className="clay-input"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter your password"
+                  style={{ padding: '12px 44px 12px 18px', width: '100%', boxSizing: 'border-box' }}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  style={eyeBtnStyle}
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {confirmPassword.length > 0 && (
+                <div style={{
+                  fontSize: '0.6rem',
+                  marginTop: '4px',
+                  color: password === confirmPassword ? '#2e7d32' : '#c62828',
+                  fontWeight: 500,
+                }}>
+                  {password === confirmPassword ? '✅ Passwords match' : '⚠️ Passwords do not match'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Inline error for login */}
           {!isRegister && loginError && (
             <div style={{
               display: 'flex',
@@ -339,12 +652,33 @@ const LoginPage = ({ onLogin }) => {
           </button>
         </form>
 
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+        {/* Forgot password link — login only */}
+        {!isRegister && (
+          <div style={{ marginTop: '10px', textAlign: 'center' }}>
+            <button
+              onClick={() => { setIsForgotPassword(true); setLoginError(''); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#888',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontFamily: 'inherit',
+              }}
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+
+        <div style={{ marginTop: '12px', textAlign: 'center' }}>
           <button
             onClick={() => {
               setIsRegister(!isRegister);
               setEmpId('');
               setPassword('');
+              setConfirmPassword('');
               setName('');
               setDepartment('');
               setLoginError('');

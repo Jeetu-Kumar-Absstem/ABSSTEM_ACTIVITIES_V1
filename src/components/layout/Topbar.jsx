@@ -21,13 +21,7 @@ const Topbar = ({ user, onLogout }) => {
         <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a3c6e' }}>absstem</div>
         {/* <div style={{ fontSize: '0.55rem', fontWeight: 300, letterSpacing: '0.15em', opacity: 0.6 }}>CLAN · ERP SYSTEM</div> */}
       </div>
-      {/* <div style={{ flex: 1, maxWidth: 400 }}>
-        <input 
-          className="clay-input" 
-          placeholder="Enter Quotation No./Sale Order No./Invoice..." 
-          style={{ padding: '8px 18px', fontSize: '0.75rem' }} 
-        />
-      </div> */}
+  
       <div style={{ 
         marginLeft: 'auto', 
         display: 'flex', 

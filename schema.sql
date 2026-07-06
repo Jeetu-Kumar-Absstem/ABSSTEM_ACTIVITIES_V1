@@ -323,6 +323,55 @@ create table if not exists public.employees (
   updated_at timestamptz not null default now()
 );
 
+create or replace function public.handle_new_employee_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_employee_code text := upper(
+    coalesce(
+      nullif(trim(new.raw_user_meta_data ->> 'emp_id'), ''),
+      nullif(trim(new.raw_user_meta_data ->> 'employee_code'), '')
+    )
+  );
+  v_name text := nullif(
+    trim(
+      coalesce(
+        new.raw_user_meta_data ->> 'name',
+        new.raw_user_meta_data ->> 'full_name',
+        split_part(coalesce(new.email, ''), '@', 1)
+      )
+    ),
+    ''
+  );
+  v_department text := nullif(trim(new.raw_user_meta_data ->> 'department'), '');
+begin
+  if v_employee_code is null or v_employee_code = '' then
+    raise exception 'Employee ID is required to create an account';
+  end if;
+
+  insert into public.employees (name, email, department, employee_code, is_active)
+  values (
+    coalesce(v_name, 'New User'),
+    nullif(lower(coalesce(new.email, '')), ''),
+    coalesce(v_department, 'General'),
+    v_employee_code,
+    true
+  )
+  on conflict (employee_code) do update
+  set
+    name = excluded.name,
+    email = excluded.email,
+    department = excluded.department,
+    is_active = true,
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
 create table if not exists public.games (
   id text primary key,
   name text not null unique,
@@ -435,6 +484,45 @@ create table if not exists public.violations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+insert into public.employees (name, email, department, employee_code, is_active)
+select
+  coalesce(
+    nullif(
+      trim(
+        coalesce(
+          u.raw_user_meta_data ->> 'name',
+          u.raw_user_meta_data ->> 'full_name',
+          split_part(coalesce(u.email, ''), '@', 1)
+        )
+      ),
+      ''
+    ),
+    'New User'
+  ),
+  nullif(lower(coalesce(u.email, '')), ''),
+  coalesce(nullif(trim(u.raw_user_meta_data ->> 'department'), ''), 'General'),
+  upper(
+    coalesce(
+      nullif(trim(u.raw_user_meta_data ->> 'emp_id'), ''),
+      nullif(trim(u.raw_user_meta_data ->> 'employee_code'), '')
+    )
+  ),
+  true
+from auth.users u
+where upper(
+  coalesce(
+    nullif(trim(u.raw_user_meta_data ->> 'emp_id'), ''),
+    nullif(trim(u.raw_user_meta_data ->> 'employee_code'), '')
+  )
+) <> ''
+on conflict (employee_code) do update
+set
+  name = excluded.name,
+  email = excluded.email,
+  department = excluded.department,
+  is_active = true,
+  updated_at = now();
 
 -- Backfill new columns on older tables if needed
 alter table if exists public.games
@@ -560,6 +648,11 @@ drop trigger if exists validate_chess_match_results_trigger on public.chess_matc
 create trigger validate_chess_match_results_trigger
 before insert or update on public.chess_match_results
 for each row execute function public.validate_match_result_row();
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_employee_profile();
 
 -- ---------------------------------------------------------------------------
 -- Views

@@ -235,7 +235,7 @@ const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, acti
 const Sidebar = () => {
   const { activeTab, setActiveTab } = useApp();
   const tabs = [
-    { id: 'booking', label: 'Booking Grid' },
+    { id: 'booking', label: 'Book Slots' },
     { id: 'master',  label: 'Game Master'  },
     { id: 'slots',   label: 'Slot Master'  },
     { id: 'rules',   label: 'Rules'        },
