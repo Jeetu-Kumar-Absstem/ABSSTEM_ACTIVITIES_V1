@@ -15,6 +15,8 @@ const Topbar = ({ user, onLogout }) => {
         borderRadius: '60px',
         position: 'relative',
         zIndex: 1000,
+        background: 'linear-gradient(135deg, rgba(190, 230, 225, 0.98), rgba(187, 246, 198, 0.92),rgba(236, 172, 222, 0.92))',
+          boxShadow: '0 18px 50px rgba(26,60,110,0.08)',
       }}
     >
       <div>

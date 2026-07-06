@@ -61,13 +61,13 @@ const ProfilePage = () => {
         style={{
           padding: '24px',
           borderRadius: '32px',
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(244,247,255,0.92))',
+          background: 'linear-gradient(135deg, rgba(220, 241, 156, 0.98), rgba(208, 218, 245, 0.92),rgba(248, 162, 162, 0.92))',
           boxShadow: '0 18px 50px rgba(26,60,110,0.08)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#8888aa', marginBottom: '4px' }}>My Profile</div>
+            <div style={{ fontSize: '0.78rem', color: '#000000', marginBottom: '4px' }}>My Profile</div>
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e1e2f', margin: 0 }}>{userName}</h1>
             <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', color: '#667' }}>
               <span className="clay-badge clay-badge-navy">{empId || 'N/A'}</span>
