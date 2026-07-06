@@ -42,7 +42,14 @@ const DISABLED_STYLE = {
 };
 
 const GameSelector = () => {
-  const { games, selectedGame, setSelectedGame, bookings, currentDate } = useApp();
+  const { games, selectedGame, setSelectedGame, bookings, currentDate, loadBookings } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadBookings();
+    setRefreshing(false);
+  };
   const [gameBookings, setGameBookings] = useState({});
 
   useEffect(() => {
@@ -155,8 +162,17 @@ const GameSelector = () => {
 
       {/* Action buttons */}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-        {/* <button className="clay-btn clay-btn-primary">+ Book Slot</button>
-        <button className="clay-btn">👤 Book for Employee</button> */}
+       <button
+          className="clay-btn"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          style={{ opacity: refreshing ? 0.7 : 1, cursor: refreshing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+            backgroundColor:'#ecf9be'
+           }}
+        >
+          <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>🔄</span>
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
     </div>
   );
