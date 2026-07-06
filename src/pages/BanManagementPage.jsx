@@ -175,11 +175,8 @@ const BanManagementPage = () => {
       return;
     }
 
-    const empSelect = document.getElementById('ban-check-employee');
-    const gameSelect = document.getElementById('ban-check-game');
-    
-    const empId = empSelect.value;
-    const game = gameSelect.value;
+    const empId = selectedEmployee;
+    const game = selectedGameCheck;
     
     if (!empId || !game) {
       setCheckResult({ type: 'info', message: 'Please select both employee and game.' });
@@ -191,26 +188,77 @@ const BanManagementPage = () => {
       setCheckResult({ type: 'info', message: 'Employee not found.' });
       return;
     }
-    
-    // Check ban by employee_code
-    const activeBan = bans.find(b => 
-      b.employee_id === employee.employee_code &&
-      (isSameGame(b.game, game, availableGames) || normalizeGameValue(b.game) === 'all games') &&
-      b.active !== false &&
-      new Date(b.until_date) > new Date()
-    );
-    
+
+    const isCheckingAllGames = normalizeGameValue(game) === 'all games';
+
+    // Helper: find active ban for employee for a specific game (or All Games ban)
+    const findActiveBanForGame = (gameName) => bans.find(b => {
+      const isActive = b.active !== false && new Date(b.until_date) > new Date();
+      if (!isActive) return false;
+      if (b.employee_id !== employee.employee_code) return false;
+      const banIsAllGames = normalizeGameValue(b.game) === 'all games';
+      return isSameGame(b.game, gameName, availableGames) || banIsAllGames;
+    });
+
+    if (isCheckingAllGames) {
+      // Check every game individually and collect banned / allowed lists
+      const bannedGames = [];
+      const allowedGames = [];
+
+      availableGames.forEach(g => {
+        const ban = findActiveBanForGame(g.name);
+        if (ban) {
+          bannedGames.push({
+            game: g,
+            ban,
+          });
+        } else {
+          allowedGames.push(g);
+        }
+      });
+
+      if (bannedGames.length === 0) {
+        setCheckResult({
+          type: 'allowed',
+          message: `✅ ${employee.name} is ALLOWED to play All Games`,
+          details: 'No active bans found for this employee.',
+        });
+      } else {
+        const bannedLines = bannedGames
+          .map(({ game: g, ban }) =>
+            `🚫 ${g.icon || ''} ${g.name} — Until: ${new Date(ban.until_date).toLocaleDateString()} (${ban.reason})`
+          )
+          .join('\n');
+        const allowedLines = allowedGames.length > 0
+          ? allowedGames.map(g => `✅ ${g.icon || ''} ${g.name}`).join('\n')
+          : 'None';
+
+        setCheckResult({
+          type: 'banned',
+          message: `🚫 ${employee.name} has active bans on ${bannedGames.length} game(s)`,
+          details: `Employee ID: ${employee.employee_code}\n\nBANNED GAMES:\n${bannedLines}\n\nALLOWED GAMES:\n${allowedLines}`,
+        });
+      }
+      return;
+    }
+
+    // Specific game check
+    const activeBan = findActiveBanForGame(game);
+
     if (activeBan) {
+      const banScope = normalizeGameValue(activeBan.game) === 'all games'
+        ? 'All Games'
+        : resolveGameLabel(activeBan.game, availableGames);
       setCheckResult({
         type: 'banned',
         message: `🚫 ${employee.name} is BANNED from ${resolveGameLabel(game, availableGames)}`,
-        details: `Employee ID: ${employee.employee_code}\nFrom: ${new Date(activeBan.from_date).toLocaleDateString()}\nUntil: ${new Date(activeBan.until_date).toLocaleDateString()}\nReason: ${activeBan.reason}`
+        details: `Employee ID: ${employee.employee_code}\nBan Scope: ${banScope}\nFrom: ${new Date(activeBan.from_date).toLocaleDateString()}\nUntil: ${new Date(activeBan.until_date).toLocaleDateString()}\nReason: ${activeBan.reason}`,
       });
     } else {
       setCheckResult({
         type: 'allowed',
         message: `✅ ${employee.name} is ALLOWED to play ${resolveGameLabel(game, availableGames)}`,
-        details: 'No active bans found for this employee and game.'
+        details: 'No active bans found for this employee and game.',
       });
     }
   };
@@ -424,7 +472,7 @@ const BanManagementPage = () => {
                 <option value="">-- Select Game --</option>
                 <option value="All Games">🚫 All Games</option>
                 {availableGames.map(game => (
-                  <option key={game.id} value={game.id}>{game.icon} {game.name}</option>
+                  <option key={game.id} value={game.name}>{game.icon} {game.name}</option>
                 ))}
               </select>
             </div>
