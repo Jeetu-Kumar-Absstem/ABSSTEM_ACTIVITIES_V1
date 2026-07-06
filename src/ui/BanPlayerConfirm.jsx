@@ -1,6 +1,8 @@
 // src/ui/BanPlayerConfirm.jsx
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import useViewport from '../hooks/useViewport';
+import BottomSheet from '../components/common/BottomSheet';
 
 /**
  * Ban-player dialog, rendered via a Portal directly into document.body.
@@ -14,6 +16,7 @@ import { createPortal } from 'react-dom';
  *  - onCancel: () => void
  */
 const BanPlayerConfirm = ({ open, player, game, gameOptions = [], onConfirm, onCancel }) => {
+  const { isMobile } = useViewport();
   const getDefaultUntilDate = () => {
     const date = new Date();
     date.setDate(date.getDate() + 30);
@@ -57,6 +60,118 @@ const BanPlayerConfirm = ({ open, player, game, gameOptions = [], onConfirm, onC
     });
   };
 
+  // ── Body content (shared between mobile & desktop) ─────────
+  const body = (
+    <>
+      <div style={{
+        marginBottom: '14px',
+        padding: '10px 14px',
+        background: '#ffebee',
+        borderRadius: '12px',
+        borderLeft: '3px solid #e53935',
+      }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Player: {player.name}</div>
+        <div style={{ fontSize: '0.7rem', color: '#c62828' }}>Game: {game}</div>
+        <div style={{ fontSize: '0.65rem', color: '#c62828', marginTop: '4px' }}>
+          Employee ID: {player.employee_id || 'N/A'}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+          From Date <span style={{ color: '#e53935' }}>*</span>
+        </label>
+        <input
+          type="date"
+          className="clay-input"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+        />
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+          Until Date <span style={{ color: '#e53935' }}>*</span>
+        </label>
+        <input
+          type="date"
+          className="clay-input"
+          value={untilDate}
+          onChange={(e) => setUntilDate(e.target.value)}
+        />
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+          Reason <span style={{ color: '#e53935' }}>*</span>
+        </label>
+        <textarea
+          className="clay-input"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Describe the reason for the ban..."
+          rows="3"
+          style={{ resize: 'vertical', width: '100%' }}
+        />
+        {error && <div style={{ color: '#e53935', fontSize: '0.7rem', marginTop: '4px' }}>{error}</div>}
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+          Banned from
+        </label>
+        <select
+          className="clay-select"
+          value={bannedFrom}
+          onChange={(e) => setBannedFrom(e.target.value)}
+        >
+          {scopeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{
+        marginBottom: '14px',
+        padding: '10px 14px',
+        background: '#fff8e1',
+        borderRadius: '8px',
+        fontSize: '0.65rem',
+        color: '#e65100',
+      }}>
+        This will ban <strong>{player.name}</strong> from <strong>{scopeOptions.find((option) => option.value === bannedFrom)?.label || bannedFrom}</strong>.
+      </div>
+    </>
+  );
+
+  const footer = (
+    <>
+      <button className="clay-btn" onClick={onCancel}>Cancel</button>
+      <button className="clay-btn clay-btn-red" onClick={handleConfirm}>
+        Confirm Ban
+      </button>
+    </>
+  );
+
+  // ── Mobile: bottom sheet ──────────────────────────────────
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open={open}
+        onClose={onCancel}
+        title="Ban Player"
+        icon="🚫"
+        footer={footer}
+        maxHeight="90vh"
+      >
+        {body}
+      </BottomSheet>
+    );
+  }
+
+  // ── Desktop: centered dialog (portaled) ───────────────────
   const dialog = (
     <div
       style={{
@@ -110,86 +225,7 @@ const BanPlayerConfirm = ({ open, player, game, gameOptions = [], onConfirm, onC
         </div>
 
         <div style={{ padding: '0 22px', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
-          <div style={{
-            marginBottom: '14px',
-            padding: '10px 14px',
-            background: '#ffebee',
-            borderRadius: '12px',
-            borderLeft: '3px solid #e53935',
-          }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Player: {player.name}</div>
-            <div style={{ fontSize: '0.7rem', color: '#c62828' }}>Game: {game}</div>
-            <div style={{ fontSize: '0.65rem', color: '#c62828', marginTop: '4px' }}>
-              Employee ID: {player.employee_id || 'N/A'}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-              From Date <span style={{ color: '#e53935' }}>*</span>
-            </label>
-            <input
-              type="date"
-              className="clay-input"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-              Until Date <span style={{ color: '#e53935' }}>*</span>
-            </label>
-            <input
-              type="date"
-              className="clay-input"
-              value={untilDate}
-              onChange={(e) => setUntilDate(e.target.value)}
-            />
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-              Reason <span style={{ color: '#e53935' }}>*</span>
-            </label>
-            <textarea
-              className="clay-input"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Describe the reason for the ban..."
-              rows="3"
-              style={{ resize: 'vertical', width: '100%' }}
-            />
-            {error && <div style={{ color: '#e53935', fontSize: '0.7rem', marginTop: '4px' }}>{error}</div>}
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-              Banned from
-            </label>
-            <select
-              className="clay-select"
-              value={bannedFrom}
-              onChange={(e) => setBannedFrom(e.target.value)}
-            >
-              {scopeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{
-            marginBottom: '14px',
-            padding: '10px 14px',
-            background: '#fff8e1',
-            borderRadius: '8px',
-            fontSize: '0.65rem',
-            color: '#e65100',
-          }}>
-            This will ban <strong>{player.name}</strong> from <strong>{scopeOptions.find((option) => option.value === bannedFrom)?.label || bannedFrom}</strong>.
-          </div>
+          {body}
         </div>
 
         <div style={{
@@ -202,10 +238,7 @@ const BanPlayerConfirm = ({ open, player, game, gameOptions = [], onConfirm, onC
           borderTop: '1px solid rgba(200,210,230,0.4)',
           background: 'white',
         }}>
-          <button className="clay-btn" onClick={onCancel}>Cancel</button>
-          <button className="clay-btn clay-btn-red" onClick={handleConfirm}>
-            Confirm Ban
-          </button>
+          {footer}
         </div>
       </div>
     </div>

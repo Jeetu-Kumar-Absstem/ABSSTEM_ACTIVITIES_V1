@@ -1,86 +1,74 @@
 // src/components/layout/Layout.jsx
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Topbar from './Topbar';
 import Sidebar from './Sidebar';
+import MobileDrawer from './MobileDrawer';
+import useViewport from '../../hooks/useViewport';
 
 const Layout = ({ children, user, onLogout }) => {
+  const { isMobile, isTablet } = useViewport();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openDrawer  = useCallback(() => setDrawerOpen(true),  []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
+  // Close drawer on back/forward navigation
+  useEffect(() => {
+    const close = () => setDrawerOpen(false);
+    window.addEventListener('popstate', close);
+    return () => window.removeEventListener('popstate', close);
+  }, []);
+
+  // Lock body scroll while drawer is open (mobile only)
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [drawerOpen]);
+
   return (
-    <div style={{ 
-      display: 'flex',
-      flexDirection: 'column',
-      minHeight: '100vh',
-      position: 'relative', 
-      zIndex: 1,
-      overflow: 'visible', // Important for dropdown visibility
-    }}>
-      <Topbar user={user} onLogout={onLogout} />
-      <div style={{ 
-        display: 'flex',
-        flex: 1,
-        gap: '20px',
-        overflow: 'visible', // Important for dropdown visibility
-        position: 'relative',
-      }}>
-        <Sidebar />
-        <div style={{ 
-          flex: 1, 
-          minWidth: 0,
-          overflow: 'visible', // Important for dropdown visibility
-          position: 'relative',
-          zIndex: 1,
-        }}>
-          {children}
-        </div>
+    <div className="app-shell">
+      <Topbar
+        user={user}
+        onLogout={onLogout}
+        onOpenDrawer={openDrawer}
+        showHamburger={isMobile}
+      />
+
+      <div className="app-body">
+        <aside className="app-sidebar">
+          <Sidebar defaultCollapsed={isTablet} />
+        </aside>
+
+        <main className="app-main">
+          <div className="app-main-inner">
+            {children}
+          </div>
+        </main>
       </div>
 
-      {/* Footer */}
-      <footer style={{
-        flexShrink: 0,
-        borderTop: '1px solid #e2e8f0',
-        backgroundColor: '#055952',
-        padding: '8px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <p style={{ fontSize: '10px', color: '#ffffff', margin: 0 }}>
+      <footer className="app-footer">
+        <p className="app-footer-copy">
           © {new Date().getFullYear()} Absstem Technologies. All rights reserved.
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <a
-            href="https://absstem.com/privacy-policy"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: '10px', color: '#ffffff', textDecoration: 'none' }}
-            onMouseEnter={e => e.target.style.color = '#2563eb'}
-            onMouseLeave={e => e.target.style.color = '#ffffff'}
-          >
-            Privacy Policy
-          </a>
-          <span style={{ color: '#cbd5e1', fontSize: '10px' }}>|</span>
-          <a
-            href="https://absstem.com/terms-condition"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: '10px', color: '#ffffff', textDecoration: 'none' }}
-            onMouseEnter={e => e.target.style.color = '#a75316'}
-            onMouseLeave={e => e.target.style.color = '#ffffff'}
-          >
-            Terms & Conditions
-          </a>
-          <span style={{ color: '#ffffff', fontSize: '10px' }}>|</span>
-          <a
-            href="https://absstem.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: '10px', color: '#ffffff', textDecoration: 'none' }}
-            onMouseEnter={e => e.target.style.color = '#f1c9dc'}
-            onMouseLeave={e => e.target.style.color = '#ffffff'}
-          >
-            absstem.com
-          </a>
+        <div className="app-footer-links">
+          <a href="https://absstem.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          <span className="app-footer-sep">|</span>
+          <a href="https://absstem.com/terms-condition" target="_blank" rel="noopener noreferrer">Terms & Conditions</a>
+          <span className="app-footer-sep">|</span>
+          <a href="https://absstem.com" target="_blank" rel="noopener noreferrer">absstem.com</a>
         </div>
       </footer>
+
+      {isMobile && (
+        <MobileDrawer
+          open={drawerOpen}
+          onClose={closeDrawer}
+          user={user}
+          onLogout={onLogout}
+        />
+      )}
     </div>
   );
 };
