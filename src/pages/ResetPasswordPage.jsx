@@ -37,29 +37,32 @@ const ResetPasswordPage = () => {
   useEffect(() => {
     let timeout;
 
-    const init = async () => {
-      // First check: maybe Supabase already restored the session from the URL
-      // (it does this automatically when detectSessionInUrl is true, which is default)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setSessionReady(true);
-        return;
-      }
-
-      // Otherwise wait for Supabase to process the URL and fire an auth event.
-      // Start a timeout — if nothing fires in 8s, the link is truly expired.
-      timeout = setTimeout(() => setSessionError(true), 8000);
-    };
-
-    // onAuthStateChange must be registered BEFORE getSession
-    // so we don't miss the event
+    // IMPORTANT: register the listener BEFORE calling getSession so we never
+    // miss the PASSWORD_RECOVERY / SIGNED_IN event on a slow connection.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session?.user) {
         setSessionReady(true);
         clearTimeout(timeout);
+        // Strip the token fragment from the URL so a page refresh doesn't
+        // re-use the (now spent) one-time token.
         window.history.replaceState(null, '', window.location.pathname);
       }
     });
+
+    const init = async () => {
+      // Supabase may have already consumed the URL hash and created a session
+      // by the time React mounts (detectSessionInUrl:true does this eagerly).
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setSessionReady(true);
+        clearTimeout(timeout);
+        return;
+      }
+
+      // Nothing yet — start a timeout. If Supabase hasn't fired within 8s
+      // the link is genuinely expired or already used.
+      timeout = setTimeout(() => setSessionError(true), 8000);
+    };
 
     init();
 
