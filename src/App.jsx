@@ -15,6 +15,13 @@ function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // If we landed on /reset-password, never resolve a session here —
+      // ResetPasswordPage owns session detection on that route.
+      if (window.location.pathname === '/reset-password') {
+        setLoading(false);
+        return;
+      }
+
       if (session?.user && !session.user.email_confirmed_at) {
         await supabase.auth.signOut();
         setUser(null);
@@ -26,7 +33,13 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // Let ResetPasswordPage handle it
+        // Let ResetPasswordPage handle it — do NOT set user
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && window.location.pathname === '/reset-password') {
+        // Supabase sometimes fires SIGNED_IN instead of PASSWORD_RECOVERY on custom domains.
+        // While on the reset route, never treat this as a normal login.
         return;
       }
 
