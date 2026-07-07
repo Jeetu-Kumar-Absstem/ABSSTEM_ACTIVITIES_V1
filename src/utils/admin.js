@@ -3,7 +3,9 @@
 // List of admin employee IDs
 export const ADMIN_IDS = [
   'ABCD1234',
-  'ABCD6789',
+  'atemp157',
+  'atemp139',
+  'abse1022'
   // Add more admin IDs here as needed
 ];
 
