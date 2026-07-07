@@ -56,7 +56,7 @@ const LoginPage = ({ onLogin }) => {
     setLoginError('');
 
     if (!validateEmpId(empId)) {
-      setLoginError('Invalid Employee ID format (e.g., ABCD1234)');
+      setLoginError('Invalid Employee ID (e.g., ABCD1234 or ABCDE123)');
       return;
     }
 
@@ -125,7 +125,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     if (!validateEmpId(empId)) {
-      showToast('Employee ID: 4 letters + 4 digits (e.g., ABCD1234)', 'error');
+      showToast('Employee ID must be 4L+4D or 5L+3D (e.g., ABCD1234 or ABCDE123)', 'error');
       return;
     }
 
@@ -197,7 +197,7 @@ const LoginPage = ({ onLogin }) => {
     const trimmedId = forgotEmpId.trim().toUpperCase();
 
     if (!validateEmpId(trimmedId)) {
-      showToast('Please enter a valid Employee ID (e.g., ABCD1234)', 'error');
+      showToast('Please enter a valid Employee ID (e.g., ABCD1234 or ABCDE123)', 'error');
       return;
     }
 
@@ -507,7 +507,7 @@ const LoginPage = ({ onLogin }) => {
               type="text"
               value={empId}
               onChange={handleEmpIdChange}
-              placeholder="e.g., ABCD1234 (4 letters + 4 digits)"
+              placeholder="e.g., ABCD1234 or ABCDE123"
               maxLength="8"
               style={{
                 padding: '12px 18px',
@@ -517,17 +517,14 @@ const LoginPage = ({ onLogin }) => {
               }}
               required
             />
-            <div style={{
-              fontSize: '0.6rem',
-              color: '#8888aa',
-              marginTop: '4px',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-            }}>
-              <span>Format: <strong>4 letters</strong> + <strong>4 digits</strong></span>
-              {empId.length > 0 && (
+            {empId.length > 0 && (
+              <div style={{
+                fontSize: '0.6rem',
+                marginTop: '4px',
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+              }}>
                 <span style={{
                   display: 'inline-block',
                   padding: '1px 10px',
@@ -539,11 +536,8 @@ const LoginPage = ({ onLogin }) => {
                 }}>
                   {empId.length === 8 && validateEmpId(empId) ? '✅ Valid' : '⚠️ Invalid'}
                 </span>
-              )}
-            </div>
-            <div style={{ fontSize: '0.55rem', color: '#999', marginTop: '2px' }}>
-              Example: <strong>ABCD1234</strong> or <strong>XYZW5678</strong>
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Password with eye toggle */}
@@ -697,15 +691,7 @@ const LoginPage = ({ onLogin }) => {
           </button>
         </div>
 
-        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(249,168,37,0.05)', borderRadius: '16px', borderLeft: '3px solid #f9a825' }}>
-          <div style={{ fontSize: '0.65rem', color: '#666', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div><strong>Demo Credentials:</strong></div>
-            <div>Emp ID: <strong>ABCD1234</strong> | Password: <strong>Test@1234</strong></div>
-            <div style={{ fontSize: '0.55rem', color: '#999' }}>
-              (Create an account first or use Supabase Auth)
-            </div>
-          </div>
-        </div>
+       
       </div>
     </div>
   );
