@@ -1,6 +1,8 @@
 // src/ui/MatchResultConfirm.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import useViewport from '../hooks/useViewport';
+import BottomSheet from '../components/common/BottomSheet';
 
 const TEAM_SIZES = {
   carrom: 2,
@@ -16,6 +18,7 @@ const getDefaultTeams = (players, teamSize) => {
 };
 
 const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], existingResult, onCancel, onConfirm }) => {
+  const { isMobile } = useViewport();
   const teamSize = TEAM_SIZES[String(game || '').toLowerCase()] || 1;
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
@@ -100,6 +103,7 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
       </div>
 
       <div
+        className="match-result-player-head"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 120px 120px',
@@ -127,6 +131,7 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
         return (
           <div
             key={playerKey}
+            className="match-result-player-row"
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 120px 120px',
@@ -147,7 +152,7 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
               </div>
             </div>
 
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}>
+            <label className="match-result-team-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={inTeamA}
@@ -159,7 +164,7 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
               </span>
             </label>
 
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}>
+            <label className="match-result-team-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={inTeamB}
@@ -215,6 +220,77 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
     });
   };
 
+  // ── Body content (shared) ─────────────────────────────────
+  const body = (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      <div className="clay-soft" style={{ padding: '12px 14px', borderRadius: '18px', background: 'rgba(26,60,110,0.04)' }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1a3c6e' }}>Who can submit</div>
+        <div style={{ fontSize: '0.72rem', color: '#556' }}>
+          Only players from this slot should submit or edit the result. Points are awarded automatically:
+          4 for the winning team, 1 for the losing team, and 2 each for a draw.
+        </div>
+      </div>
+
+      {players.length < teamSize * 2 && (
+        <div style={{ padding: '12px 14px', borderRadius: '16px', background: '#fff3cd', color: '#7a5a00', fontSize: '0.72rem' }}>
+          This slot currently needs {teamSize * 2} players before a result can be saved.
+        </div>
+      )}
+
+      {renderPlayerRows()}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div className="clay-soft" style={{ padding: '10px 12px', borderRadius: '14px', fontSize: '0.75rem', color: '#1a3c6e' }}>
+          Team A: <strong>{teamA.filter(Boolean).length}</strong> / {teamSize}
+        </div>
+        <div className="clay-soft" style={{ padding: '10px 12px', borderRadius: '14px', fontSize: '0.75rem', color: '#1a3c6e' }}>
+          Team B: <strong>{teamB.filter(Boolean).length}</strong> / {teamSize}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: '8px' }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1a3c6e' }}>Result</div>
+        <select className="clay-select" value={result} onChange={(e) => setResult(e.target.value)}>
+          <option value="team_a">Team A won</option>
+          <option value="team_b">Team B won</option>
+          <option value="draw">Draw</option>
+        </select>
+      </div>
+
+      {error && (
+        <div style={{ color: '#c62828', fontSize: '0.76rem', background: '#ffebee', padding: '10px 12px', borderRadius: '14px' }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+
+  const footer = (
+    <>
+      <button className="clay-btn" onClick={onCancel}>Cancel</button>
+      <button className="clay-btn clay-btn-primary" onClick={handleConfirm} disabled={players.length < teamSize * 2}>
+        Save Result
+      </button>
+    </>
+  );
+
+  // ── Mobile: bottom sheet ──────────────────────────────────
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open={open}
+        onClose={onCancel}
+        title={`${String(game || '').toUpperCase()} · ${slotLabel}`}
+        icon="🏆"
+        footer={footer}
+        maxHeight="92vh"
+      >
+        {body}
+      </BottomSheet>
+    );
+  }
+
+  // ── Desktop: centered dialog (portaled) ───────────────────
   const dialog = (
     <div
       style={{
@@ -250,46 +326,8 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
           <button className="clay-btn" onClick={onCancel}>x</button>
         </div>
 
-        <div style={{ padding: '0 24px 20px', display: 'grid', gap: '16px' }}>
-          <div className="clay-soft" style={{ padding: '12px 14px', borderRadius: '18px', background: 'rgba(26,60,110,0.04)' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1a3c6e' }}>Who can submit</div>
-            <div style={{ fontSize: '0.72rem', color: '#556' }}>
-              Only players from this slot should submit or edit the result. Points are awarded automatically:
-              4 for the winning team, 1 for the losing team, and 2 each for a draw.
-            </div>
-          </div>
-
-          {players.length < teamSize * 2 && (
-            <div style={{ padding: '12px 14px', borderRadius: '16px', background: '#fff3cd', color: '#7a5a00', fontSize: '0.72rem' }}>
-              This slot currently needs {teamSize * 2} players before a result can be saved.
-            </div>
-          )}
-
-          {renderPlayerRows()}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="clay-soft" style={{ padding: '10px 12px', borderRadius: '14px', fontSize: '0.75rem', color: '#1a3c6e' }}>
-              Team A: <strong>{teamA.filter(Boolean).length}</strong> / {teamSize}
-            </div>
-            <div className="clay-soft" style={{ padding: '10px 12px', borderRadius: '14px', fontSize: '0.75rem', color: '#1a3c6e' }}>
-              Team B: <strong>{teamB.filter(Boolean).length}</strong> / {teamSize}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gap: '8px' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1a3c6e' }}>Result</div>
-            <select className="clay-select" value={result} onChange={(e) => setResult(e.target.value)}>
-              <option value="team_a">Team A won</option>
-              <option value="team_b">Team B won</option>
-              <option value="draw">Draw</option>
-            </select>
-          </div>
-
-          {error && (
-            <div style={{ color: '#c62828', fontSize: '0.76rem', background: '#ffebee', padding: '10px 12px', borderRadius: '14px' }}>
-              {error}
-            </div>
-          )}
+        <div style={{ padding: '0 24px 20px' }}>
+          {body}
         </div>
 
         <div style={{
@@ -300,10 +338,7 @@ const MatchResultConfirm = ({ open, game, day, slotId, slotLabel, players = [], 
           borderTop: '1px solid rgba(200,210,230,0.4)',
           background: 'rgba(255,255,255,0.98)',
         }}>
-          <button className="clay-btn" onClick={onCancel}>Cancel</button>
-          <button className="clay-btn clay-btn-primary" onClick={handleConfirm} disabled={players.length < teamSize * 2}>
-            Save Result
-          </button>
+          {footer}
         </div>
       </div>
     </div>

@@ -1,6 +1,8 @@
 // src/ui/RemoveBookingConfirm.jsx
 import React from 'react';
 import { createPortal } from 'react-dom';
+import useViewport from '../hooks/useViewport';
+import BottomSheet from '../components/common/BottomSheet';
 
 /**
  * Confirmation dialog for removing your own booking, rendered via a Portal
@@ -16,7 +18,40 @@ import { createPortal } from 'react-dom';
  *  - onCancel: () => void
  */
 const RemoveBookingConfirm = ({ open, playerName, day, slotLabel, onConfirm, onCancel }) => {
+  const { isMobile } = useViewport();
   if (!open) return null;
+
+  const body = (
+    <p style={{ fontSize: '0.85rem', color: '#444466', lineHeight: 1.5, margin: 0 }}>
+      Remove <strong>{playerName}</strong>'s booking for <strong>{day}</strong>
+      {slotLabel ? <> at <strong>{slotLabel}</strong></> : null}? This can't be undone.
+    </p>
+  );
+
+  const footer = (
+    <>
+      <button className="clay-btn" onClick={onCancel} style={{ padding: '8px 18px' }}>
+        Cancel
+      </button>
+      <button className="clay-btn clay-btn-red" onClick={onConfirm} style={{ padding: '8px 18px' }}>
+        ✖️ Remove
+      </button>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open={open}
+        onClose={onCancel}
+        title="Remove Booking?"
+        icon="✖️"
+        footer={footer}
+      >
+        {body}
+      </BottomSheet>
+    );
+  }
 
   const dialog = (
     <div
@@ -54,18 +89,10 @@ const RemoveBookingConfirm = ({ open, playerName, day, slotLabel, onConfirm, onC
           </h3>
         </div>
 
-        <p style={{ fontSize: '0.85rem', color: '#444466', lineHeight: 1.5, margin: '0 0 18px' }}>
-          Remove <strong>{playerName}</strong>'s booking for <strong>{day}</strong>
-          {slotLabel ? <> at <strong>{slotLabel}</strong></> : null}? This can't be undone.
-        </p>
+        {body}
 
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button className="clay-btn" onClick={onCancel} style={{ padding: '8px 18px' }}>
-            Cancel
-          </button>
-          <button className="clay-btn clay-btn-red" onClick={onConfirm} style={{ padding: '8px 18px' }}>
-            ✖️ Remove
-          </button>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '18px' }}>
+          {footer}
         </div>
       </div>
     </div>

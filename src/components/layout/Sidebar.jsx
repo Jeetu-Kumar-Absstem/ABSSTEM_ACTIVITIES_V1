@@ -14,6 +14,14 @@ const TAB_COLORS = {
   activities: { bg: '#055952', shadow: 'rgba(15,118,110,0.35)',  waves: ['#5eead4', '#2dd4bf', '#0f766e'] },
 };
 
+const TAB_ICONS = {
+  booking: '🎯',
+  master:  '🎮',
+  slots:   '⏰',
+  rules:   '📜',
+  bans:    '🚫',
+};
+
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
@@ -119,7 +127,7 @@ const PillWaveSVG = ({ waves, pathRefs }) => (
 );
 
 // ── Tab pill buttons (sub-items) ─────────────────────────────────
-const PillButton = ({ tabId, label, active, onClick }) => {
+const PillButton = ({ tabId, label, active, onClick, collapsed }) => {
   const { bg, shadow, waves } = TAB_COLORS[tabId] || {
     bg: '#888', shadow: 'rgba(136,136,136,0.3)', waves: ['#aaa', '#888', '#666'],
   };
@@ -134,17 +142,20 @@ const PillButton = ({ tabId, label, active, onClick }) => {
       onClick={onClick}
       onMouseEnter={() => handleMouseEnter(active)}
       onMouseLeave={() => handleMouseLeave(active)}
+      title={collapsed ? label : undefined}
+      aria-label={label}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative', overflow: 'hidden',
-        padding: '9px 16px', margin: '4px 6px', width: 'calc(100% - 12px)',
+        padding: collapsed ? '9px 6px' : '9px 16px',
+        margin: '4px 6px', width: 'calc(100% - 12px)',
         backgroundColor: solidFill ? bg : 'transparent',
         border: `2px solid ${isHL ? bg : 'rgba(200,210,230,0.5)'}`,
         borderRadius: '100px', cursor: 'pointer',
         boxShadow: active
           ? `0 4px 14px ${shadow}, 0 1px 3px rgba(0,0,0,0.08)`
           : isHL ? `0 2px 10px ${shadow}` : '0 1px 3px rgba(0,0,0,0.06)',
-        transition: 'border-color 0.15s ease, box-shadow 0.2s ease',
+        transition: 'border-color 0.15s ease, box-shadow 0.2s ease, padding 0.2s ease',
       }}
     >
       {showSVG && <PillWaveSVG waves={waves} pathRefs={pathRefs} />}
@@ -154,16 +165,31 @@ const PillButton = ({ tabId, label, active, onClick }) => {
         fontFamily: '"Aeonik Pro", Arial, sans-serif',
         fontWeight: 700, fontSize: 'clamp(11px, 0.72vw, 13px)',
         lineHeight: '120%', textAlign: 'center', letterSpacing: '0.01em',
-        transition: 'color 0.1s ease', whiteSpace: 'nowrap', userSelect: 'none',
+        transition: 'color 0.1s ease, opacity 0.2s ease',
+        whiteSpace: 'nowrap', userSelect: 'none',
+        opacity: collapsed ? 0 : 1,
+        width: collapsed ? 0 : 'auto',
+        overflow: 'hidden',
       }}>
         {label}
       </span>
+      {collapsed && (
+        <span style={{
+          position: 'relative', zIndex: 1,
+          color: solidFill ? '#fff' : isHL ? '#000' : '#555',
+          fontSize: '1.05rem',
+          opacity: collapsed ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+        }} aria-hidden>
+          {TAB_ICONS[tabId] || '•'}
+        </span>
+      )}
     </div>
   );
 };
 
 // ── SidebarItem — now also a pill wave button for the header ─────
-const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, active, onClick }) => {
+const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, active, onClick, collapsed }) => {
   const [open, setOpen] = useState(defaultOpen);
   const { bg, shadow, waves } = TAB_COLORS[colorId] || TAB_COLORS.dashboard;
 
@@ -175,7 +201,7 @@ const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, acti
 
   const handleClick = () => {
     onClick && onClick();
-    if (children) setOpen(o => !o);
+    if (children && !collapsed) setOpen(o => !o);
   };
 
   return (
@@ -185,17 +211,20 @@ const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, acti
         onClick={handleClick}
         onMouseEnter={() => handleMouseEnter(active || false)}
         onMouseLeave={() => handleMouseLeave(active || false)}
+        title={collapsed ? label : undefined}
+        aria-label={label}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between',
           position: 'relative', overflow: 'hidden',
-          padding: '10px 16px', margin: '0 6px',
+          padding: collapsed ? '10px 6px' : '10px 16px',
+          margin: '0 6px',
           backgroundColor: solidFill ? bg : 'transparent',
           border: `2px solid ${isHL ? bg : 'rgba(200,210,230,0.5)'}`,
           borderRadius: '100px', cursor: 'pointer',
           boxShadow: solidFill
             ? `0 4px 14px ${shadow}, 0 1px 3px rgba(0,0,0,0.08)`
             : isHL ? `0 2px 10px ${shadow}` : '0 1px 3px rgba(0,0,0,0.06)',
-          transition: 'border-color 0.15s ease, box-shadow 0.2s ease',
+          transition: 'border-color 0.15s ease, box-shadow 0.2s ease, padding 0.2s ease',
         }}
       >
         {showSVG && <PillWaveSVG waves={waves} pathRefs={pathRefs} />}
@@ -204,12 +233,16 @@ const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, acti
           fontSize: '0.75rem', fontWeight: 700,
           fontFamily: '"Aeonik Pro", Arial, sans-serif',
           color: solidFill ? '#fff' : isHL ? '#000' : '#444466',
-          transition: 'color 0.1s ease', userSelect: 'none',
+          transition: 'color 0.1s ease, opacity 0.2s ease', userSelect: 'none',
           display: 'flex', alignItems: 'center', gap: '6px',
+          opacity: collapsed ? 0 : 1,
+          width: collapsed ? 0 : 'auto',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
         }}>
           {icon} {label}
         </span>
-        {children && (
+        {children && !collapsed && (
           <span style={{
             position: 'relative', zIndex: 1,
             fontSize: '0.6rem',
@@ -222,7 +255,7 @@ const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, acti
       </div>
 
       {/* Children sub-items */}
-      {children && open && (
+      {children && open && !collapsed && (
         <div style={{ paddingLeft: '4px', paddingBottom: '4px', marginTop: '2px' }}>
           {children}
         </div>
@@ -232,8 +265,10 @@ const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, acti
 };
 
 // ── Sidebar ──────────────────────────────────────────────────────
-const Sidebar = () => {
+const Sidebar = ({ defaultCollapsed = false }) => {
   const { activeTab, setActiveTab } = useApp();
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
   const tabs = [
     { id: 'booking', label: 'Book Slots' },
     { id: 'master',  label: 'Game Master'  },
@@ -244,13 +279,47 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="clay" style={{
-      width: 200, flexShrink: 0, padding: '12px 8px',
-      borderRadius: '32px', minHeight: 'calc(100vh - 120px)', overflowY: 'auto',
-      display: 'flex', flexDirection: 'column', gap: '4px',
-    }}>
-      <SidebarItem colorId="dashboard"  icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-      <SidebarItem colorId="activities" icon="🎮" label="Activities" defaultOpen={true}>
+    <div
+      className="clay sidebar-clay"
+      style={{
+        width: collapsed ? 64 : 200,
+        flexShrink: 0, padding: '12px 8px',
+        borderRadius: '32px', minHeight: 'calc(100vh - 120px)', overflowY: 'auto',
+        display: 'flex', flexDirection: 'column', gap: '4px',
+        transition: 'width 0.25s cubic-bezier(.2,.8,.2,1)',
+      }}
+    >
+      {/* Collapse toggle */}
+      <button
+        type="button"
+        className="sidebar-collapse-btn"
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <span style={{
+          display: 'inline-block',
+          transform: collapsed ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.2s ease',
+        }}>›</span>
+        {!collapsed && <span style={{ marginLeft: 8, fontSize: '0.7rem' }}>Collapse</span>}
+      </button>
+
+      <SidebarItem
+        colorId="dashboard"
+        icon="📊"
+        label="Dashboard"
+        active={activeTab === 'dashboard'}
+        onClick={() => setActiveTab('dashboard')}
+        collapsed={collapsed}
+      />
+      <SidebarItem
+        colorId="activities"
+        icon="🎮"
+        label="Activities"
+        defaultOpen={true}
+        collapsed={collapsed}
+      >
         {tabs.map(tab => (
           <PillButton
             key={tab.id}
@@ -258,6 +327,7 @@ const Sidebar = () => {
             label={tab.label}
             active={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
+            collapsed={collapsed}
           />
         ))}
       </SidebarItem>
