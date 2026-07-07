@@ -507,7 +507,7 @@ const LoginPage = ({ onLogin }) => {
               type="text"
               value={empId}
               onChange={handleEmpIdChange}
-              placeholder="e.g., ABCD1234 or ABCDE123"
+              // placeholder="e.g., ABCD1234 or ABCDE123"
               maxLength="8"
               style={{
                 padding: '12px 18px',
