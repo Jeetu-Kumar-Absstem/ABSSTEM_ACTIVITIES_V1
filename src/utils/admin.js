@@ -5,6 +5,7 @@ export const ADMIN_IDS = [
   'atemp157',
   'ABSE1022',
   'ABCD1234',
+  'atemp139'
   // Add more admin IDs here as needed
 ];
 
