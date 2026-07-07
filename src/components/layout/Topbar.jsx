@@ -2,6 +2,9 @@
 import React from 'react';
 import ProfileIcon from '../common/ProfileIcon';
 
+// 👇 Replace this with your actual logo path
+import absstem_logo_with_name from '/public/absstem_logo_with_name.png';
+
 const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
   return (
     <div
@@ -32,8 +35,18 @@ const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
         </button>
       )}
 
-      <div>
-        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a3c6e' }}>Absstem</div>
+      {/* Logo */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <img
+          src={absstem_logo_with_name}
+          alt="Absstem"
+          style={{
+            height: '75px',       // ← adjust height here
+            width: 'auto',        // keeps aspect ratio
+            objectFit: 'contain',
+            display: 'block',
+          }}
+        />
       </div>
 
       <div style={{
