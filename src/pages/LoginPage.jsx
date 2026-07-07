@@ -220,6 +220,8 @@ const LoginPage = ({ onLogin }) => {
         showToast('No email is linked to this Employee ID.', 'error');
         return;
       }
+      console.log("APP_URL =", APP_URL);
+      console.log("Redirect URL =", APP_URL + "/reset-password");
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         empData.email,
