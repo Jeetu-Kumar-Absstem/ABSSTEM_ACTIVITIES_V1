@@ -284,27 +284,39 @@ const DashboardPage = () => {
   );
 };
 
-const MetricCard = ({ label, value, caption, accent }) => (
-  <div
-    className="clay-card"
-    style={{
-      padding: '18px',
-      borderRadius: '24px',
-      background: 'rgba(255,255,255,0.96)',
-      borderTop: `4px solid ${accent}`,
-    }}
-  >
-    <div style={{ fontSize: '0.68rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-      {label}
+const MetricCard = ({ label, value, caption, accent }) => {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <div
+      className="clay-card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '18px',
+        borderRadius: '24px',
+        background: 'rgba(255,255,255,0.96)',
+        borderTop: `4px solid ${accent}`,
+        borderRight: `2px solid ${hovered ? accent : 'transparent'}`,
+        borderBottom: `2px solid ${hovered ? accent : 'transparent'}`,
+        borderLeft: `2px solid ${hovered ? accent : 'transparent'}`,
+        transform: hovered ? 'translateY(-5px) scale(1.03)' : 'translateY(0) scale(1)',
+        boxShadow: hovered ? `0 8px 20px ${accent}33` : 'none',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+        cursor: 'default',
+      }}
+    >
+      <div style={{ fontSize: '0.68rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {label}
+      </div>
+      <div style={{ marginTop: '8px', fontSize: '1.9rem', fontWeight: 800, color: accent, lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#667' }}>
+        {caption}
+      </div>
     </div>
-    <div style={{ marginTop: '8px', fontSize: '1.9rem', fontWeight: 800, color: accent, lineHeight: 1 }}>
-      {value}
-    </div>
-    <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#667' }}>
-      {caption}
-    </div>
-  </div>
-);
+  );
+};
 
 const thStyle = {
   padding: '8px 10px',
