@@ -9,9 +9,14 @@ const TAB_COLORS = {
   rules:      { bg: '#cf2379', shadow: 'rgba(236,72,153,0.35)',  waves: ['#f9a8d4', '#f472b6', '#ec4899'] },
   bans:       { bg: '#551ed4', shadow: 'rgba(139,92,246,0.35)',  waves: ['#c4b5fd', '#a78bfa', '#8b5cf6'] },
   reports:    { bg: '#0f96ad', shadow: 'rgba(6,182,212,0.35)',   waves: ['#67e8f9', '#22d3ee', '#06b6d4'] },
+  // Events subsection
+  eventsCalendar: { bg: '#0f3a7a', shadow: 'rgba(26,60,110,0.35)', waves: ['#93b4e0', '#4a7bbf', '#1a3c6e'] },
+  tournaments:    { bg: '#b8860b', shadow: 'rgba(184,134,11,0.35)', waves: ['#fde68a', '#fbbf24', '#b8860b'] },
+  leaderboard:    { bg: '#6a1b9a', shadow: 'rgba(106,27,154,0.35)', waves: ['#c4b5fd', '#a78bfa', '#6a1b9a'] },
   // SidebarItem headers
   dashboard:  { bg: '#0f3a7a', shadow: 'rgba(26,60,110,0.35)',   waves: ['#93b4e0', '#4a7bbf', '#1a3c6e'] },
   activities: { bg: '#055952', shadow: 'rgba(15,118,110,0.35)',  waves: ['#5eead4', '#2dd4bf', '#0f766e'] },
+  events:     { bg: '#7c2d12', shadow: 'rgba(124,45,18,0.35)',   waves: ['#fed7aa', '#fb923c', '#7c2d12'] },
 };
 
 const TAB_ICONS = {
@@ -20,6 +25,9 @@ const TAB_ICONS = {
   slots:   '⏰',
   rules:   '📜',
   bans:    '🚫',
+  eventsCalendar: '📅',
+  tournaments:    '🏆',
+  leaderboard:    '🥇',
 };
 
 function easeInOutCubic(t) {
@@ -278,6 +286,12 @@ const Sidebar = ({ defaultCollapsed = false }) => {
     // { id: 'reports', label: 'Reports'      },
   ];
 
+  const eventTabs = [
+    { id: 'eventsCalendar', label: 'Events Calendar' },
+    { id: 'tournaments',    label: 'Tournaments'     },
+    { id: 'leaderboard',    label: 'Leaderboard'     },
+  ];
+
   return (
     <div
       className="clay sidebar-clay"
@@ -321,6 +335,24 @@ const Sidebar = ({ defaultCollapsed = false }) => {
         collapsed={collapsed}
       >
         {tabs.map(tab => (
+          <PillButton
+            key={tab.id}
+            tabId={tab.id}
+            label={tab.label}
+            active={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            collapsed={collapsed}
+          />
+        ))}
+      </SidebarItem>
+      <SidebarItem
+        colorId="events"
+        icon="🎉"
+        label="Events"
+        defaultOpen={true}
+        collapsed={collapsed}
+      >
+        {eventTabs.map(tab => (
           <PillButton
             key={tab.id}
             tabId={tab.id}
