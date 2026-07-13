@@ -1,10 +1,125 @@
 // src/pages/TournamentsPage.jsx
 // Activity Planner ▸ Events ▸ Tournaments
 // Sub-tabs: Active Tournaments | Bracket/Fixtures | Match Results | Stopwatch | Final Results
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
+
+// Confirm-delete modal (admin action on a tournament).
+const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
+  <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
+    <div style={{ ...styles.modalCard, maxWidth: 420 }}>
+      <div style={{ ...styles.modalHeader, background: '#c62828' }}>
+        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Delete Tournament</h3>
+        <button onClick={onCancel} style={styles.modalClose}>✕</button>
+      </div>
+      <div style={{ padding: '1rem', fontSize: '0.78rem', color: '#333' }}>
+        <p style={{ margin: '0 0 0.5rem 0' }}>
+          Are you sure you want to delete <strong>{tournament?.name}</strong> ({tournament?.code})?
+        </p>
+        <p style={{ margin: 0, color: '#c62828', fontSize: '0.72rem' }}>
+          This will also remove all participants, matches and final results linked to it. This cannot be undone.
+        </p>
+      </div>
+      <div style={styles.modalFooter}>
+        <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
+        <button onClick={onConfirm} style={styles.dangerBtn}>🗑 Delete</button>
+      </div>
+    </div>
+  </div>
+);
+
+// Batch-register modal: pick one or more active tournaments in a single click.
+const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCancel, onSubmit }) => {
+  // Open, accepting-registration, not-full, not-already-registered.
+  const eligible = tournaments.filter(t => {
+    if (t.status === 'completed' || t.status === 'cancelled') return false;
+    if (t.registration_open === false) return false;
+    const parts = partsByTournament[t.id] || [];
+    if (parts.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase())) return false;
+    const cap = t.max_participants || 8;
+    return parts.length < cap;
+  });
+  const [selected, setSelected] = useState(() => new Set(eligible.map(t => t.id)));
+
+  const toggle = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
+      <div style={{ ...styles.modalCard, maxWidth: 560 }}>
+        <div style={styles.modalHeader}>
+          <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>🏆 Register for Tournaments</h3>
+          <button onClick={onCancel} style={styles.modalClose}>✕</button>
+        </div>
+        <div style={{ padding: '1rem' }}>
+          <div style={{ fontSize: '0.72rem', color: '#666', marginBottom: '0.6rem' }}>
+            One registration per person per tournament. Tick all tournaments you'd like to join — you can pick one or many.
+          </div>
+          {eligible.length === 0 ? (
+            <div style={{ padding: '1.2rem', textAlign: 'center', color: '#888', fontSize: '0.78rem' }}>
+              No open tournaments available — either you're already registered or they're all full.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              {eligible.map(t => {
+                const parts = partsByTournament[t.id] || [];
+                const isSel = selected.has(t.id);
+                return (
+                  <label
+                    key={t.id}
+                    style={{
+                      display: 'flex', gap: '0.6rem', alignItems: 'center',
+                      padding: '0.55rem 0.7rem', borderRadius: 6,
+                      border: `1px solid ${isSel ? '#1a3c6e' : '#d0d0d0'}`,
+                      background: isSel ? '#e8eef7' : '#fafafa',
+                      cursor: 'pointer', fontSize: '0.75rem',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSel}
+                      onChange={() => toggle(t.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: '#1e1e2f' }}>{t.name}</div>
+                      <div style={{ fontSize: '0.66rem', color: '#666' }}>
+                        {t.code} · {t.game} · {t.format.replace('_', ' ')} · {formatDate(t.start_date)}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.66rem', color: '#444', whiteSpace: 'nowrap' }}>
+                      {parts.length} / {t.max_participants}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div style={styles.modalFooter}>
+          <span style={{ flex: 1, fontSize: '0.7rem', color: '#666' }}>
+            {selected.size} selected
+          </span>
+          <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
+          <button
+            onClick={() => onSubmit([...selected])}
+            disabled={selected.size === 0 || !currentEmpId}
+            style={{
+              ...styles.navyBtn,
+              opacity: selected.size === 0 || !currentEmpId ? 0.5 : 1,
+              cursor: selected.size === 0 || !currentEmpId ? 'not-allowed' : 'pointer',
+            }}
+          >Register</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const SUB_TABS = [
   { id: 'active',     label: 'Active Tournaments', icon: '🏆' },
@@ -48,6 +163,7 @@ const TournamentsPage = () => {
     currentUser,
     isAdmin,
     addTournament,
+    deleteTournament,
     registerForTournament,
     addTournamentMatch,
     recordMatchResult,
@@ -56,15 +172,10 @@ const TournamentsPage = () => {
     getParticipantsByTournament,
     getResultsByTournament,
     getEmployeeName,
-    loadTournaments,
-    loadTournamentParticipants,
-    loadTournamentMatches,
-    loadFinalResults,
   } = useApp();
   const { showToast } = useToast();
 
   const [sub, setSub] = useState('active');
-  const [activeTournament, setActiveTournament] = useState(null);
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
   const [tForm, setTForm] = useState({
     name: '', game: 'Carrom', format: 'knockout',
@@ -79,20 +190,13 @@ const TournamentsPage = () => {
   const [resultMatchId, setResultMatchId] = useState(null);
   const [rForm, setRForm] = useState({ score_a: '', score_b: '', winner: '', duration: '' });
   const [finalForm, setFinalForm] = useState([]);
+  const [tournamentToDelete, setTournamentToDelete] = useState(null);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
-  useEffect(() => {
-    loadTournaments();
-    loadTournamentParticipants();
-    loadTournamentMatches();
-    loadFinalResults();
-  }, [loadTournaments, loadTournamentParticipants, loadTournamentMatches, loadFinalResults]);
-
-  // Default the active tournament to the first one if none selected.
-  useEffect(() => {
-    if (!activeTournament && tournaments.length > 0) {
-      setActiveTournament(tournaments[0].id);
-    }
-  }, [tournaments, activeTournament]);
+  // Auto-pick the first tournament if the user hasn't picked one yet.
+  // Derived state — no effect needed, no cascading renders.
+  const [activeTournamentOverride, setActiveTournament] = useState(null);
+  const activeTournament = activeTournamentOverride ?? (tournaments.length > 0 ? tournaments[0].id : null);
 
   const activeTournamentRecord = useMemo(
     () => tournaments.find(t => t.id === activeTournament) || null,
@@ -102,6 +206,17 @@ const TournamentsPage = () => {
     () => activeTournament ? getParticipantsByTournament(activeTournament) : [],
     [activeTournament, tournamentParticipants, getParticipantsByTournament]
   );
+  // Map of tournament_id -> active (non-withdrawn) participants.
+  // Used by the active-tournaments table and the batch-register modal.
+  const partsByTournament = useMemo(() => {
+    const map = {};
+    for (const p of tournamentParticipants) {
+      if (p.status === 'withdrawn') continue;
+      if (!map[p.tournament_id]) map[p.tournament_id] = [];
+      map[p.tournament_id].push(p);
+    }
+    return map;
+  }, [tournamentParticipants]);
   const matchesForActive = useMemo(
     () => activeTournament ? getMatchesByTournament(activeTournament) : [],
     [activeTournament, tournamentMatches, getMatchesByTournament]
@@ -132,7 +247,7 @@ const TournamentsPage = () => {
           <table style={styles.table}>
             <thead>
               <tr style={styles.theadRow}>
-                {['Code','Tournament','Game','Format','Start','End','Participants','Status','Action'].map(h => (
+                {['Code','Tournament','Game','Format','Start','End','Participants','Status','Register','Action'].map(h => (
                   <th key={h} style={styles.th}>{h}</th>
                 ))}
               </tr>
@@ -140,14 +255,31 @@ const TournamentsPage = () => {
             <tbody>
               {tournaments.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
+                  <td colSpan="10" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
                     No tournaments yet. {isAdmin() && 'Click "New Tournament" to create one.'}
                   </td>
                 </tr>
               ) : tournaments.map((t) => {
                 const status = STATUS_BADGE[t.status] || STATUS_BADGE.draft;
                 const format = FORMAT_BADGE[t.format] || FORMAT_BADGE.knockout;
-                const partCount = tournamentParticipants.filter(p => p.tournament_id === t.id && p.status !== 'withdrawn').length;
+                const partCount = (partsByTournament[t.id] || []).length;
+                const cap = t.max_participants || 8;
+                const isFull = partCount >= cap;
+                const isCompleted = t.status === 'completed' || t.status === 'cancelled';
+                const regOpen = t.registration_open !== false;
+                const alreadyRegistered = (partsByTournament[t.id] || []).some(
+                  p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
+                );
+                // Per-row "Register" button: shown when registration is open,
+                // tournament is not done, and the user hasn't joined yet.
+                const canRegister = !isCompleted && regOpen && !alreadyRegistered && !isFull && !!currentEmpId;
+                const regLabel = alreadyRegistered
+                  ? '✓ Registered'
+                  : isFull
+                    ? '🔒 Full'
+                    : isCompleted
+                      ? '—'
+                      : regOpen ? '🏆 Register' : 'Closed';
                 return (
                   <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={styles.td}><strong>{t.code}</strong></td>
@@ -156,8 +288,27 @@ const TournamentsPage = () => {
                     <td style={styles.td}><span style={{ ...format, ...styles.tinyChip }}>{format.label}</span></td>
                     <td style={styles.td}>{formatDate(t.start_date)}</td>
                     <td style={styles.td}>{formatDate(t.end_date)}</td>
-                    <td style={styles.td}>{partCount} / {t.max_participants}</td>
+                    <td style={styles.td}>{partCount} / {cap}</td>
                     <td style={styles.td}><span style={{ ...status, ...styles.tinyChip }}>{status.label}</span></td>
+                    <td style={styles.td}>
+                      <button
+                        onClick={() => handleRegisterForOne(t.id)}
+                        disabled={!canRegister}
+                        style={{
+                          ...styles.tinyEnterBtn,
+                          background: alreadyRegistered ? '#388e3c' : isFull || isCompleted ? '#9e9e9e' : '#1a3c6e',
+                          opacity: canRegister || alreadyRegistered ? 1 : 0.6,
+                          cursor: canRegister || alreadyRegistered ? 'pointer' : 'not-allowed',
+                        }}
+                        title={
+                          alreadyRegistered ? 'You are already registered'
+                          : isFull ? 'Tournament is full'
+                          : isCompleted ? 'Tournament is closed'
+                          : regOpen ? 'Click to register'
+                          : 'Registration closed'
+                        }
+                      >{regLabel}</button>
+                    </td>
                     <td style={styles.td}>
                       <button
                         onClick={() => { setActiveTournament(t.id); setSub('bracket'); }}
@@ -169,6 +320,13 @@ const TournamentsPage = () => {
                         style={{ ...styles.tinyIconBtn, background: activeTournament === t.id ? '#fff3e0' : undefined }}
                         title="Select"
                       >{activeTournament === t.id ? '✓' : '→'}</button>
+                      {isAdmin() && (
+                        <button
+                          onClick={() => setTournamentToDelete(t)}
+                          style={{ ...styles.tinyIconBtn, color: '#c62828', borderColor: '#ffcdd2' }}
+                          title="Delete tournament"
+                        >🗑</button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -176,6 +334,13 @@ const TournamentsPage = () => {
             </tbody>
           </table>
         </div>
+        {!isAdmin() && (
+          <div style={{ marginTop: '0.7rem', textAlign: 'right' }}>
+            <button onClick={() => setShowRegisterModal(true)} style={styles.navyBtn}>
+              🏆 Register for Multiple Tournaments
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -518,6 +683,67 @@ const TournamentsPage = () => {
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────
+  // Register for a single tournament from the active-tournaments table.
+  const handleRegisterForOne = async (tournamentId) => {
+    if (!currentEmpId) {
+      showToast('Your profile is missing an employee ID', 'error');
+      return;
+    }
+    const result = await registerForTournament(tournamentId, currentEmpId);
+    if (result.success) {
+      const t = tournaments.find(x => x.id === tournamentId);
+      showToast(`Registered for "${t?.name || 'tournament'}"!`);
+    } else {
+      showToast(result.error || 'Failed to register', 'error');
+    }
+  };
+
+  // Register for many tournaments in one click from the batch modal.
+  const handleBatchRegister = async (tournamentIds) => {
+    if (!currentEmpId) {
+      showToast('Your profile is missing an employee ID', 'error');
+      return;
+    }
+    if (!tournamentIds || tournamentIds.length === 0) return;
+
+    let successCount = 0;
+    const failures = [];
+    for (const tid of tournamentIds) {
+      const r = await registerForTournament(tid, currentEmpId);
+      if (r.success) successCount += 1;
+      else failures.push({ id: tid, error: r.error });
+    }
+
+    if (successCount > 0 && failures.length === 0) {
+      showToast(`Registered for ${successCount} tournament${successCount > 1 ? 's' : ''}!`);
+      setShowRegisterModal(false);
+    } else if (successCount > 0 && failures.length > 0) {
+      const t = tournaments.find(x => x.id === failures[0].id);
+      showToast(`Registered for ${successCount}. "${t?.name}" failed: ${failures[0].error}`, 'warning');
+      setShowRegisterModal(false);
+    } else {
+      const t = tournaments.find(x => x.id === failures[0].id);
+      showToast(`Failed to register: ${failures[0]?.error || 'unknown error'}`.replace(`"${t?.name}"`, `"${t?.name}"`));
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!tournamentToDelete) return;
+    const t = tournamentToDelete;
+    const result = await deleteTournament(t.id);
+    if (result.success) {
+      showToast(`"${t.name}" deleted`);
+      setTournamentToDelete(null);
+      // If we just deleted the active tournament, fall back to the first one remaining.
+      if (activeTournament === t.id) {
+        const remaining = tournaments.filter(x => x.id !== t.id);
+        setActiveTournament(remaining.length > 0 ? remaining[0].id : null);
+      }
+    } else {
+      showToast(result.error || 'Failed to delete tournament', 'error');
+    }
+  };
+
   const handleRegister = async () => {
     if (!currentEmpId) {
       showToast('Your profile is missing an employee ID', 'error');
@@ -893,12 +1119,33 @@ const TournamentsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Delete tournament confirm modal (admin) */}
+      {tournamentToDelete && (
+        <ConfirmDeleteModal
+          tournament={tournamentToDelete}
+          onCancel={() => setTournamentToDelete(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {/* Batch register modal — pick one or more active tournaments */}
+      {showRegisterModal && (
+        <BatchRegisterModal
+          tournaments={tournaments}
+          currentEmpId={currentEmpId}
+          partsByTournament={partsByTournament}
+          onCancel={() => setShowRegisterModal(false)}
+          onSubmit={handleBatchRegister}
+        />
+      )}
     </div>
   );
 };
 
 // ── Stopwatch sub-component (with countdown) ────────────────────────
-const StopwatchPanel = ({ matches, tournament }) => {
+// eslint-disable-next-line no-unused-vars
+const StopwatchPanel = ({ matches, tournament: _tournament }) => {
   const { showToast } = useToast();
   const [swMs, setSwMs] = useState(0);
   const [swRunning, setSwRunning] = useState(false);

@@ -1,6 +1,11 @@
 // src/utils/admin.js
 
-// List of admin employee IDs
+// Client-side mirror of public.app_admins (see models/18_admins.sql).
+// The DB table is the authoritative source — keep this list in sync so admin
+// UI shows up on first paint without waiting for a round-trip.
+// When you add/remove an admin, update BOTH this file AND the
+// `public.app_admins` table (insert / delete rows).
+
 export const ADMIN_IDS = [
   'atemp157',
   'ABSE1022',

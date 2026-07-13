@@ -2,7 +2,7 @@
 // Activity Planner ▸ Events ▸ Events Calendar
 // Renders a top tab bar (Events Calendar / Tournaments / Leaderboard) plus
 // a full month calendar, an Upcoming Events list and a Past Events table.
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
@@ -61,7 +61,6 @@ const formatTimeRange = (event) => {
 const EventsCalendarPage = () => {
   const {
     events,
-    loadEvents,
     getUpcomingEvents,
     getPastEvents,
     addEvent,
@@ -90,7 +89,8 @@ const EventsCalendarPage = () => {
   });
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  useEffect(() => { loadEvents(); }, [loadEvents]);
+  // Initial load happens in AppProvider; this page just reads `events` from
+  // context. After addEvent/deleteEvent, AppContext already refreshes the list.
 
   const upcomingEvents = useMemo(() => getUpcomingEvents(), [getUpcomingEvents, events]);
   const pastEvents = useMemo(() => getPastEvents(), [getPastEvents, events]);

@@ -22,6 +22,7 @@ Recommended apply order:
 1. `15_leaderboard.sql`         — materialised activity points
 1. `16_views.sql`               — upcoming / past / active / leaderboard / hall of fame views
 1. `17_rls.sql`                 — row-level security for the new tables
+1. `18_admins.sql`              — admin allow-list (drives `app_is_admin()`)
 
 Notes:
 - The root [schema.sql](../schema.sql) still exists as the full combined script.

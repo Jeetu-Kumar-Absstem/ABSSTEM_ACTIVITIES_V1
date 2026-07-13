@@ -125,7 +125,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     if (!validateEmpId(empId)) {
-      showToast('Employee ID: 4 letters + 4 digits (e.g., ABCD1234)', 'error');
+      showToast('Employee ID Format is wrong:', 'error');
       return;
     }
 
@@ -509,7 +509,7 @@ const LoginPage = ({ onLogin }) => {
               type="text"
               value={empId}
               onChange={handleEmpIdChange}
-              placeholder="e.g., ABCD1234 (4 letters + 4 digits)"
+              // placeholder="e.g., ABCD1234 (4 letters + 4 digits)"
               maxLength="8"
               style={{
                 padding: '12px 18px',

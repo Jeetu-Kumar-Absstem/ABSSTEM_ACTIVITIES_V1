@@ -3,7 +3,7 @@
 // Full leaderboard of all players (no top-4 limit), with podium, filters and
 // a search box. Built to replace the dashboard's "Top 4 Board" so users can
 // see everyone's rank and the breakdown behind their points.
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
@@ -36,7 +36,8 @@ const LeaderboardPage = () => {
   const [gameFilter, setGameFilter] = useState('all');
   const [sortBy, setSortBy] = useState('rank'); // rank | points | wins | participations | recent
 
-  useEffect(() => { loadLeaderboard(); }, [loadLeaderboard]);
+  // Initial load happens in AppProvider; this page just reads `leaderboard` from
+  // context. The Refresh button below calls loadLeaderboard() to re-fetch on demand.
 
   // Derive department & game lists from the actual data.
   const departments = useMemo(() => {
