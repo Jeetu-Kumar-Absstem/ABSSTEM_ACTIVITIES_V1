@@ -88,6 +88,7 @@ const EventsCalendarPage = () => {
     max_participants: '',
   });
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
   // Initial load happens in AppProvider; this page just reads `events` from
   // context. After addEvent/deleteEvent, AppContext already refreshes the list.
@@ -231,7 +232,24 @@ const EventsCalendarPage = () => {
           { label: 'Outstation',    val: outstationCount, color: '#388e3c', sub: 'All time' },
           { label: 'Celebrations',  val: celebrationCount, color: '#e65100', sub: 'All time' },
         ].map((s, i) => (
-          <div key={i} style={{ ...styles.statCard, borderTop: `3px solid ${s.color}` }}>
+          <div
+            key={i}
+            className="clay-card"
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+            style={{
+              ...styles.statCard,
+              padding: '12px 16px',
+              borderTop: `3px solid ${s.color}`,
+              borderRight: `2px solid ${hoveredIndex === i ? s.color : 'transparent'}`,
+              borderBottom: `2px solid ${hoveredIndex === i ? s.color : 'transparent'}`,
+              borderLeft: `2px solid ${hoveredIndex === i ? s.color : 'transparent'}`,
+              transform: hoveredIndex === i ? 'translateY(-5px) scale(1.03)' : 'translateY(0) scale(1)',
+              boxShadow: hoveredIndex === i ? `0 8px 20px ${s.color}33` : 'none',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+              cursor: 'default',
+            }}
+          >
             <div style={styles.statLabel}>{s.label}</div>
             <div style={{ ...styles.statVal, color: s.color }}>{s.val}</div>
             <div style={styles.statSub}>{s.sub}</div>

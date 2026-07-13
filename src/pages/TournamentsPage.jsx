@@ -187,6 +187,7 @@ const TournamentsPage = () => {
   const [mForm, setMForm] = useState({
     match_code: '', round: 'QF', match_number: 1,
     player_a: '', player_b: '', scheduled_at: '',
+    team_a_p1: '', team_a_p2: '', team_b_p1: '', team_b_p2: '',
   });
   const [resultMatchId, setResultMatchId] = useState(null);
   const [rForm, setRForm] = useState({ score_a: '', score_b: '', winner: '', duration: '' });
@@ -661,7 +662,7 @@ const TournamentsPage = () => {
   };
 
   const renderStopwatch = () => {
-    return <StopwatchPanel matches={matchesForActive} tournament={activeTournamentRecord} />;
+    return <StopwatchPanel matches={matchesForActive} tournament={activeTournamentRecord} getEmployeeName={getEmployeeName} />;
   };
 
   const renderFinalResults = () => {
@@ -887,23 +888,38 @@ const TournamentsPage = () => {
       match_code: `${round}${matchesForActive.filter(m => m.round === round).length + 1}`,
       round, match_number: matchesForActive.filter(m => m.round === round).length + 1,
       player_a: '', player_b: '', scheduled_at: '',
+      team_a_p1: '', team_a_p2: '', team_b_p1: '', team_b_p2: '',
     });
     setShowNewMatchModal(true);
   };
 
   const handleCreateMatch = async () => {
     if (!activeTournament) return;
-    if (!mForm.player_a || !mForm.player_b) {
-      showToast('Both players are required', 'error');
-      return;
+    const isCarrom = activeTournamentRecord?.game === 'Carrom';
+    let playerA, playerB;
+    if (isCarrom) {
+      if (!mForm.team_a_p1 || !mForm.team_b_p1) {
+        showToast('At least one player per team is required', 'error');
+        return;
+      }
+      // Encode team members as comma-separated IDs
+      playerA = [mForm.team_a_p1, mForm.team_a_p2].filter(Boolean).join(',');
+      playerB = [mForm.team_b_p1, mForm.team_b_p2].filter(Boolean).join(',');
+    } else {
+      if (!mForm.player_a || !mForm.player_b) {
+        showToast('Both players are required', 'error');
+        return;
+      }
+      playerA = mForm.player_a;
+      playerB = mForm.player_b;
     }
     const result = await addTournamentMatch({
       tournament_id: activeTournament,
       match_code: mForm.match_code,
       round: mForm.round,
       match_number: parseInt(mForm.match_number, 10) || 1,
-      player_a_employee_id: mForm.player_a,
-      player_b_employee_id: mForm.player_b,
+      player_a_employee_id: playerA,
+      player_b_employee_id: playerB,
       scheduled_at: mForm.scheduled_at || null,
     });
     if (result.success) {
@@ -1081,26 +1097,89 @@ const TournamentsPage = () => {
                   <input style={styles.formInput} value={mForm.match_code}
                          onChange={(e) => setMForm(f => ({ ...f, match_code: e.target.value }))} />
                 </div>
-                <div style={styles.formRow}>
-                  <label style={styles.formLabel}>Player A</label>
-                  <select style={styles.formInput} value={mForm.player_a}
-                          onChange={(e) => setMForm(f => ({ ...f, player_a: e.target.value }))}>
-                    <option value="">— select —</option>
-                    {partsList.map(p => (
-                      <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={styles.formRow}>
-                  <label style={styles.formLabel}>Player B</label>
-                  <select style={styles.formInput} value={mForm.player_b}
-                          onChange={(e) => setMForm(f => ({ ...f, player_b: e.target.value }))}>
-                    <option value="">— select —</option>
-                    {partsList.map(p => (
-                      <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                    ))}
-                  </select>
-                </div>
+                {activeTournamentRecord?.game === 'Carrom' ? (
+                  <>
+                    {/* Team A */}
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' }}>🔵 Team A <span style={{ fontWeight: 400, color: '#666' }}>(max 2 players)</span></div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                          <div style={styles.formRow}>
+                            <label style={styles.formLabel}>Player 1 *</label>
+                            <select style={styles.formInput} value={mForm.team_a_p1}
+                                    onChange={(e) => setMForm(f => ({ ...f, team_a_p1: e.target.value }))}>
+                              <option value="">— select —</option>
+                              {partsList.filter(p => p.employee_id !== mForm.team_a_p2 && p.employee_id !== mForm.team_b_p1 && p.employee_id !== mForm.team_b_p2).map(p => (
+                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={styles.formRow}>
+                            <label style={styles.formLabel}>Player 2 (optional)</label>
+                            <select style={styles.formInput} value={mForm.team_a_p2}
+                                    onChange={(e) => setMForm(f => ({ ...f, team_a_p2: e.target.value }))}>
+                              <option value="">— none —</option>
+                              {partsList.filter(p => p.employee_id !== mForm.team_a_p1 && p.employee_id !== mForm.team_b_p1 && p.employee_id !== mForm.team_b_p2).map(p => (
+                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Team B */}
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' }}>🟠 Team B <span style={{ fontWeight: 400, color: '#666' }}>(max 2 players)</span></div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                          <div style={styles.formRow}>
+                            <label style={styles.formLabel}>Player 1 *</label>
+                            <select style={styles.formInput} value={mForm.team_b_p1}
+                                    onChange={(e) => setMForm(f => ({ ...f, team_b_p1: e.target.value }))}>
+                              <option value="">— select —</option>
+                              {partsList.filter(p => p.employee_id !== mForm.team_a_p1 && p.employee_id !== mForm.team_a_p2 && p.employee_id !== mForm.team_b_p2).map(p => (
+                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={styles.formRow}>
+                            <label style={styles.formLabel}>Player 2 (optional)</label>
+                            <select style={styles.formInput} value={mForm.team_b_p2}
+                                    onChange={(e) => setMForm(f => ({ ...f, team_b_p2: e.target.value }))}>
+                              <option value="">— none —</option>
+                              {partsList.filter(p => p.employee_id !== mForm.team_a_p1 && p.employee_id !== mForm.team_a_p2 && p.employee_id !== mForm.team_b_p1).map(p => (
+                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.formRow}>
+                      <label style={styles.formLabel}>Player A</label>
+                      <select style={styles.formInput} value={mForm.player_a}
+                              onChange={(e) => setMForm(f => ({ ...f, player_a: e.target.value }))}>
+                        <option value="">— select —</option>
+                        {partsList.map(p => (
+                          <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={styles.formRow}>
+                      <label style={styles.formLabel}>Player B</label>
+                      <select style={styles.formInput} value={mForm.player_b}
+                              onChange={(e) => setMForm(f => ({ ...f, player_b: e.target.value }))}>
+                        <option value="">— select —</option>
+                        {partsList.map(p => (
+                          <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                   <label style={styles.formLabel}>Scheduled Time</label>
                   <input style={styles.formInput} type="datetime-local" value={mForm.scheduled_at}
@@ -1251,7 +1330,7 @@ const TournamentsPage = () => {
 
 // ── Stopwatch sub-component (with countdown) ────────────────────────
 // eslint-disable-next-line no-unused-vars
-const StopwatchPanel = ({ matches, tournament: _tournament }) => {
+const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) => {
   const { showToast } = useToast();
   const [swMs, setSwMs] = useState(0);
   const [swRunning, setSwRunning] = useState(false);
@@ -1260,6 +1339,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament }) => {
   const [cdMs, setCdMs] = useState(600000);
   const [cdRunning, setCdRunning] = useState(false);
   const cdRef = useRef(null);
+  const [linkedMatchId, setLinkedMatchId] = useState('');
 
   const swToggle = useCallback(() => {
     if (swRunning) {
@@ -1332,6 +1412,19 @@ const StopwatchPanel = ({ matches, tournament: _tournament }) => {
   }, []);
 
   const todaySchedule = matches.filter(m => m.status !== 'completed').slice(0, 6);
+  const scheduledMatches = matches.filter(m => m.status !== 'completed');
+  const linkedMatch = linkedMatchId ? matches.find(m => String(m.id) === String(linkedMatchId)) : null;
+
+  const getMatchLabel = (m) => {
+    const code = m.match_code || `M${m.match_number}`;
+    const a = m.player_a_employee_id
+      ? m.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+      : 'TBD';
+    const b = m.player_b_employee_id
+      ? m.player_b_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+      : 'TBD';
+    return `${code} — ${a} vs ${b}`;
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -1359,10 +1452,82 @@ const StopwatchPanel = ({ matches, tournament: _tournament }) => {
                 </div>
               ))}
           </div>
+          {/* Linked match display */}
+          {linkedMatch && (
+            <div style={{ marginTop: '0.75rem', background: 'rgba(255,255,255,0.1)', borderRadius: 6, padding: '0.55rem 0.7rem', border: '1px solid rgba(255,255,255,0.2)' }}>
+              <div style={{ fontSize: '0.62rem', opacity: 0.6, marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Linked Match</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{linkedMatch.match_code || `M${linkedMatch.match_number}`} · {linkedMatch.round}</div>
+              <div style={{ fontSize: '0.7rem', opacity: 0.85, marginTop: '0.15rem' }}>
+                {linkedMatch.player_a_employee_id
+                  ? linkedMatch.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+                  : 'TBD'}
+                {' '}<span style={{ opacity: 0.5 }}>vs</span>{' '}
+                {linkedMatch.player_b_employee_id
+                  ? linkedMatch.player_b_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+                  : 'TBD'}
+              </div>
+              {linkedMatch.scheduled_at && (
+                <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: '0.2rem' }}>
+                  🕐 {new Date(linkedMatch.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div style={{ display: 'grid', gap: '1rem' }}>
+        {/* Link to Match */}
+        <div className="clay-card" style={styles.card}>
+          <div style={styles.cardHeader}>
+            <div style={styles.cardHeaderTitle}>🔗 Link Stopwatch to Match</div>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#666', marginBottom: '0.55rem' }}>
+            Select a scheduled match to link this stopwatch session. The timer will be associated with the chosen match.
+          </div>
+          <select
+            value={linkedMatchId}
+            onChange={(e) => {
+              setLinkedMatchId(e.target.value);
+              if (e.target.value) showToast('Stopwatch linked to match');
+            }}
+            style={{ ...styles.formInput, marginBottom: '0.5rem' }}
+          >
+            <option value="">— No match linked —</option>
+            {scheduledMatches.map(m => (
+              <option key={m.id} value={m.id}>{getMatchLabel(m)}</option>
+            ))}
+          </select>
+          {linkedMatch ? (
+            <div style={{ background: '#e8f5e9', borderRadius: 6, padding: '0.6rem 0.75rem', border: '1px solid #a5d6a7' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2e7d32', marginBottom: '0.25rem' }}>
+                ✓ Linked — {linkedMatch.round} · {linkedMatch.match_code || `M${linkedMatch.match_number}`}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#388e3c' }}>
+                {linkedMatch.player_a_employee_id
+                  ? linkedMatch.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+                  : 'TBD'}
+                {' vs '}
+                {linkedMatch.player_b_employee_id
+                  ? linkedMatch.player_b_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+                  : 'TBD'}
+              </div>
+              {linkedMatch.scheduled_at && (
+                <div style={{ fontSize: '0.65rem', color: '#555', marginTop: '0.2rem' }}>
+                  Scheduled: {new Date(linkedMatch.scheduled_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                </div>
+              )}
+              <button
+                onClick={() => { setLinkedMatchId(''); showToast('Match unlinked', 'warning'); }}
+                style={{ ...styles.outlineBtn, marginTop: '0.5rem', fontSize: '0.65rem', color: '#c62828', borderColor: '#ffcdd2' }}
+              >✕ Unlink</button>
+            </div>
+          ) : (
+            <div style={{ padding: '0.6rem', textAlign: 'center', color: '#aaa', fontSize: '0.7rem', background: '#fafafa', borderRadius: 6, border: '1px dashed #ddd' }}>
+              No match linked — stopwatch runs independently
+            </div>
+          )}
+        </div>
         <div className="clay-card" style={{ ...styles.card }}>
           <div style={styles.cardHeader}>
             <div style={styles.cardHeaderTitle}>⏰ Countdown Timer</div>
@@ -1399,7 +1564,13 @@ const StopwatchPanel = ({ matches, tournament: _tournament }) => {
                   {m.scheduled_at ? new Date(m.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'} — {m.match_code || `Match ${m.match_number}`}
                 </div>
                 <div style={{ color: '#666' }}>
-                  {m.player_a_employee_id ? (m.player_a_employee_id === 'TBD' ? 'TBD' : m.player_a_employee_id) : 'TBD'} vs {m.player_b_employee_id || 'TBD'}
+                  {m.player_a_employee_id
+                    ? m.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+                    : 'TBD'}
+                  {' vs '}
+                  {m.player_b_employee_id
+                    ? m.player_b_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
+                    : 'TBD'}
                 </div>
               </div>
             ))}
@@ -1458,7 +1629,7 @@ const styles = {
 
   swBtn: { width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' },
 
-  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 70 },
+  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 120 },
   modalCard: { background: 'white', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.22)' },
   modalHeader: { background: '#1a3c6e', color: 'white', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0' },
   modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer' },

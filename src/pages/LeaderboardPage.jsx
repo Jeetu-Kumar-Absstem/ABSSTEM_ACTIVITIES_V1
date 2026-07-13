@@ -35,6 +35,7 @@ const LeaderboardPage = () => {
   const [deptFilter, setDeptFilter] = useState('all');
   const [gameFilter, setGameFilter] = useState('all');
   const [sortBy, setSortBy] = useState('rank'); // rank | points | wins | participations | recent
+  const [hoveredMetric, setHoveredMetric] = useState(null);
 
   // Initial load happens in AppProvider; this page just reads `leaderboard` from
   // context. The Refresh button below calls loadLeaderboard() to re-fetch on demand.
@@ -178,7 +179,7 @@ const LeaderboardPage = () => {
             🏆 Champions of the Floor
           </h1>
           <div style={{ fontSize: '0.8rem', opacity: 0.88 }}>
-            Points: Win = 5 · Tourney Win = 20 · Runner-up = 15 · 3rd = 10 · Participation = 2 · Violation = −5 · No-show = −3
+            Points: Win = 5 · Tournament Win = 20 · Runner-up = 15 · 3rd = 10 · Participation = 2 · Violation = −5 · No-show = −3
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -216,15 +217,25 @@ const LeaderboardPage = () => {
 
       {/* Stats row */}
       <div style={styles.statsRow}>
-        <MetricCard label="Players ranked"  value={stats.total}        accent="#1a3c6e" sub={stats.top ? `Top: ${stats.top.employee_name || stats.top.employee_id}` : 'No data yet'} />
-        <MetricCard label="Highest score"   value={stats.top ? stats.top.total_points : 0} accent="#f9a825" sub={stats.top ? `${stats.top.employee_name || stats.top.employee_id}` : '—'} />
-        <MetricCard label="Most wins"       value={stats.mostWins.wins || 0} accent="#1b5e20" sub={stats.mostWins.employee_name || '—'} />
-        <MetricCard label="Most active"     value={stats.mostActive.participations || 0} accent="#6a1b9a" sub={stats.mostActive.employee_name || '—'} />
-        <MetricCard label="Total points awarded" value={stats.totalPoints} accent="#00897b" sub="Filtered scope" />
+        {[
+          { label: 'Players ranked',       value: stats.total,                        accent: '#1a3c6e', sub: stats.top ? `Top: ${stats.top.employee_name || stats.top.employee_id}` : 'No data yet' },
+          { label: 'Highest score',        value: stats.top ? stats.top.total_points : 0, accent: '#f9a825', sub: stats.top ? `${stats.top.employee_name || stats.top.employee_id}` : '—' },
+          { label: 'Most wins',            value: stats.mostWins.wins || 0,           accent: '#1b5e20', sub: stats.mostWins.employee_name || '—' },
+          { label: 'Most active',          value: stats.mostActive.participations || 0, accent: '#6a1b9a', sub: stats.mostActive.employee_name || '—' },
+          { label: 'Total points awarded', value: stats.totalPoints,                  accent: '#00897b', sub: 'Filtered scope' },
+        ].map((m, i) => (
+          <MetricCard
+            key={i}
+            {...m}
+            hovered={hoveredMetric === i}
+            onMouseEnter={() => setHoveredMetric(i)}
+            onMouseLeave={() => setHoveredMetric(null)}
+          />
+        ))}
       </div>
 
       {/* Filter bar */}
-      <div className="clay-card" style={{ ...styles.card, marginBottom: 14 }}>
+      <div className="clay-card" style={{ ...styles.card, marginBottom: 14,background:'#f4f7bf' }}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>📋 Full Leaderboard</div>
           <span style={{ fontSize: '0.7rem', color: '#888' }}>{filteredRows.length} of {(leaderboard || []).length} player(s)</span>
@@ -328,17 +339,28 @@ const LeaderboardPage = () => {
 };
 
 const PodiumCard = ({ row, pos, tall }) => {
+  const [hovered, setHovered] = useState(false);
   const style = RANK_STYLES[pos] || RANK_STYLES[1];
   return (
-    <div style={{
-      background: style.bg,
-      border: `2px solid ${style.border}`,
-      borderRadius: 12,
-      padding: tall ? '1.4rem 0.8rem 1rem' : '0.9rem 0.6rem 0.7rem',
-      textAlign: 'center',
-      minHeight: tall ? 200 : 160,
-      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-    }}>
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: style.bg,
+        borderTop: `3px solid ${style.border}`,
+        borderRight: `2px solid ${hovered ? style.border : 'transparent'}`,
+        borderBottom: `2px solid ${hovered ? style.border : 'transparent'}`,
+        borderLeft: `2px solid ${hovered ? style.border : 'transparent'}`,
+        borderRadius: 12,
+        padding: tall ? '1.4rem 0.8rem 1rem' : '0.9rem 0.6rem 0.7rem',
+        textAlign: 'center',
+        minHeight: tall ? 200 : 160,
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        transform: hovered ? 'translateY(-5px) scale(1.03)' : 'translateY(0) scale(1)',
+        boxShadow: hovered ? `0 8px 20px ${style.border}55` : 'none',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+        cursor: 'default',
+      }}>
       <div style={{ fontSize: tall ? '2rem' : '1.4rem' }}>{style.icon}</div>
       <div style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
         {style.label}
@@ -360,12 +382,25 @@ const PodiumCard = ({ row, pos, tall }) => {
   );
 };
 
-const MetricCard = ({ label, value, sub, accent }) => (
-  <div className="clay-card" style={{
-    background: 'white', borderRadius: 14, padding: '0.85rem 1rem',
-    borderTop: `3px solid ${accent}`,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-  }}>
+const MetricCard = ({ label, value, sub, accent, hovered, onMouseEnter, onMouseLeave }) => (
+  <div
+    className="clay-card"
+    onMouseEnter={onMouseEnter}
+    onMouseLeave={onMouseLeave}
+    style={{
+      background: 'white',
+      borderRadius: 14,
+      padding: '12px 16px',
+      borderTop: `3px solid ${accent}`,
+      borderRight: `2px solid ${hovered ? accent : 'transparent'}`,
+      borderBottom: `2px solid ${hovered ? accent : 'transparent'}`,
+      borderLeft: `2px solid ${hovered ? accent : 'transparent'}`,
+      transform: hovered ? 'translateY(-5px) scale(1.03)' : 'translateY(0) scale(1)',
+      boxShadow: hovered ? `0 8px 20px ${accent}33` : '0 2px 8px rgba(0,0,0,0.04)',
+      transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+      cursor: 'default',
+    }}
+  >
     <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: accent, lineHeight: 1.1, marginTop: 4 }}>{value}</div>
     <div style={{ fontSize: '0.6rem', color: '#888', marginTop: 4 }}>{sub}</div>
