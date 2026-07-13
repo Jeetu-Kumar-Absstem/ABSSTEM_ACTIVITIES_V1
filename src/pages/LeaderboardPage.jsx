@@ -198,7 +198,7 @@ const LeaderboardPage = () => {
         <div className="clay-card" style={{ ...styles.card, marginBottom: 14 }}>
           <div style={styles.cardHeader}>
             <div style={styles.cardHeaderTitle}>🏅 Top 3 Podium</div>
-            <div style={{ fontSize: '0.7rem', color: '#888' }}>Overall, all games combined</div>
+            <div style={{ fontSize: '0.7rem', color: '#080808' }}>Overall, all games combined</div>
           </div>
           <div style={styles.podium}>
             {podium[2] && (

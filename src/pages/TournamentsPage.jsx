@@ -168,6 +168,7 @@ const TournamentsPage = () => {
     addTournamentMatch,
     recordMatchResult,
     declareFinalResults,
+    unregisterFromTournament,
     getMatchesByTournament,
     getParticipantsByTournament,
     getResultsByTournament,
@@ -193,10 +194,20 @@ const TournamentsPage = () => {
   const [tournamentToDelete, setTournamentToDelete] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
 
-  // Auto-pick the first tournament if the user hasn't picked one yet.
-  // Derived state — no effect needed, no cascading renders.
+  // Auto-pick the first tournament if the user hasn't picked one yet, or
+  // if the previously selected one no longer exists (e.g. it was deleted,
+  // or the Supabase reload came back with a different ID type).
   const [activeTournamentOverride, setActiveTournament] = useState(null);
-  const activeTournament = activeTournamentOverride ?? (tournaments.length > 0 ? tournaments[0].id : null);
+  const activeTournament = useMemo(() => {
+    if (activeTournamentOverride != null) {
+      // Compare as strings so a string override (from <select> onChange) still
+      // matches an integer/numeric ID coming back from Supabase.
+      const overrideStr = String(activeTournamentOverride);
+      const found = tournaments.find(t => String(t.id) === overrideStr);
+      if (found) return found.id;
+    }
+    return tournaments.length > 0 ? tournaments[0].id : null;
+  }, [tournaments, activeTournamentOverride]);
 
   const activeTournamentRecord = useMemo(
     () => tournaments.find(t => t.id === activeTournament) || null,
@@ -229,10 +240,24 @@ const TournamentsPage = () => {
   const currentEmpId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || '';
   const isRegisteredForActive = partsList.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase());
 
+  // Permission helper for editing a match result.
+  // Admin can always edit. Non-admin can edit only if they actually played
+  // the match (player_a or player_b) AND both slots are filled (not TBD).
+  const canEditMatch = (m) => {
+    if (!m) return false;
+    if (isAdmin()) return true;
+    if (!currentEmpId) return false;
+    const me = currentEmpId.toUpperCase();
+    const a = (m.player_a_employee_id || '').toUpperCase();
+    const b = (m.player_b_employee_id || '').toUpperCase();
+    if (!a || !b) return false; // TBD slots — only admin can fill them in
+    return me === a || me === b;
+  };
+
   // ── Sub-tab renderers ─────────────────────────────────────────────────
   const renderActiveTournaments = () => {
     return (
-      <div className="clay-card" style={styles.card}>
+      <div className="clay-card" style={{background:'#f4bf70'}}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>Active & Upcoming Tournaments</div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -247,7 +272,7 @@ const TournamentsPage = () => {
           <table style={styles.table}>
             <thead>
               <tr style={styles.theadRow}>
-                {['Code','Tournament','Game','Format','Start','End','Participants','Status','Register','Action'].map(h => (
+                {['Code','Tournament','Game','Format','Start','End','Participants','Status','Register','Unregister','Action'].map(h => (
                   <th key={h} style={styles.th}>{h}</th>
                 ))}
               </tr>
@@ -255,7 +280,7 @@ const TournamentsPage = () => {
             <tbody>
               {tournaments.length === 0 ? (
                 <tr>
-                  <td colSpan="10" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
+                  <td colSpan="11" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
                     No tournaments yet. {isAdmin() && 'Click "New Tournament" to create one.'}
                   </td>
                 </tr>
@@ -310,6 +335,20 @@ const TournamentsPage = () => {
                       >{regLabel}</button>
                     </td>
                     <td style={styles.td}>
+                      {alreadyRegistered && !isCompleted ? (
+                        <button
+                          onClick={() => handleUnregisterForOne(t.id)}
+                          style={{
+                            ...styles.tinyEnterBtn,
+                            background: '#c62828',
+                          }}
+                          title="Unregister from this tournament"
+                        >✕ Unregister</button>
+                      ) : (
+                        <span style={{ fontSize: '0.66rem', color: '#bbb' }}>—</span>
+                      )}
+                    </td>
+                    <td style={styles.td}>
                       <button
                         onClick={() => { setActiveTournament(t.id); setSub('bracket'); }}
                         style={styles.tinyIconBtn}
@@ -346,10 +385,17 @@ const TournamentsPage = () => {
   };
 
   const renderBracket = () => {
+    if (tournaments.length === 0) {
+      return (
+        <div className="clay-card" style={{ ...styles.card, textAlign: 'center', padding: '2rem' }}>
+          <div style={{ fontSize: '0.85rem', color: '#888' }}>No tournaments exist yet.</div>
+        </div>
+      );
+    }
     if (!activeTournamentRecord) {
       return (
         <div className="clay-card" style={{ ...styles.card, textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', color: '#888' }}>Select a tournament from the Active tab to view its bracket.</div>
+          <div style={{ fontSize: '0.85rem', color: '#888' }}>Loading tournament data…</div>
         </div>
       );
     }
@@ -388,7 +434,7 @@ const TournamentsPage = () => {
           <div style={styles.matchMeta}>
             {m.status === 'completed' ? '✓ Final' : m.status === 'live' ? '● Live' : '⏳ Pending'}
           </div>
-          {(isAdmin() || (m.status !== 'completed' && (currentEmpId.toUpperCase() === (m.player_a_employee_id || '').toUpperCase() || currentEmpId.toUpperCase() === (m.player_b_employee_id || '').toUpperCase()))) && (
+          {canEditMatch(m) && (
             <button onClick={() => openResultModal(m)} style={styles.tinyEnterBtn}>
               {m.status === 'completed' ? '✎ Edit' : '⏎ Enter Result'}
             </button>
@@ -401,14 +447,30 @@ const TournamentsPage = () => {
       <div style={{ display: 'grid', gap: '1rem' }}>
         <div className="clay-card" style={styles.card}>
           <div style={styles.cardHeader}>
-            <div style={styles.cardHeaderTitle}>
-              🏆 {activeTournamentRecord.name} — {activeTournamentRecord.format.replace('_', ' ').toUpperCase()} Bracket
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div style={styles.cardHeaderTitle}>📊 Bracket / Fixtures</div>
+              <select
+                value={activeTournament || ''}
+                onChange={(e) => setActiveTournament(e.target.value)}
+                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' }}
+              >
+                {tournaments.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} · {t.game} · {STATUS_BADGE[t.status]?.label || t.status}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              {activeTournamentRecord && (
+                <span style={{ fontSize: '0.7rem', color: '#888' }}>
+                  {activeTournamentRecord.format.replace('_', ' ').toUpperCase()}
+                </span>
+              )}
               {isAdmin() && (
                 <button onClick={() => openNewMatchModal('QF')} style={styles.navyBtn}>+ Add Match</button>
               )}
-              {!isAdmin() && activeTournamentRecord.status === 'registration_open' && (
+              {!isAdmin() && activeTournamentRecord?.status === 'registration_open' && (
                 <button
                   onClick={handleRegister}
                   disabled={isRegisteredForActive || !currentEmpId}
@@ -457,7 +519,7 @@ const TournamentsPage = () => {
         </div>
 
         {/* Participants */}
-        <div className="clay-card" style={styles.card}>
+        <div className="clay-card" style={{background:'#f3dcd6'}}>
           <div style={styles.cardHeader}>
             <div style={styles.cardHeaderTitle}>
               Registered Participants — {activeTournamentRecord.name}
@@ -472,7 +534,7 @@ const TournamentsPage = () => {
             <table style={styles.table}>
               <thead>
                 <tr style={styles.theadRow}>
-                  {['#','Employee','Department','Seed','Matches Played','Won','Lost','Status'].map(h => (
+                  {['#','Employee','Department','Registered Tournaments','Matches Played','Won','Lost','Status'].map(h => (
                     <th key={h} style={styles.th}>{h}</th>
                   ))}
                 </tr>
@@ -485,7 +547,26 @@ const TournamentsPage = () => {
                     <td style={styles.td}>{i + 1}</td>
                     <td style={styles.td}><strong>{getEmployeeName(p.employee_id)}</strong></td>
                     <td style={styles.td}>{employees.find(e => e.employee_code === p.employee_id)?.department || '—'}</td>
-                    <td style={styles.td}>{p.seed ?? '—'}</td>
+                    <td style={styles.td}>
+                      {(() => {
+                        const count = Object.values(partsByTournament).filter(list =>
+                          list.some(x => x.employee_id?.toUpperCase() === p.employee_id?.toUpperCase())
+                        ).length;
+                        return (
+                          <span
+                            title={`Registered in ${count} active tournament(s)`}
+                            style={{
+                              ...styles.tinyChip,
+                              background: count > 1 ? '#e3f2fd' : '#f5f5f5',
+                              color: count > 1 ? '#1565c0' : '#666',
+                              fontWeight: count > 1 ? 700 : 400,
+                            }}
+                          >
+                            {count}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td style={styles.td}>{p.matches_played}</td>
                     <td style={styles.td}>{p.wins}</td>
                     <td style={styles.td}>{p.losses}</td>
@@ -518,7 +599,7 @@ const TournamentsPage = () => {
       );
     }
     return (
-      <div className="clay-card" style={styles.card}>
+      <div className="clay-card" style={{background:'#e6dd68'}}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>Match Records — {activeTournamentRecord.name}</div>
         </div>
@@ -526,15 +607,17 @@ const TournamentsPage = () => {
           <table style={styles.table}>
             <thead>
               <tr style={styles.theadRow}>
-                {['Round','Match','Player A','Score','Score','Player B','Played','Status','Action'].map(h => (
-                  <th key={h} style={styles.th}>{h}</th>
+                {['Round','Match','Player A','Score A','Score B','Player B','Played','Status','Action'].map((h, i) => (
+                  <th key={i} style={styles.th}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {matchesForActive.length === 0 ? (
                 <tr><td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>No matches scheduled.</td></tr>
-              ) : matchesForActive.map((m) => (
+              ) : matchesForActive.map((m) => {
+                const allowed = canEditMatch(m);
+                return (
                 <tr key={m.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={styles.td}>{m.round} · M{m.match_number}</td>
                   <td style={styles.td}><strong>{m.match_code || `M${m.match_number}`}</strong></td>
@@ -556,12 +639,20 @@ const TournamentsPage = () => {
                     }}>{m.status}</span>
                   </td>
                   <td style={styles.td}>
-                    <button onClick={() => openResultModal(m)} style={styles.tinyEnterBtn}>
-                      {m.status === 'completed' ? '✎ Edit' : '⏎ Enter Result'}
-                    </button>
+                    {allowed ? (
+                      <button onClick={() => openResultModal(m)} style={styles.tinyEnterBtn}>
+                        {m.status === 'completed' ? '✎ Edit' : '⏎ Enter Result'}
+                      </button>
+                    ) : (
+                      <span
+                        style={{ fontSize: '0.62rem', color: '#bbb' }}
+                        title="Only the two players in this match (or an admin) can enter results"
+                      >🔒</span>
+                    )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -695,6 +786,21 @@ const TournamentsPage = () => {
       showToast(`Registered for "${t?.name || 'tournament'}"!`);
     } else {
       showToast(result.error || 'Failed to register', 'error');
+    }
+  };
+
+  // Unregister from a single tournament from the active-tournaments table.
+  const handleUnregisterForOne = async (tournamentId) => {
+    if (!currentEmpId) {
+      showToast('Your profile is missing an employee ID', 'error');
+      return;
+    }
+    const result = await unregisterFromTournament(tournamentId, currentEmpId);
+    if (result.success) {
+      const t = tournaments.find(x => x.id === tournamentId);
+      showToast(`Unregistered from "${t?.name || 'tournament'}"`, 'warning');
+    } else {
+      showToast(result.error || 'Failed to unregister', 'error');
     }
   };
 

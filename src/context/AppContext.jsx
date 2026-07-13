@@ -857,16 +857,39 @@ export const AppProvider = ({ children }) => {
       }
 
       const nextSeed = (tournamentParticipants.filter(p => p.tournament_id === tournamentId).length || 0) + 1;
-      const { data, error } = await supabase
-        .from('tournament_participants')
-        .insert([{
-          tournament_id: tournamentId,
-          employee_id: employeeId,
-          seed: nextSeed,
-          status: 'registered',
-        }])
-        .select();
-      if (error) throw error;
+
+      // If the player previously unregistered, a withdrawn row still exists.
+      // UPDATE it back to 'registered' to avoid the unique(tournament_id, employee_id) conflict.
+      const existingWithdrawn = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
+          p.status === 'withdrawn'
+      );
+
+      let data;
+      if (existingWithdrawn) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('tournament_participants')
+          .update({ status: 'registered', seed: nextSeed })
+          .match({ id: existingWithdrawn.id })
+          .select();
+        if (updateErr) throw updateErr;
+        data = updated;
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('tournament_participants')
+          .insert([{
+            tournament_id: tournamentId,
+            employee_id: employeeId,
+            seed: nextSeed,
+            status: 'registered',
+          }])
+          .select();
+        if (insertErr) throw insertErr;
+        data = inserted;
+      }
+
       await loadTournamentParticipants();
 
       // Award +2 participation points via the leaderboard helper.
@@ -897,6 +920,25 @@ export const AppProvider = ({ children }) => {
       if (error) throw error;
       await loadTournamentParticipants();
       return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Convenience wrapper: finds the active participant row by tournamentId +
+  // employeeId, then delegates to withdrawFromTournament.
+  const unregisterFromTournament = async (tournamentId, employeeId) => {
+    try {
+      const participant = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
+          p.status !== 'withdrawn'
+      );
+      if (!participant) {
+        return { success: false, error: 'You are not registered for this tournament' };
+      }
+      return await withdrawFromTournament(participant.id);
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -936,7 +978,25 @@ export const AppProvider = ({ children }) => {
       const match = tournamentMatches.find(m => m.id === matchId);
       if (!match) return { success: false, error: 'Match not found' };
 
+      // Permission check (mirrors the UI gate in TournamentsPage.canEditMatch):
+      // admin can always edit; non-admin must be one of the two players, and
+      // both player slots must be filled in (no TBD results).
       const recordedBy = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || null;
+      if (!isAdmin()) {
+        if (!recordedBy) {
+          return { success: false, error: 'Your profile is missing an employee ID' };
+        }
+        const me = String(recordedBy).toUpperCase();
+        const a = String(match.player_a_employee_id || '').toUpperCase();
+        const b = String(match.player_b_employee_id || '').toUpperCase();
+        if (!a || !b) {
+          return { success: false, error: 'Only an admin can record a result before both players are set' };
+        }
+        if (me !== a && me !== b) {
+          return { success: false, error: 'Only the two players in this match can record its result' };
+        }
+      }
+
       const { error } = await supabase
         .from('tournament_matches')
         .update({
@@ -1338,6 +1398,7 @@ export const AppProvider = ({ children }) => {
     deleteTournament,
     registerForTournament,
     withdrawFromTournament,
+    unregisterFromTournament,
     addTournamentMatch,
     recordMatchResult,
     declareFinalResults,

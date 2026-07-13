@@ -193,13 +193,27 @@ const EventsCalendarPage = () => {
       showToast('Only admins can delete events', 'error');
       return;
     }
-    if (!window.confirm('Delete this event?')) return;
     const result = await deleteEvent(eventId);
     if (result.success) {
       showToast('Event deleted');
       setSelectedEvent(null);
+      setEventToDelete(null);
     } else {
       showToast(result.error || 'Failed to delete event', 'error');
+    }
+  };
+
+  // Two-step delete from the upcoming-events card: first click sets the
+  // pending target (the card flips into a confirm state), second click commits.
+  const [eventToDelete, setEventToDelete] = useState(null);
+  const requestDeleteFromCard = (e, ev) => {
+    e.stopPropagation(); // don't open the details modal
+    if (!isAdmin()) return;
+    if (eventToDelete?.id === ev.id) {
+      // Second click on the same card's delete — commit the delete.
+      handleDeleteEvent(ev.id);
+    } else {
+      setEventToDelete(ev);
     }
   };
 
@@ -312,15 +326,47 @@ const EventsCalendarPage = () => {
               upcomingEvents.slice(0, 6).map((ev) => {
                 const status = STATUS_BADGE[ev.event_status] || STATUS_BADGE.scheduled;
                 const type = EVENT_TYPE_STYLE[ev.event_type] || EVENT_TYPE_STYLE.company;
+                const isPending = eventToDelete?.id === ev.id;
                 return (
                   <div
                     key={ev.id}
-                    style={styles.sideItem}
-                    onClick={() => setSelectedEvent(ev)}
+                    style={{
+                      ...styles.sideItem,
+                      background: isPending ? '#ffebee' : 'transparent',
+                      borderLeft: isPending ? '3px solid #c62828' : '3px solid transparent',
+                    }}
+                    onClick={() => {
+                      if (isPending) {
+                        // Clicking the card body while in confirm state cancels.
+                        setEventToDelete(null);
+                      } else {
+                        setSelectedEvent(ev);
+                      }
+                    }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.4rem' }}>
                       <div style={styles.sideItemTitle}>{ev.title}</div>
-                      <span style={{ ...type, ...styles.miniChip }}>{ev.event_type}</span>
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                        <span style={{ ...type, ...styles.miniChip }}>{ev.event_type}</span>
+                        {isAdmin() && (
+                          <button
+                            onClick={(e) => requestDeleteFromCard(e, ev)}
+                            title={isPending ? 'Click again to confirm delete' : 'Delete this event'}
+                            style={{
+                              background: isPending ? '#c62828' : 'transparent',
+                              color: isPending ? 'white' : '#c62828',
+                              border: `1px solid ${isPending ? '#c62828' : '#ffcdd2'}`,
+                              borderRadius: 4,
+                              padding: '0.1rem 0.35rem',
+                              fontSize: '0.66rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >{isPending ? '✓ Confirm' : '🗑'}</button>
+                        )}
+                      </div>
                     </div>
                     <div style={styles.sideItemMeta}>
                       <span>📅 {formatDateRange(ev)}</span>
