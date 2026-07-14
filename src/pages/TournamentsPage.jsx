@@ -36,6 +36,8 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
   const eligible = tournaments.filter(t => {
     if (t.status === 'completed' || t.status === 'cancelled') return false;
     if (t.registration_open === false) return false;
+    // Lock registration once the start date has passed.
+    if (t.start_date && new Date(t.start_date) <= new Date()) return false;
     const parts = partsByTournament[t.id] || [];
     if (parts.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase())) return false;
     const cap = t.max_participants || 8;
@@ -293,19 +295,23 @@ const TournamentsPage = () => {
                 const isFull = partCount >= cap;
                 const isCompleted = t.status === 'completed' || t.status === 'cancelled';
                 const regOpen = t.registration_open !== false;
+                // Lock registration once the start date has passed.
+                const startDatePassed = t.start_date && new Date(t.start_date) <= new Date();
                 const alreadyRegistered = (partsByTournament[t.id] || []).some(
                   p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
                 );
                 // Per-row "Register" button: shown when registration is open,
-                // tournament is not done, and the user hasn't joined yet.
-                const canRegister = !isCompleted && regOpen && !alreadyRegistered && !isFull && !!currentEmpId;
+                // start date hasn't passed, tournament is not done, and the user hasn't joined yet.
+                const canRegister = !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !isFull && !!currentEmpId;
                 const regLabel = alreadyRegistered
                   ? '✓ Registered'
                   : isFull
                     ? '🔒 Full'
                     : isCompleted
                       ? '—'
-                      : regOpen ? '🏆 Register' : 'Closed';
+                      : startDatePassed
+                        ? 'Started'
+                        : regOpen ? '🏆 Register' : 'Closed';
                 return (
                   <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={styles.td}><strong>{t.code}</strong></td>
@@ -322,7 +328,7 @@ const TournamentsPage = () => {
                         disabled={!canRegister}
                         style={{
                           ...styles.tinyEnterBtn,
-                          background: alreadyRegistered ? '#388e3c' : isFull || isCompleted ? '#9e9e9e' : '#1a3c6e',
+                          background: alreadyRegistered ? '#388e3c' : isFull || isCompleted || startDatePassed ? '#9e9e9e' : '#1a3c6e',
                           opacity: canRegister || alreadyRegistered ? 1 : 0.6,
                           cursor: canRegister || alreadyRegistered ? 'pointer' : 'not-allowed',
                         }}
@@ -330,6 +336,7 @@ const TournamentsPage = () => {
                           alreadyRegistered ? 'You are already registered'
                           : isFull ? 'Tournament is full'
                           : isCompleted ? 'Tournament is closed'
+                          : startDatePassed ? 'Registration closed — tournament has started'
                           : regOpen ? 'Click to register'
                           : 'Registration closed'
                         }
@@ -363,7 +370,7 @@ const TournamentsPage = () => {
                       {isAdmin() && (
                         <button
                           onClick={() => setTournamentToDelete(t)}
-                          style={{ ...styles.tinyIconBtn, color: '#c62828', borderColor: '#ffcdd2' }}
+                          style={{ ...styles.tinyIconBtn, color: '#000000', borderColor: '#ffcdd2' }}
                           title="Delete tournament"
                         >🗑</button>
                       )}
@@ -404,6 +411,20 @@ const TournamentsPage = () => {
     const sf = matchesForActive.filter(m => m.round === 'SF');
     const f  = matchesForActive.filter(m => m.round === 'F');
     const tp = matchesForActive.filter(m => m.round === '3RD');
+
+    // Derive match stats directly from completed matches so the participants
+    // table always reflects reality even before the DB counters are updated.
+    const participantStats = {};
+    for (const m of matchesForActive) {
+      if (m.status !== 'completed') continue;
+      const players = [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean);
+      players.forEach(pid => {
+        if (!participantStats[pid]) participantStats[pid] = { played: 0, won: 0, lost: 0 };
+        participantStats[pid].played += 1;
+        if (m.winner_employee_id === pid) participantStats[pid].won += 1;
+        else participantStats[pid].lost += 1;
+      });
+    }
 
     const renderMatch = (m) => {
       const a = m.player_a_employee_id ? getEmployeeName(m.player_a_employee_id) : 'TBD';
@@ -568,9 +589,9 @@ const TournamentsPage = () => {
                         );
                       })()}
                     </td>
-                    <td style={styles.td}>{p.matches_played}</td>
-                    <td style={styles.td}>{p.wins}</td>
-                    <td style={styles.td}>{p.losses}</td>
+                    <td style={styles.td}>{participantStats[p.employee_id]?.played ?? p.matches_played ?? 0}</td>
+                    <td style={styles.td}>{participantStats[p.employee_id]?.won   ?? p.wins          ?? 0}</td>
+                    <td style={styles.td}>{participantStats[p.employee_id]?.lost  ?? p.losses        ?? 0}</td>
                     <td style={styles.td}>
                       <span style={{
                         ...(p.status === 'eliminated' ? { bg: '#ffebee', color: '#c62828' } :

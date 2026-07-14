@@ -164,6 +164,14 @@ const LoginPage = ({ onLogin }) => {
 
       if (error) throw error;
 
+      // Supabase silently returns identities: [] when the email already exists (no error thrown)
+      if (data.user?.identities?.length === 0) {
+        showToast('This email is already registered. Please login instead.', 'error');
+        setIsRegister(false);
+        setLoading(false);
+        return;
+      }
+
       // Sign out immediately — prevent auto-login before email is confirmed
       await supabase.auth.signOut();
       showToast('We sent a confirmation email. Please confirm it before logging in.', 'success');

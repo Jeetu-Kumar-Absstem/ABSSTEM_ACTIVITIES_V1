@@ -849,6 +849,10 @@ export const AppProvider = ({ children }) => {
       if (!tournament.registration_open) {
         return { success: false, error: 'Registration is closed for this tournament' };
       }
+      // Block registration once the tournament start date has passed.
+      if (tournament.start_date && new Date(tournament.start_date) <= new Date()) {
+        return { success: false, error: 'Registration is closed — tournament has already started' };
+      }
       const registeredCount = tournamentParticipants.filter(
         p => p.tournament_id === tournamentId && p.status !== 'withdrawn'
       ).length;
@@ -1012,7 +1016,33 @@ export const AppProvider = ({ children }) => {
       if (error) throw error;
       await loadTournamentMatches();
 
-      // Update participant win/loss counters.
+      // ── Update tournament_participants match stats ──────────────────────
+      // Determine winner / loser from the saved result.
+      const winner = resultData.winner_employee_id;
+      const loser =
+        match.player_a_employee_id === winner
+          ? match.player_b_employee_id
+          : match.player_a_employee_id;
+
+      // Only increment matches_played when recording for the first time.
+      // If the match was already 'completed' this is an edit — skip the
+      // played counter so we don't double-count.
+      const isFirstEntry = match.status !== 'completed';
+
+      try {
+        await supabase.rpc('participant_record_match', {
+          p_tournament_id:   match.tournament_id,
+          p_winner_id:       winner  || '',
+          p_loser_id:        loser   || '',
+          p_increment_played: isFirstEntry,
+        });
+      } catch (statsErr) {
+        // Non-fatal: log but don't block the result from being saved.
+        console.warn('participant_record_match failed:', statsErr);
+      }
+      await loadTournamentParticipants();
+
+      // ── Update leaderboard win/loss counters ───────────────────────────
       if (match.player_a_employee_id) {
         await supabase.rpc('leaderboard_apply', {
           p_employee_id: match.player_a_employee_id,
