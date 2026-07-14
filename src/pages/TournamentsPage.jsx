@@ -510,8 +510,8 @@ const TournamentsPage = () => {
 
           <div style={styles.bracketGrid}>
             {/* Quarter finals */}
-            <div style={styles.bracketCol}>
-              <div style={styles.bracketColHeader}>QUARTER FINAL</div>
+            <div style={{ ...styles.bracketCol, background: '#f1613d' }}>
+              <div style={{ ...styles.bracketColHeader, background: '#6286e8' }}>QUARTER FINAL</div>
               <div style={styles.bracketColBody}>
                 {qf.length === 0 ? <div style={styles.emptyCol}>No QF matches yet</div> : qf.map(renderMatch)}
               </div>
@@ -1632,7 +1632,7 @@ const styles = {
 
   bracketGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', alignItems: 'stretch' },
   bracketCol: { display: 'flex', flexDirection: 'column' },
-  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
+  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
   bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100 },
   emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic' },
   matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem' },

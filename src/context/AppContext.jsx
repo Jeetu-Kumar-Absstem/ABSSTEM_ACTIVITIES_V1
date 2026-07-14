@@ -1043,23 +1043,29 @@ export const AppProvider = ({ children }) => {
       await loadTournamentParticipants();
 
       // ── Update leaderboard win/loss counters ───────────────────────────
-      if (match.player_a_employee_id) {
-        await supabase.rpc('leaderboard_apply', {
-          p_employee_id: match.player_a_employee_id,
-          p_game: 'all',
-          p_delta: resultData.winner_employee_id === match.player_a_employee_id
-            ? { match_wins: 1 }
-            : { match_losses: 1 },
-        });
-      }
-      if (match.player_b_employee_id) {
-        await supabase.rpc('leaderboard_apply', {
-          p_employee_id: match.player_b_employee_id,
-          p_game: 'all',
-          p_delta: resultData.winner_employee_id === match.player_b_employee_id
-            ? { match_wins: 1 }
-            : { match_losses: 1 },
-        });
+      // IMPORTANT: only award points on the FIRST entry of a result.
+      // If match.status was already 'completed', this is a score correction/edit.
+      // Calling leaderboard_apply again would double-count points — that is
+      // exactly what caused the "extra points on edit" bug.
+      if (isFirstEntry) {
+        if (match.player_a_employee_id) {
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: match.player_a_employee_id,
+            p_game: 'all',
+            p_delta: resultData.winner_employee_id === match.player_a_employee_id
+              ? { match_wins: 1 }
+              : { match_losses: 1 },
+          });
+        }
+        if (match.player_b_employee_id) {
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: match.player_b_employee_id,
+            p_game: 'all',
+            p_delta: resultData.winner_employee_id === match.player_b_employee_id
+              ? { match_wins: 1 }
+              : { match_losses: 1 },
+          });
+        }
       }
       await loadLeaderboard();
       return { success: true };
