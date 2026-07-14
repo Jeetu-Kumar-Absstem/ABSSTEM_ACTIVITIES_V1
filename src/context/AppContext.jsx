@@ -23,6 +23,13 @@ export const AppProvider = ({ children }) => {
   const [bans, setBans] = useState([]);
   const [rules, setRules] = useState([]);
   const [violations, setViolations] = useState([]);
+  // ── Events / Tournaments / Leaderboard state ────────────────────────────
+  const [events, setEvents] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
+  const [tournamentParticipants, setTournamentParticipants] = useState([]);
+  const [tournamentMatches, setTournamentMatches] = useState([]);
+  const [finalResults, setFinalResults] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gamesLoaded, setGamesLoaded] = useState(false); // track if Supabase games have loaded
@@ -277,6 +284,123 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // ── Events / Tournaments / Leaderboard loaders ──────────────────────────
+  const loadEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('start_date', { ascending: true });
+      if (error) throw error;
+      setEvents(data || []);
+    } catch (err) {
+      console.error('Error loading events:', err);
+      setEvents([]);
+    }
+  };
+
+  const loadTournaments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tournaments')
+        .select('*')
+        .order('start_date', { ascending: false });
+      if (error) throw error;
+      setTournaments(data || []);
+    } catch (err) {
+      console.error('Error loading tournaments:', err);
+      setTournaments([]);
+    }
+  };
+
+  const loadTournamentParticipants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tournament_participants')
+        .select('*')
+        .order('registered_at', { ascending: true });
+      if (error) throw error;
+      setTournamentParticipants(data || []);
+    } catch (err) {
+      console.error('Error loading tournament participants:', err);
+      setTournamentParticipants([]);
+    }
+  };
+
+  const loadTournamentMatches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tournament_matches')
+        .select('*')
+        .order('tournament_id', { ascending: true })
+        .order('round', { ascending: true })
+        .order('match_number', { ascending: true });
+      if (error) throw error;
+
+      // Fetch team players from junction table and attach to each match.
+      let playersMap = {};
+      try {
+        const { data: players } = await supabase
+          .from('tournament_match_players')
+          .select('match_id, employee_id, team, position')
+          .order('position', { ascending: true });
+        if (players) {
+          players.forEach(p => {
+            if (!playersMap[p.match_id]) playersMap[p.match_id] = { A: [], B: [] };
+            playersMap[p.match_id][p.team].push({ employee_id: p.employee_id, position: p.position });
+          });
+        }
+      } catch (_) { /* table may not exist yet — degrade gracefully */ }
+
+      const enriched = (data || []).map(m => ({
+        ...m,
+        team_a_players: playersMap[m.id]?.A || [],
+        team_b_players: playersMap[m.id]?.B || [],
+      }));
+      setTournamentMatches(enriched);
+    } catch (err) {
+      console.error('Error loading tournament matches:', err);
+      setTournamentMatches([]);
+    }
+  };
+
+  const loadFinalResults = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('final_results')
+        .select('*')
+        .order('position', { ascending: true });
+      if (error) throw error;
+      setFinalResults(data || []);
+    } catch (err) {
+      console.error('Error loading final results:', err);
+      setFinalResults([]);
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard_with_rank')
+        .select('*')
+        .order('rank', { ascending: true });
+      if (error) {
+        // Fallback to the raw table if the view is not yet created.
+        const fallback = await supabase
+          .from('leaderboard')
+          .select('*')
+          .order('total_points', { ascending: false });
+        if (fallback.error) throw fallback.error;
+        setLeaderboard(fallback.data || []);
+        return;
+      }
+      setLeaderboard(data || []);
+    } catch (err) {
+      console.error('Error loading leaderboard:', err);
+      setLeaderboard([]);
+    }
+  };
+
   useEffect(() => {
     loadGames();
     loadEmployees();
@@ -286,6 +410,12 @@ export const AppProvider = ({ children }) => {
     loadBans();
     loadRules();
     loadViolations();
+    loadEvents();
+    loadTournaments();
+    loadTournamentParticipants();
+    loadTournamentMatches();
+    loadFinalResults();
+    loadLeaderboard();
     
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUser(data.user || null);
@@ -544,6 +674,521 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // ── Events CRUD (admin) ─────────────────────────────────────────────────
+  const addEvent = async (eventData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can create events!' };
+    }
+    try {
+      const submitter =
+        currentUser?.user_metadata?.name ||
+        currentUser?.email?.split('@')[0] ||
+        'Admin';
+      const code =
+        eventData.code ||
+        `EVT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+
+      const { data, error } = await supabase
+        .from('events')
+        .insert([{
+          code,
+          title: eventData.title,
+          description: eventData.description || null,
+          event_type: eventData.event_type || 'company',
+          start_date: eventData.start_date,
+          end_date: eventData.end_date || null,
+          start_time: eventData.start_time || null,
+          end_time: eventData.end_time || null,
+          venue: eventData.venue || null,
+          location: eventData.location || null,
+          organizer: eventData.organizer || submitter,
+          max_participants: eventData.max_participants || null,
+          banner_color: eventData.banner_color || null,
+          icon: eventData.icon || null,
+          created_by: submitter,
+          is_published: eventData.is_published !== false,
+          event_status: eventData.event_status || 'scheduled',
+        }])
+        .select();
+      if (error) throw error;
+      await loadEvents();
+      return { success: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateEvent = async (eventId, eventData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can edit events!' };
+    }
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({
+          title: eventData.title,
+          description: eventData.description,
+          event_type: eventData.event_type,
+          start_date: eventData.start_date,
+          end_date: eventData.end_date,
+          start_time: eventData.start_time,
+          end_time: eventData.end_time,
+          venue: eventData.venue,
+          location: eventData.location,
+          organizer: eventData.organizer,
+          max_participants: eventData.max_participants,
+          banner_color: eventData.banner_color,
+          icon: eventData.icon,
+          is_published: eventData.is_published,
+          event_status: eventData.event_status,
+        })
+        .match({ id: eventId });
+      if (error) throw error;
+      await loadEvents();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteEvent = async (eventId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can delete events!' };
+    }
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .match({ id: eventId });
+      if (error) throw error;
+      await loadEvents();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // ── Tournament CRUD (admin) ─────────────────────────────────────────────
+  const addTournament = async (tournamentData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can create tournaments!' };
+    }
+    try {
+      const submitter =
+        currentUser?.user_metadata?.name ||
+        currentUser?.email?.split('@')[0] ||
+        'Admin';
+      const code =
+        tournamentData.code ||
+        `TRN-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+      const { data, error } = await supabase
+        .from('tournaments')
+        .insert([{
+          code,
+          name: tournamentData.name,
+          description: tournamentData.description || null,
+          game: tournamentData.game,
+          event_id: tournamentData.event_id || null,
+          format: tournamentData.format || 'knockout',
+          start_date: tournamentData.start_date,
+          end_date: tournamentData.end_date || null,
+          registration_open: tournamentData.registration_open !== false,
+          max_participants: tournamentData.max_participants || 8,
+          players_per_team: tournamentData.players_per_team || 1,
+          status: tournamentData.status || 'registration_open',
+          prize_pool: tournamentData.prize_pool || null,
+          rules: tournamentData.rules || null,
+          created_by: submitter,
+        }])
+        .select();
+      if (error) throw error;
+      await loadTournaments();
+      return { success: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateTournament = async (tournamentId, tournamentData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can edit tournaments!' };
+    }
+    try {
+      const { error } = await supabase
+        .from('tournaments')
+        .update({
+          name: tournamentData.name,
+          description: tournamentData.description,
+          game: tournamentData.game,
+          event_id: tournamentData.event_id,
+          format: tournamentData.format,
+          start_date: tournamentData.start_date,
+          end_date: tournamentData.end_date,
+          registration_open: tournamentData.registration_open,
+          max_participants: tournamentData.max_participants,
+          status: tournamentData.status,
+          prize_pool: tournamentData.prize_pool,
+          rules: tournamentData.rules,
+          champion_employee_id: tournamentData.champion_employee_id,
+          runner_up_employee_id: tournamentData.runner_up_employee_id,
+          third_place_employee_id: tournamentData.third_place_employee_id,
+        })
+        .match({ id: tournamentId });
+      if (error) throw error;
+      await loadTournaments();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteTournament = async (tournamentId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can delete tournaments!' };
+    }
+    try {
+      const { error } = await supabase
+        .from('tournaments')
+        .delete()
+        .match({ id: tournamentId });
+      if (error) throw error;
+      await loadTournaments();
+      await loadTournamentParticipants();
+      await loadTournamentMatches();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // ── Tournament participation (any auth user can self-register) ──────────
+  const registerForTournament = async (tournamentId, employeeId) => {
+    try {
+      const tournament = tournaments.find(t => t.id === tournamentId);
+      if (!tournament) {
+        return { success: false, error: 'Tournament not found' };
+      }
+      if (!tournament.registration_open) {
+        return { success: false, error: 'Registration is closed for this tournament' };
+      }
+      // Block registration once the tournament start date has passed.
+      if (tournament.start_date && new Date(tournament.start_date) <= new Date()) {
+        return { success: false, error: 'Registration is closed — tournament has already started' };
+      }
+      const registeredCount = tournamentParticipants.filter(
+        p => p.tournament_id === tournamentId && p.status !== 'withdrawn'
+      ).length;
+      if (registeredCount >= (tournament.max_participants || 8)) {
+        return { success: false, error: 'Tournament is full' };
+      }
+
+      const nextSeed = (tournamentParticipants.filter(p => p.tournament_id === tournamentId).length || 0) + 1;
+
+      // If the player previously unregistered, a withdrawn row still exists.
+      // UPDATE it back to 'registered' to avoid the unique(tournament_id, employee_id) conflict.
+      const existingWithdrawn = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
+          p.status === 'withdrawn'
+      );
+
+      let data;
+      if (existingWithdrawn) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('tournament_participants')
+          .update({ status: 'registered', seed: nextSeed })
+          .match({ id: existingWithdrawn.id })
+          .select();
+        if (updateErr) throw updateErr;
+        data = updated;
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('tournament_participants')
+          .insert([{
+            tournament_id: tournamentId,
+            employee_id: employeeId,
+            seed: nextSeed,
+            status: 'registered',
+          }])
+          .select();
+        if (insertErr) throw insertErr;
+        data = inserted;
+      }
+
+      await loadTournamentParticipants();
+
+      // Refresh the leaderboard so the UI shows the new participation row.
+      // The DB trigger trg_leaderboard_participant (model 16) is the primary
+      // path for awarding the +1 participation. We do NOT call
+      // leaderboard_apply here in JS — that previously caused doubling.
+      await loadLeaderboard();
+
+      return { success: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const withdrawFromTournament = async (participantId) => {
+    try {
+      const { error } = await supabase
+        .from('tournament_participants')
+        .update({ status: 'withdrawn' })
+        .match({ id: participantId });
+      if (error) throw error;
+      await loadTournamentParticipants();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Convenience wrapper: finds the active participant row by tournamentId +
+  // employeeId, then delegates to withdrawFromTournament.
+  const unregisterFromTournament = async (tournamentId, employeeId) => {
+    try {
+      const participant = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
+          p.status !== 'withdrawn'
+      );
+      if (!participant) {
+        return { success: false, error: 'You are not registered for this tournament' };
+      }
+      return await withdrawFromTournament(participant.id);
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // ── Tournament matches (admin for create, participants for results) ─────
+  const addTournamentMatch = async (matchData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can create matches' };
+    }
+    try {
+      // player_a_employee_id / player_b_employee_id = captain only (FK-safe).
+      const { data, error } = await supabase
+        .from('tournament_matches')
+        .insert([{
+          tournament_id: matchData.tournament_id,
+          match_code: matchData.match_code,
+          round: matchData.round || 'QF',
+          match_number: matchData.match_number || 1,
+          player_a_employee_id: matchData.player_a_employee_id || null,
+          player_b_employee_id: matchData.player_b_employee_id || null,
+          scheduled_at: matchData.scheduled_at || null,
+          next_match_winner_id: matchData.next_match_winner_id || null,
+          next_match_loser_id: matchData.next_match_loser_id || null,
+          notes: matchData.notes || null,
+        }])
+        .select();
+      if (error) throw error;
+
+      // Insert all team members into the junction table.
+      // team_a_players / team_b_players are arrays of employee_ids ordered by position.
+      const matchId = data?.[0]?.id;
+      if (matchId) {
+        const playerRows = [];
+        (matchData.team_a_players || []).forEach((empId, idx) => {
+          if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'A', position: idx + 1 });
+        });
+        (matchData.team_b_players || []).forEach((empId, idx) => {
+          if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'B', position: idx + 1 });
+        });
+        if (playerRows.length > 0) {
+          try {
+            await supabase.from('tournament_match_players').insert(playerRows);
+          } catch (_) { /* degrade gracefully if table not yet created */ }
+        }
+      }
+
+      await loadTournamentMatches();
+      return { success: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const recordMatchResult = async (matchId, resultData) => {
+    try {
+      const match = tournamentMatches.find(m => m.id === matchId);
+      if (!match) return { success: false, error: 'Match not found' };
+
+      // Permission check (mirrors the UI gate in TournamentsPage.canEditMatch):
+      // admin can always edit; non-admin must be one of the two players, and
+      // both player slots must be filled in (no TBD results).
+      const recordedBy = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || null;
+      if (!isAdmin()) {
+        if (!recordedBy) {
+          return { success: false, error: 'Your profile is missing an employee ID' };
+        }
+        const me = String(recordedBy).toUpperCase();
+        const a = String(match.player_a_employee_id || '').toUpperCase();
+        const b = String(match.player_b_employee_id || '').toUpperCase();
+        if (!a || !b) {
+          return { success: false, error: 'Only an admin can record a result before both players are set' };
+        }
+        if (me !== a && me !== b) {
+          return { success: false, error: 'Only the two players in this match can record its result' };
+        }
+      }
+
+      const { error } = await supabase
+        .from('tournament_matches')
+        .update({
+          score_a: resultData.score_a,
+          score_b: resultData.score_b,
+          winner_employee_id: resultData.winner_employee_id,
+          status: 'completed',
+          played_at: new Date().toISOString(),
+          duration_seconds: resultData.duration_seconds || null,
+          recorded_by_employee_id: recordedBy,
+        })
+        .match({ id: matchId });
+      if (error) throw error;
+      await loadTournamentMatches();
+
+      // ── Update tournament_participants match stats ──────────────────────
+      // Determine winner / loser from the saved result.
+      const winner = resultData.winner_employee_id;
+      const loser =
+        match.player_a_employee_id === winner
+          ? match.player_b_employee_id
+          : match.player_a_employee_id;
+
+      // Only increment matches_played when recording for the first time.
+      // If the match was already 'completed' this is an edit — skip the
+      // played counter so we don't double-count.
+      const isFirstEntry = match.status !== 'completed';
+
+      try {
+        await supabase.rpc('participant_record_match', {
+          p_tournament_id:   match.tournament_id,
+          p_winner_id:       winner  || '',
+          p_loser_id:        loser   || '',
+          p_increment_played: isFirstEntry,
+        });
+      } catch (statsErr) {
+        // Non-fatal: log but don't block the result from being saved.
+        console.warn('participant_record_match failed:', statsErr);
+      }
+      await loadTournamentParticipants();
+
+      // ── Update leaderboard win/loss counters ───────────────────────────
+      // IMPORTANT: only award points on the FIRST entry of a result.
+      // If match.status was already 'completed', this is a score correction/edit.
+      // Calling leaderboard_apply again would double-count points — that is
+      // exactly what caused the "extra points on edit" bug.
+      if (isFirstEntry) {
+        // Collect all players on each side: captain + any extra from junction table.
+        const teamAIds = [
+          match.player_a_employee_id,
+          ...(match.team_a_players || []).map(p => p.employee_id),
+        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+
+        const teamBIds = [
+          match.player_b_employee_id,
+          ...(match.team_b_players || []).map(p => p.employee_id),
+        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+
+        // Determine which team won based on the captain FK matching winner_employee_id.
+        const teamAWon = resultData.winner_employee_id === match.player_a_employee_id;
+
+        for (const empId of teamAIds) {
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: empId,
+            p_game: 'all',
+            p_delta: teamAWon ? { match_wins: 1 } : { match_losses: 1 },
+          });
+        }
+        for (const empId of teamBIds) {
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: empId,
+            p_game: 'all',
+            p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
+          });
+        }
+      }
+      await loadLeaderboard();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // ── Final results (admin) ───────────────────────────────────────────────
+  const declareFinalResults = async (tournamentId, results) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can declare final results' };
+    }
+    try {
+      const submitter = currentUser?.user_metadata?.name || 'Admin';
+      // Wipe previous declarations for this tournament then re-insert (idempotent).
+      await supabase.from('final_results').delete().eq('tournament_id', tournamentId);
+
+      const rows = results
+        .filter(r => r.employee_id)
+        .map(r => ({
+          tournament_id: tournamentId,
+          employee_id: r.employee_id,
+          department: r.department || null,
+          position: r.position,
+          matches_played: r.matches_played || 0,
+          wins: r.wins || 0,
+          losses: r.losses || 0,
+          points: r.points || 0,
+          prize_amount: r.prize_amount || null,
+          prize_description: r.prize_description || null,
+          certificate_issued: !!r.certificate_issued,
+          declared_by: submitter,
+        }));
+      if (rows.length === 0) {
+        return { success: false, error: 'No results to declare' };
+      }
+      const { error } = await supabase.from('final_results').insert(rows);
+      if (error) throw error;
+
+      // Update champion / runner-up / 3rd on the tournament itself.
+      const champion    = rows.find(r => r.position === 1);
+      const runnerUp    = rows.find(r => r.position === 2);
+      const thirdPlace  = rows.find(r => r.position === 3);
+      await supabase
+        .from('tournaments')
+        .update({
+          status: 'completed',
+          champion_employee_id: champion?.employee_id || null,
+          runner_up_employee_id: runnerUp?.employee_id || null,
+          third_place_employee_id: thirdPlace?.employee_id || null,
+        })
+        .match({ id: tournamentId });
+
+      // Award tournament podium points via the leaderboard helper.
+      for (const row of rows) {
+        const delta = {};
+        if (row.position === 1) delta.tournament_wins = 1;
+        else if (row.position === 2) delta.tournament_seconds = 1;
+        else if (row.position === 3) delta.tournament_thirds = 1;
+        if (Object.keys(delta).length) {
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: row.employee_id,
+            p_game: 'all',
+            p_delta: delta,
+          });
+        }
+      }
+
+      await loadFinalResults();
+      await loadTournaments();
+      await loadLeaderboard();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   // Get player bans
   const getPlayerBans = (playerName, game) => {
     const normalizedGame = String(game || '');
@@ -627,6 +1272,104 @@ export const AppProvider = ({ children }) => {
       currentUser?.email?.split('@')[0] ||
       '';
     return getPlayerStatsFromResults(gameResults, employeeId, employeeName);
+  };
+
+  // ── Derived helpers for Events / Tournaments / Leaderboard ──────────────
+  const getUpcomingEvents = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return events
+      .filter(e => {
+        if (!e.is_published) return false;
+        if (e.event_status === 'cancelled' || e.event_status === 'completed') return false;
+        const start = e.start_date ? new Date(e.start_date) : null;
+        if (!start) return false;
+        const end = e.end_date ? new Date(e.end_date) : null;
+        if (end && end < today) return false;
+        return start >= today || (end && end >= today);
+      })
+      .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
+  };
+
+  const getPastEvents = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return events
+      .filter(e => {
+        if (e.event_status === 'completed') return true;
+        const end = e.end_date ? new Date(e.end_date) : null;
+        if (end && end < today) return true;
+        const start = e.start_date ? new Date(e.start_date) : null;
+        return start && start < today;
+      })
+      .sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
+  };
+
+  const getTournamentById = (tournamentId) =>
+    tournaments.find(t => t.id === tournamentId) || null;
+
+  const getMatchesByTournament = (tournamentId) =>
+    tournamentMatches
+      .filter(m => m.tournament_id === tournamentId)
+      .sort((a, b) => {
+        const roundOrder = { QF: 1, SF: 2, F: 3, '3RD': 4, RR: 5, GROUP: 6, QUAL: 7 };
+        const ra = roundOrder[a.round] || 99;
+        const rb = roundOrder[b.round] || 99;
+        if (ra !== rb) return ra - rb;
+        return (a.match_number || 0) - (b.match_number || 0);
+      });
+
+  const getParticipantsByTournament = (tournamentId) =>
+    tournamentParticipants
+      .filter(p => p.tournament_id === tournamentId && p.status !== 'withdrawn')
+      .sort((a, b) => (a.seed || 0) - (b.seed || 0));
+
+  const getResultsByTournament = (tournamentId) =>
+    finalResults
+      .filter(r => r.tournament_id === tournamentId)
+      .sort((a, b) => (a.position || 0) - (b.position || 0));
+
+  const getPlayerLeaderboardEntry = (employeeId, game = null) => {
+    if (!employeeId) return null;
+    if (game) {
+      return leaderboard.find(
+        l => l.employee_id?.toUpperCase() === employeeId.toUpperCase() && l.game === game
+      ) || null;
+    }
+    // Sum across all games
+    const rows = leaderboard.filter(
+      l => l.employee_id?.toUpperCase() === employeeId.toUpperCase()
+    );
+    if (rows.length === 0) return null;
+    return rows.reduce((acc, row) => ({
+      ...acc,
+      total_points: acc.total_points + (row.total_points || 0),
+      tournament_wins: acc.tournament_wins + (row.tournament_wins || 0),
+      tournament_seconds: acc.tournament_seconds + (row.tournament_seconds || 0),
+      tournament_thirds: acc.tournament_thirds + (row.tournament_thirds || 0),
+      match_wins: acc.match_wins + (row.match_wins || 0),
+      match_losses: acc.match_losses + (row.match_losses || 0),
+      draws: acc.draws + (row.draws || 0),
+      participations: acc.participations + (row.participations || 0),
+      rule_violations: acc.rule_violations + (row.rule_violations || 0),
+      no_shows: acc.no_shows + (row.no_shows || 0),
+    }), {
+      employee_id: employeeId,
+      game: 'all',
+      total_points: 0,
+      tournament_wins: 0, tournament_seconds: 0, tournament_thirds: 0,
+      match_wins: 0, match_losses: 0, draws: 0,
+      participations: 0, rule_violations: 0, no_shows: 0,
+    });
+  };
+
+  const getEmployeeName = (employeeId) => {
+    if (!employeeId) return 'TBD';
+    const match = employees.find(
+      e => e.employee_code?.toUpperCase() === String(employeeId).toUpperCase()
+    );
+    if (match) return match.name;
+    return String(employeeId);
   };
 
   // Check if player is banned
@@ -715,6 +1458,39 @@ export const AppProvider = ({ children }) => {
     getSlotMatchResult,
     getPlayerGameStats,
     resolveGameKey,
+    // ── Events / Tournaments / Leaderboard ──────────────────────────────
+    events,
+    tournaments,
+    tournamentParticipants,
+    tournamentMatches,
+    finalResults,
+    leaderboard,
+    loadEvents,
+    loadTournaments,
+    loadTournamentParticipants,
+    loadTournamentMatches,
+    loadFinalResults,
+    loadLeaderboard,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+    addTournament,
+    updateTournament,
+    deleteTournament,
+    registerForTournament,
+    withdrawFromTournament,
+    unregisterFromTournament,
+    addTournamentMatch,
+    recordMatchResult,
+    declareFinalResults,
+    getUpcomingEvents,
+    getPastEvents,
+    getTournamentById,
+    getMatchesByTournament,
+    getParticipantsByTournament,
+    getResultsByTournament,
+    getPlayerLeaderboardEntry,
+    getEmployeeName,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

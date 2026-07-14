@@ -3,12 +3,15 @@ import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard',      icon: '📊' },
-  { id: 'booking',   label: 'Book Slots',     icon: '🎯' },
-  { id: 'master',    label: 'Game Master',    icon: '🎮' },
-  { id: 'slots',     label: 'Slot Master',    icon: '⏰' },
-  { id: 'rules',     label: 'Rules',          icon: '📜' },
-  { id: 'bans',      label: 'Ban Management', icon: '🚫' },
+  { id: 'dashboard',       label: 'Dashboard',       icon: '📊' },
+  { id: 'booking',         label: 'Book Slots',      icon: '🎯' },
+  { id: 'master',          label: 'Game Master',     icon: '🎮' },
+  { id: 'slots',           label: 'Slot Master',     icon: '⏰' },
+  { id: 'rules',           label: 'Rules',           icon: '📜' },
+  { id: 'bans',            label: 'Ban Management',  icon: '🚫' },
+  { id: 'eventsCalendar',  label: 'Events Calendar', icon: '📅' },
+  { id: 'tournaments',     label: 'Tournaments',     icon: '🏆' },
+  { id: 'leaderboard',     label: 'Leaderboard',     icon: '🥇' },
 ];
 
 const MobileDrawer = ({ open, onClose, user, onLogout }) => {

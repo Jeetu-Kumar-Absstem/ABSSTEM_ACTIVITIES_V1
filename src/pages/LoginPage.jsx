@@ -125,7 +125,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     if (!validateEmpId(empId)) {
-      showToast('Employee ID must be 4L+4D or 5L+3D (e.g., ABCD1234 or ABCDE123)', 'error');
+      showToast('Employee ID Format is wrong:', 'error');
       return;
     }
 
@@ -163,6 +163,14 @@ const LoginPage = ({ onLogin }) => {
       });
 
       if (error) throw error;
+
+      // Supabase silently returns identities: [] when the email already exists (no error thrown)
+      if (data.user?.identities?.length === 0) {
+        showToast('This email is already registered. Please login instead.', 'error');
+        setIsRegister(false);
+        setLoading(false);
+        return;
+      }
 
       // Sign out immediately — prevent auto-login before email is confirmed
       await supabase.auth.signOut();
@@ -509,7 +517,7 @@ const LoginPage = ({ onLogin }) => {
               type="text"
               value={empId}
               onChange={handleEmpIdChange}
-              // placeholder="e.g., ABCD1234 or ABCDE123"
+              // placeholder="e.g., ABCD1234 (4 letters + 4 digits)"
               maxLength="8"
               style={{
                 padding: '12px 18px',

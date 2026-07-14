@@ -23,7 +23,20 @@ returns boolean
 language sql
 stable
 as $$
-  select app_current_emp_id() = any (array['ABCD1234', 'ABCD6789']);
+  -- Authoritative admin check.
+  -- Primary source: public.app_admins table (see 18_admins.sql).
+  -- Legacy hardcoded list kept as a fallback so the function keeps working
+  -- before 18_admins.sql is applied — order of file apply doesn't matter.
+  select
+    public.app_current_emp_id() = any (array['ABCD1234', 'ABCD6789'])
+    or (
+      to_regclass('public.app_admins') is not null
+      and exists (
+        select 1
+        from public.app_admins a
+        where a.emp_id = public.app_current_emp_id()
+      )
+    );
 $$;
 
 create or replace function public.resolve_game_id(p_value text)

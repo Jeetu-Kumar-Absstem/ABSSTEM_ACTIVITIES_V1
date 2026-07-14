@@ -66,7 +66,6 @@ const DashboardPage = () => {
       (String(ban.game) === String(selectedGameRecord.id) || ban.game === selectedGameRecord.name || String(ban.game).toLowerCase() === String(selectedGameRecord.name || '').toLowerCase() || ban.game === 'All Games')
   ).length;
 
-  const topPlayers = leaderboard.slice(0, 4);
   const leader = leaderboard[0];
   const totalEmployees = leaderboard.length;
 
@@ -127,51 +126,6 @@ const DashboardPage = () => {
         <MetricCard label="Leaderboard leader" value={leader ? leader.points : 0} caption={leader ? `${leader.name} is ranked #${leader.rank}` : 'No match results yet'} accent="#1b5e20" />
         <MetricCard label="Active bans" value={activeBanCount} caption={`${selectedGameRecord.name} scope`} accent="#c62828" />
         <MetricCard label="Employees" value={totalEmployees} caption="Loaded from employee master" accent="#f9a825" />
-      </section>
-
-      <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top 4 Board</div>
-            <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: '#1e1e2f' }}>Highest scoring players — {selectedGameRecord.name}</h2>
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#666' }}>
-            Sorted by points, then wins
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
-          {topPlayers.length > 0 ? topPlayers.map((player) => (
-            <div
-              key={`${player.employee_id || player.name}-${player.rank}`}
-              className="clay-soft"
-              style={{
-                padding: '16px',
-                borderRadius: '22px',
-                borderTop: `4px solid ${player.rank === 1 ? '#1b5e20' : player.rank === 2 ? '#1a3c6e' : player.rank === 3 ? '#f9a825' : '#8e44ad'}`,
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,255,0.94))',
-              }}
-            >
-              <div style={{ fontSize: '0.68rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Rank #{player.rank}
-              </div>
-              <div style={{ marginTop: '6px', fontSize: '1rem', fontWeight: 800, color: '#1e1e2f' }}>
-                {player.name}
-              </div>
-              <div style={{ marginTop: '4px', fontSize: '0.7rem', color: '#667' }}>
-                {player.employee_id || 'N/A'} | {player.department || 'General'}
-              </div>
-              <div style={{ marginTop: '12px', fontSize: '1.6rem', fontWeight: 800, color: '#1a3c6e' }}>
-                {player.points}
-              </div>
-              <div style={{ fontSize: '0.68rem', color: '#777' }}>points</div>
-            </div>
-          )) : (
-            <div style={{ padding: '18px', color: '#8888aa', fontSize: '0.8rem' }}>
-              No leaderboard data for {selectedGameRecord.name} yet.
-            </div>
-          )}
-        </div>
       </section>
 
       <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
