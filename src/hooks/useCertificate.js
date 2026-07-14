@@ -11,19 +11,23 @@
 //
 //   "This certificate is proudly presented to"  top=238
 //   ── blue underline ──────────────────────    top≈265
-//   NAME GOES HERE                              y=233  (bottom-left)
+//   NAME GOES HERE                              y=234 (bottom-left) 
 //   "for being courageous…"                     top=322
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { supabase } from '../utils/supabase';
 
+
+
 const PAGE_HEIGHT = 528.914;
 const PAGE_WIDTH  = 792;
 
 // ── Overlay config — coordinates calibrated to your actual PDF ───────────────
-const NAME_Y        = 233;   // baseline of employee name (on the underline)
+const NAME_Y        = 234;   // baseline of employee name (on the underline)
 const NAME_SIZE     = 26;    // large enough to be readable, fits long names
 const NAME_COLOR    = rgb(0.063, 0.278, 0.506);  // Absstem dark navy #104779
+
+
 
 // ── Fetch template from Supabase Storage (public bucket) ────────────────────
 // Bucket name: certificates   File name: certificate_template.pdf

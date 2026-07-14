@@ -336,7 +336,28 @@ export const AppProvider = ({ children }) => {
         .order('round', { ascending: true })
         .order('match_number', { ascending: true });
       if (error) throw error;
-      setTournamentMatches(data || []);
+
+      // Fetch team players from junction table and attach to each match.
+      let playersMap = {};
+      try {
+        const { data: players } = await supabase
+          .from('tournament_match_players')
+          .select('match_id, employee_id, team, position')
+          .order('position', { ascending: true });
+        if (players) {
+          players.forEach(p => {
+            if (!playersMap[p.match_id]) playersMap[p.match_id] = { A: [], B: [] };
+            playersMap[p.match_id][p.team].push({ employee_id: p.employee_id, position: p.position });
+          });
+        }
+      } catch (_) { /* table may not exist yet — degrade gracefully */ }
+
+      const enriched = (data || []).map(m => ({
+        ...m,
+        team_a_players: playersMap[m.id]?.A || [],
+        team_b_players: playersMap[m.id]?.B || [],
+      }));
+      setTournamentMatches(enriched);
     } catch (err) {
       console.error('Error loading tournament matches:', err);
       setTournamentMatches([]);
@@ -773,6 +794,7 @@ export const AppProvider = ({ children }) => {
           end_date: tournamentData.end_date || null,
           registration_open: tournamentData.registration_open !== false,
           max_participants: tournamentData.max_participants || 8,
+          players_per_team: tournamentData.players_per_team || 1,
           status: tournamentData.status || 'registration_open',
           prize_pool: tournamentData.prize_pool || null,
           rules: tournamentData.rules || null,
@@ -896,18 +918,11 @@ export const AppProvider = ({ children }) => {
 
       await loadTournamentParticipants();
 
-      // Award +2 participation points via the leaderboard helper.
-      try {
-        await supabase.rpc('leaderboard_apply', {
-          p_employee_id: employeeId,
-          p_game: tournament.game || 'all',
-          p_delta: { participations: 1 },
-        });
-        await loadLeaderboard();
-      } catch (lbErr) {
-        // Non-fatal: leaderboard helper is best-effort.
-        console.warn('leaderboard_apply failed:', lbErr);
-      }
+      // Refresh the leaderboard so the UI shows the new participation row.
+      // The DB trigger trg_leaderboard_participant (model 16) is the primary
+      // path for awarding the +1 participation. We do NOT call
+      // leaderboard_apply here in JS — that previously caused doubling.
+      await loadLeaderboard();
 
       return { success: true, data: data?.[0] || null };
     } catch (err) {
@@ -954,6 +969,7 @@ export const AppProvider = ({ children }) => {
       return { success: false, error: 'Only admins can create matches' };
     }
     try {
+      // player_a_employee_id / player_b_employee_id = captain only (FK-safe).
       const { data, error } = await supabase
         .from('tournament_matches')
         .insert([{
@@ -970,6 +986,25 @@ export const AppProvider = ({ children }) => {
         }])
         .select();
       if (error) throw error;
+
+      // Insert all team members into the junction table.
+      // team_a_players / team_b_players are arrays of employee_ids ordered by position.
+      const matchId = data?.[0]?.id;
+      if (matchId) {
+        const playerRows = [];
+        (matchData.team_a_players || []).forEach((empId, idx) => {
+          if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'A', position: idx + 1 });
+        });
+        (matchData.team_b_players || []).forEach((empId, idx) => {
+          if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'B', position: idx + 1 });
+        });
+        if (playerRows.length > 0) {
+          try {
+            await supabase.from('tournament_match_players').insert(playerRows);
+          } catch (_) { /* degrade gracefully if table not yet created */ }
+        }
+      }
+
       await loadTournamentMatches();
       return { success: true, data: data?.[0] || null };
     } catch (err) {
@@ -1048,22 +1083,32 @@ export const AppProvider = ({ children }) => {
       // Calling leaderboard_apply again would double-count points — that is
       // exactly what caused the "extra points on edit" bug.
       if (isFirstEntry) {
-        if (match.player_a_employee_id) {
+        // Collect all players on each side: captain + any extra from junction table.
+        const teamAIds = [
+          match.player_a_employee_id,
+          ...(match.team_a_players || []).map(p => p.employee_id),
+        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+
+        const teamBIds = [
+          match.player_b_employee_id,
+          ...(match.team_b_players || []).map(p => p.employee_id),
+        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+
+        // Determine which team won based on the captain FK matching winner_employee_id.
+        const teamAWon = resultData.winner_employee_id === match.player_a_employee_id;
+
+        for (const empId of teamAIds) {
           await supabase.rpc('leaderboard_apply', {
-            p_employee_id: match.player_a_employee_id,
+            p_employee_id: empId,
             p_game: 'all',
-            p_delta: resultData.winner_employee_id === match.player_a_employee_id
-              ? { match_wins: 1 }
-              : { match_losses: 1 },
+            p_delta: teamAWon ? { match_wins: 1 } : { match_losses: 1 },
           });
         }
-        if (match.player_b_employee_id) {
+        for (const empId of teamBIds) {
           await supabase.rpc('leaderboard_apply', {
-            p_employee_id: match.player_b_employee_id,
+            p_employee_id: empId,
             p_game: 'all',
-            p_delta: resultData.winner_employee_id === match.player_b_employee_id
-              ? { match_wins: 1 }
-              : { match_losses: 1 },
+            p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
           });
         }
       }

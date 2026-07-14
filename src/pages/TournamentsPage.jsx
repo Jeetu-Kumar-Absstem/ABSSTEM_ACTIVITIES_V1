@@ -185,14 +185,17 @@ const TournamentsPage = () => {
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
   const [tForm, setTForm] = useState({
     name: '', game: 'Carrom', format: 'knockout',
+    players_per_team: 1,
     start_date: '', end_date: '', max_participants: 8,
     prize_pool: '', description: '',
   });
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
   const [mForm, setMForm] = useState({
     match_code: '', round: 'QF', match_number: 1,
-    player_a: '', player_b: '', scheduled_at: '',
-    team_a_p1: '', team_a_p2: '', team_b_p1: '', team_b_p2: '',
+    scheduled_at: '',
+    // Dynamic: team_a[0..N-1] and team_b[0..N-1] based on players_per_team
+    team_a: ['', '', ''],
+    team_b: ['', '', ''],
   });
   const [resultMatchId, setResultMatchId] = useState(null);
   const [rForm, setRForm] = useState({ score_a: '', score_b: '', winner: '', duration: '' });
@@ -257,7 +260,14 @@ const TournamentsPage = () => {
     const a = (m.player_a_employee_id || '').toUpperCase();
     const b = (m.player_b_employee_id || '').toUpperCase();
     if (!a || !b) return false; // TBD slots — only admin can fill them in
-    return me === a || me === b;
+    // Check captain columns first
+    if (me === a || me === b) return true;
+    // Then check all team members from junction table
+    const allPlayers = [
+      ...(m.team_a_players || []),
+      ...(m.team_b_players || []),
+    ].map(p => (p.employee_id || '').toUpperCase());
+    return allPlayers.includes(me);
   };
 
   // ── Sub-tab renderers ─────────────────────────────────────────────────
@@ -415,23 +425,39 @@ const TournamentsPage = () => {
     const f  = matchesForActive.filter(m => m.round === 'F');
     const tp = matchesForActive.filter(m => m.round === '3RD');
 
-    // Derive match stats directly from completed matches so the participants
-    // table always reflects reality even before the DB counters are updated.
+    // Derive match stats from completed matches including all team members.
     const participantStats = {};
     for (const m of matchesForActive) {
       if (m.status !== 'completed') continue;
-      const players = [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean);
-      players.forEach(pid => {
+      // Build full team rosters: captain + junction table players
+      const teamAIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)]
+        .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+      const teamBIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)]
+        .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+      const teamAWon = m.winner_employee_id === m.player_a_employee_id;
+      [...teamAIds, ...teamBIds].forEach(pid => {
         if (!participantStats[pid]) participantStats[pid] = { played: 0, won: 0, lost: 0 };
         participantStats[pid].played += 1;
-        if (m.winner_employee_id === pid) participantStats[pid].won += 1;
+        const onTeamA = teamAIds.includes(pid);
+        if ((onTeamA && teamAWon) || (!onTeamA && !teamAWon)) participantStats[pid].won += 1;
         else participantStats[pid].lost += 1;
       });
     }
 
+    // Build a display label for a team: "Captain" for 1v1, "P1 & P2 & P3" for multi
+    const teamLabel = (captainId, teamPlayers) => {
+      if (!captainId) return 'TBD';
+      if (!teamPlayers || teamPlayers.length === 0) return getEmployeeName(captainId);
+      // teamPlayers from junction table includes captain too; deduplicate by position order
+      const ids = teamPlayers.map(p => p.employee_id);
+      // Ensure captain is first
+      const ordered = [captainId, ...ids.filter(id => id !== captainId)];
+      return ordered.map(id => getEmployeeName(id)).join(' & ');
+    };
+
     const renderMatch = (m) => {
-      const a = m.player_a_employee_id ? getEmployeeName(m.player_a_employee_id) : 'TBD';
-      const b = m.player_b_employee_id ? getEmployeeName(m.player_b_employee_id) : 'TBD';
+      const a = teamLabel(m.player_a_employee_id, m.team_a_players);
+      const b = teamLabel(m.player_b_employee_id, m.team_b_players);
       const hasScore = m.score_a !== null && m.score_b !== null;
       const isFinal = m.round === 'F';
       return (
@@ -446,7 +472,7 @@ const TournamentsPage = () => {
             color: hasScore && m.score_a > m.score_b ? '#1b5e20' : '#212121',
             fontWeight: hasScore && m.score_a > m.score_b ? 700 : 500,
           }}>
-            <span>{a}</span><span>{m.score_a ?? '—'}</span>
+            <span style={{ fontSize: '0.7rem' }}>{a}</span><span>{m.score_a ?? '—'}</span>
           </div>
           <div style={{
             ...styles.matchPlayer,
@@ -454,7 +480,7 @@ const TournamentsPage = () => {
             color: hasScore && m.score_b > m.score_a ? '#1b5e20' : '#212121',
             fontWeight: hasScore && m.score_b > m.score_a ? 700 : 500,
           }}>
-            <span>{b}</span><span>{m.score_b ?? '—'}</span>
+            <span style={{ fontSize: '0.7rem' }}>{b}</span><span>{m.score_b ?? '—'}</span>
           </div>
           <div style={styles.matchMeta}>
             {m.status === 'completed' ? '✓ Final' : m.status === 'live' ? '● Live' : '⏳ Pending'}
@@ -647,12 +673,12 @@ const TournamentsPage = () => {
                   <td style={styles.td}>{m.round} · M{m.match_number}</td>
                   <td style={styles.td}><strong>{m.match_code || `M${m.match_number}`}</strong></td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_a_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_a_employee_id ? 700 : 500 }}>
-                    {m.player_a_employee_id ? getEmployeeName(m.player_a_employee_id) : 'TBD'}
+                    {m.player_a_employee_id ? [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
                   <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{m.score_a ?? '—'}</td>
                   <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{m.score_b ?? '—'}</td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_b_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_b_employee_id ? 700 : 500 }}>
-                    {m.player_b_employee_id ? getEmployeeName(m.player_b_employee_id) : 'TBD'}
+                    {m.player_b_employee_id ? [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
                   <td style={styles.td}>{m.played_at ? formatDate(m.played_at) : '—'}</td>
                   <td style={styles.td}>
@@ -708,72 +734,107 @@ const TournamentsPage = () => {
             {isAdmin() && (
               <button
                 onClick={() => {
-                  // ── Derive positions from bracket matches ──────────────
-                  // Build per-player stats from all completed matches
+                  // ── Validate that a completed Final exists ──────────────
+                  // Auto-population needs the Final (round F) with a result.
+                  // If the Final hasn't been played yet, warn the admin and
+                  // still open the modal so they can add 3rd place manually
+                  // or pick winners by hand.
+                  const finalMatch = matchesForActive.find(m => m.round === 'F' && m.status === 'completed');
+                  const finalUnplayed = matchesForActive.find(m => m.round === 'F' && m.status !== 'completed');
+                  if (!finalMatch && finalUnplayed) {
+                    showToast('Final match hasn\'t been played yet. Record the Final result first, or add 3rd place manually below.', 'warning');
+                  } else if (!finalMatch && !finalUnplayed) {
+                    showToast('No Final match scheduled. You can still add 3rd place manually below.', 'warning');
+                  }
+
+                  // ── Compute per-player stats from completed matches ──────────
                   const statsMap = {};
                   for (const m of matchesForActive) {
                     if (m.status !== 'completed') continue;
-                    const players = [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean);
-                    players.forEach(pid => {
-                      if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0 };
+                    const teamAIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)]
+                      .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+                    const teamBIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)]
+                      .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+                    const teamAWon = m.winner_employee_id === m.player_a_employee_id;
+                    [...teamAIds, ...teamBIds].forEach(pid => {
+                      if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0, points: 0 };
                       statsMap[pid].played += 1;
-                      if (m.winner_employee_id === pid) statsMap[pid].won += 1;
-                      else statsMap[pid].lost += 1;
+                      const onA = teamAIds.includes(pid);
+                      if ((onA && teamAWon) || (!onA && !teamAWon)) {
+                        statsMap[pid].won += 1;
+                        statsMap[pid].points += 3;
+                      } else {
+                        statsMap[pid].lost += 1;
+                      }
                     });
                   }
 
-                  const mkRow = (empId, position, prizeAmt, prizeLabel) => {
-                    const s = statsMap[empId] || { played: 0, won: 0, lost: 0 };
+                  // ── Determine positions from bracket ────────────────────────
+                  // 1st = winner of Final (round F)
+                  // 2nd = loser of Final
+                  // 3rd = winner of 3rd-place match (round 3RD) — optional
+                  const thirdMatch = matchesForActive.find(m => m.round === '3RD' && m.status === 'completed');
+
+                  const makeEntry = (empId, position) => {
+                    const dept = employees.find(e => e.employee_code === empId)?.department || '—';
+                    const s = statsMap[empId] || { played: 0, won: 0, lost: 0, points: 0 };
                     return {
                       employee_id: empId,
-                      department: employees.find(e => e.employee_code === empId)?.department || '—',
+                      department: dept,
                       position,
                       matches_played: s.played,
                       wins: s.won,
                       losses: s.lost,
-                      points: s.won * 3,
-                      prize_amount: prizeAmt,
-                      prize_description: prizeLabel,
+                      points: s.points,
+                      prize_amount: '',          // admin fills this in
+                      prize_description: '',     // derived on save
                     };
                   };
 
-                  // Find the Final match
-                  const finalMatch = matchesForActive.find(m => m.round === 'F' && m.status === 'completed');
-                  // Find the 3rd-place match
-                  const thirdMatch = matchesForActive.find(m => m.round === '3RD' && m.status === 'completed');
+                  // Helper: get all player IDs for a side of a match (captain + team members)
+                  const getTeamIds = (match, side) => {
+                    if (side === 'A') {
+                      return [match.player_a_employee_id, ...(match.team_a_players || []).map(p => p.employee_id)]
+                        .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+                    } else {
+                      return [match.player_b_employee_id, ...(match.team_b_players || []).map(p => p.employee_id)]
+                        .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+                    }
+                  };
 
                   const rows = [];
 
                   if (finalMatch) {
-                    const winner = finalMatch.winner_employee_id;
-                    const loser = [finalMatch.player_a_employee_id, finalMatch.player_b_employee_id]
-                      .find(id => id && id !== winner);
-                    if (winner) rows.push(mkRow(winner, 1, 1000, '₹1,000 + Trophy'));
-                    if (loser)  rows.push(mkRow(loser,  2, 500,  '₹500 + Trophy'));
+                    const winnerCaptainId = finalMatch.winner_employee_id;
+                    const winnerSide = finalMatch.player_a_employee_id === winnerCaptainId ? 'A' : 'B';
+                    const loserSide  = winnerSide === 'A' ? 'B' : 'A';
+
+                    // All members of winning team → 1st place
+                    getTeamIds(finalMatch, winnerSide).forEach(id => rows.push(makeEntry(id, 1)));
+                    // All members of losing team → 2nd place
+                    getTeamIds(finalMatch, loserSide).forEach(id => rows.push(makeEntry(id, 2)));
                   }
 
                   if (thirdMatch) {
-                    const thirdWinner = thirdMatch.winner_employee_id;
-                    if (thirdWinner) rows.push(mkRow(thirdWinner, 3, 300, '₹300 + Medal'));
-                  } else {
-                    // No 3rd-place match yet — add a placeholder so admin can pick manually
-                    rows.push({
-                      employee_id: '__3RD__',
-                      department: '—',
-                      position: 3,
-                      matches_played: 0,
-                      wins: 0,
-                      losses: 0,
-                      points: 0,
-                      prize_amount: 300,
-                      prize_description: '₹300 + Medal',
-                    });
+                    const winnerCaptainId = thirdMatch.winner_employee_id;
+                    const winnerSide = thirdMatch.player_a_employee_id === winnerCaptainId ? 'A' : 'B';
+                    getTeamIds(thirdMatch, winnerSide).forEach(id => rows.push(makeEntry(id, 3)));
                   }
 
-                  setFinalForm(rows);
+                  // Remove duplicates (safety) then sort by position
+                  const seen = new Set();
+                  const deduped = rows.filter(r => { if (seen.has(r.employee_id)) return false; seen.add(r.employee_id); return true; });
+                  deduped.sort((a, b) => a.position - b.position);
+
+                  // If 1st/2nd couldn't be auto-derived (no completed Final),
+                  // but a 3RD match was completed, the winner of that 3RD match
+                  // is a real 3rd place — keep it. Admin can still add 1st/2nd
+                  // manually by editing the rows, or the bracket needs the Final
+                  // result recorded.
+                  setFinalForm(deduped);
                 }}
                 style={styles.navyBtn}
-              >📣 Declare Winners</button>
+              >📣 Declare Results</button>
             )}
           </div>
 
@@ -988,11 +1049,12 @@ const TournamentsPage = () => {
     const result = await addTournament({
       ...tForm,
       max_participants: parseInt(tForm.max_participants, 10) || 8,
+      players_per_team: parseInt(tForm.players_per_team, 10) || 1,
     });
     if (result.success) {
       showToast(`Tournament "${tForm.name}" created!`);
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', format: 'knockout', start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '' });
+      setTForm({ name: '', game: 'Carrom', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '' });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -1000,43 +1062,47 @@ const TournamentsPage = () => {
   };
 
   const openNewMatchModal = (round) => {
+    const ppt = activeTournamentRecord?.players_per_team || 1;
     setMForm({
       match_code: `${round}${matchesForActive.filter(m => m.round === round).length + 1}`,
       round, match_number: matchesForActive.filter(m => m.round === round).length + 1,
-      player_a: '', player_b: '', scheduled_at: '',
-      team_a_p1: '', team_a_p2: '', team_b_p1: '', team_b_p2: '',
+      scheduled_at: '',
+      team_a: Array(ppt).fill(''),
+      team_b: Array(ppt).fill(''),
     });
     setShowNewMatchModal(true);
   };
 
   const handleCreateMatch = async () => {
     if (!activeTournament) return;
-    const isCarrom = activeTournamentRecord?.game === 'Carrom';
-    let playerA, playerB;
-    if (isCarrom) {
-      if (!mForm.team_a_p1 || !mForm.team_b_p1) {
-        showToast('At least one player per team is required', 'error');
-        return;
-      }
-      // Encode team members as comma-separated IDs
-      playerA = [mForm.team_a_p1, mForm.team_a_p2].filter(Boolean).join(',');
-      playerB = [mForm.team_b_p1, mForm.team_b_p2].filter(Boolean).join(',');
-    } else {
-      if (!mForm.player_a || !mForm.player_b) {
-        showToast('Both players are required', 'error');
-        return;
-      }
-      playerA = mForm.player_a;
-      playerB = mForm.player_b;
+    const ppt = activeTournamentRecord?.players_per_team || 1;
+    const teamA = (mForm.team_a || []).filter(Boolean);
+    const teamB = (mForm.team_b || []).filter(Boolean);
+
+    if (teamA.length === 0 || teamB.length === 0) {
+      showToast('At least one player per team is required', 'error');
+      return;
     }
+    if (ppt > 1 && (teamA.length < 1 || teamB.length < 1)) {
+      showToast('Captain (Player 1) is required for each team', 'error');
+      return;
+    }
+
+    // Captain goes into the FK column; all players go into junction table.
+    const captainA = teamA[0];
+    const captainB = teamB[0];
+
     const result = await addTournamentMatch({
       tournament_id: activeTournament,
       match_code: mForm.match_code,
       round: mForm.round,
       match_number: parseInt(mForm.match_number, 10) || 1,
-      player_a_employee_id: playerA,
-      player_b_employee_id: playerB,
+      player_a_employee_id: captainA,
+      player_b_employee_id: captainB,
       scheduled_at: mForm.scheduled_at || null,
+      // Full rosters for junction table
+      team_a_players: teamA,
+      team_b_players: teamB,
     });
     if (result.success) {
       showToast('Match added');
@@ -1080,7 +1146,21 @@ const TournamentsPage = () => {
       showToast('No results to declare', 'error');
       return;
     }
-    const result = await declareFinalResults(activeTournament, finalForm);
+    // Validate: any manual position (1st / 2nd / 3rd) must have a player selected.
+    const incompleteManual = finalForm.find(r => r._manual && !r.employee_id);
+    if (incompleteManual) {
+      const pos = incompleteManual.position;
+      const label = pos === 1 ? '1st' : pos === 2 ? '2nd' : `${pos}th`;
+      showToast(`Please select a player for ${label} place or remove the entry`, 'error');
+      return;
+    }
+    // Strip internal _manual flag before persisting
+    const payload = finalForm.map(({ _manual, ...rest }) => ({
+      ...rest,
+      prize_amount: parseInt(rest.prize_amount, 10) || 0,
+      prize_description: rest.prize_amount ? `₹${rest.prize_amount}` : rest.prize_description || '',
+    }));
+    const result = await declareFinalResults(activeTournament, payload);
     if (result.success) {
       showToast('Final results declared!');
       setFinalForm([]);
@@ -1171,6 +1251,15 @@ const TournamentsPage = () => {
                          onChange={(e) => setTForm(f => ({ ...f, max_participants: e.target.value }))} />
                 </div>
                 <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Players Per Team</label>
+                  <select style={styles.formInput} value={tForm.players_per_team}
+                          onChange={(e) => setTForm(f => ({ ...f, players_per_team: parseInt(e.target.value, 10) }))}>
+                    <option value={1}>1 — Singles (1v1)</option>
+                    <option value={2}>2 — Doubles (2v2)</option>
+                    <option value={3}>3 — Triples (3v3)</option>
+                  </select>
+                </div>
+                <div style={styles.formRow}>
                   <label style={styles.formLabel}>Prize Pool</label>
                   <input style={styles.formInput} value={tForm.prize_pool}
                          onChange={(e) => setTForm(f => ({ ...f, prize_pool: e.target.value }))} />
@@ -1200,108 +1289,112 @@ const TournamentsPage = () => {
               <button onClick={() => setShowNewMatchModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
-              <div style={styles.formGrid}>
-                <div style={styles.formRow}>
-                  <label style={styles.formLabel}>Round</label>
-                  <select style={styles.formInput} value={mForm.round}
-                          onChange={(e) => setMForm(f => ({ ...f, round: e.target.value }))}>
-                    <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
-                  </select>
-                </div>
-                <div style={styles.formRow}>
-                  <label style={styles.formLabel}>Match Code</label>
-                  <input style={styles.formInput} value={mForm.match_code}
-                         onChange={(e) => setMForm(f => ({ ...f, match_code: e.target.value }))} />
-                </div>
-                {activeTournamentRecord?.game === 'Carrom' ? (
-                  <>
+              {(() => {
+                const ppt = activeTournamentRecord?.players_per_team || 1;
+                // Collect all currently selected IDs to prevent duplicates across teams
+                const allSelected = [
+                  ...(mForm.team_a || []),
+                  ...(mForm.team_b || []),
+                ].filter(Boolean);
+
+                const availableFor = (team, slotIdx) =>
+                  partsList.filter(p => {
+                    const id = p.employee_id;
+                    // Allow the currently selected value in this slot
+                    const currentVal = team === 'A' ? mForm.team_a[slotIdx] : mForm.team_b[slotIdx];
+                    if (id === currentVal) return true;
+                    return !allSelected.includes(id);
+                  });
+
+                const setSlot = (team, idx, val) => {
+                  setMForm(f => {
+                    const arr = team === 'A' ? [...(f.team_a || [])] : [...(f.team_b || [])];
+                    arr[idx] = val;
+                    return team === 'A' ? { ...f, team_a: arr } : { ...f, team_b: arr };
+                  });
+                };
+
+                return (
+                  <div style={styles.formGrid}>
+                    <div style={styles.formRow}>
+                      <label style={styles.formLabel}>Round</label>
+                      <select style={styles.formInput} value={mForm.round}
+                              onChange={(e) => setMForm(f => ({ ...f, round: e.target.value }))}>
+                        <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
+                      </select>
+                    </div>
+                    <div style={styles.formRow}>
+                      <label style={styles.formLabel}>Match Code</label>
+                      <input style={styles.formInput} value={mForm.match_code}
+                             onChange={(e) => setMForm(f => ({ ...f, match_code: e.target.value }))} />
+                    </div>
+
                     {/* Team A */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' }}>🔵 Team A <span style={{ fontWeight: 400, color: '#666' }}>(max 2 players)</span></div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                          <div style={styles.formRow}>
-                            <label style={styles.formLabel}>Player 1 *</label>
-                            <select style={styles.formInput} value={mForm.team_a_p1}
-                                    onChange={(e) => setMForm(f => ({ ...f, team_a_p1: e.target.value }))}>
-                              <option value="">— select —</option>
-                              {partsList.filter(p => p.employee_id !== mForm.team_a_p2 && p.employee_id !== mForm.team_b_p1 && p.employee_id !== mForm.team_b_p2).map(p => (
-                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={styles.formRow}>
-                            <label style={styles.formLabel}>Player 2 (optional)</label>
-                            <select style={styles.formInput} value={mForm.team_a_p2}
-                                    onChange={(e) => setMForm(f => ({ ...f, team_a_p2: e.target.value }))}>
-                              <option value="">— none —</option>
-                              {partsList.filter(p => p.employee_id !== mForm.team_a_p1 && p.employee_id !== mForm.team_b_p1 && p.employee_id !== mForm.team_b_p2).map(p => (
-                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                              ))}
-                            </select>
-                          </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' }}>
+                          🔵 Team A
+                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
+                          {Array.from({ length: ppt }).map((_, idx) => (
+                            <div key={idx} style={styles.formRow}>
+                              <label style={styles.formLabel}>
+                                {ppt === 1 ? 'Player A *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1}${idx === 0 ? ' *' : ' (optional)'}`}
+                              </label>
+                              <select
+                                style={styles.formInput}
+                                value={(mForm.team_a || [])[idx] || ''}
+                                onChange={(e) => setSlot('A', idx, e.target.value)}
+                              >
+                                <option value="">{idx === 0 ? '— select —' : '— none —'}</option>
+                                {availableFor('A', idx).map(p => (
+                                  <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
+
                     {/* Team B */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' }}>🟠 Team B <span style={{ fontWeight: 400, color: '#666' }}>(max 2 players)</span></div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                          <div style={styles.formRow}>
-                            <label style={styles.formLabel}>Player 1 *</label>
-                            <select style={styles.formInput} value={mForm.team_b_p1}
-                                    onChange={(e) => setMForm(f => ({ ...f, team_b_p1: e.target.value }))}>
-                              <option value="">— select —</option>
-                              {partsList.filter(p => p.employee_id !== mForm.team_a_p1 && p.employee_id !== mForm.team_a_p2 && p.employee_id !== mForm.team_b_p2).map(p => (
-                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={styles.formRow}>
-                            <label style={styles.formLabel}>Player 2 (optional)</label>
-                            <select style={styles.formInput} value={mForm.team_b_p2}
-                                    onChange={(e) => setMForm(f => ({ ...f, team_b_p2: e.target.value }))}>
-                              <option value="">— none —</option>
-                              {partsList.filter(p => p.employee_id !== mForm.team_a_p1 && p.employee_id !== mForm.team_a_p2 && p.employee_id !== mForm.team_b_p1).map(p => (
-                                <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                              ))}
-                            </select>
-                          </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' }}>
+                          🟠 Team B
+                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
+                          {Array.from({ length: ppt }).map((_, idx) => (
+                            <div key={idx} style={styles.formRow}>
+                              <label style={styles.formLabel}>
+                                {ppt === 1 ? 'Player B *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1}${idx === 0 ? ' *' : ' (optional)'}`}
+                              </label>
+                              <select
+                                style={styles.formInput}
+                                value={(mForm.team_b || [])[idx] || ''}
+                                onChange={(e) => setSlot('B', idx, e.target.value)}
+                              >
+                                <option value="">{idx === 0 ? '— select —' : '— none —'}</option>
+                                {availableFor('B', idx).map(p => (
+                                  <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={styles.formRow}>
-                      <label style={styles.formLabel}>Player A</label>
-                      <select style={styles.formInput} value={mForm.player_a}
-                              onChange={(e) => setMForm(f => ({ ...f, player_a: e.target.value }))}>
-                        <option value="">— select —</option>
-                        {partsList.map(p => (
-                          <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                        ))}
-                      </select>
+
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <label style={styles.formLabel}>Scheduled Time</label>
+                      <input style={styles.formInput} type="datetime-local" value={mForm.scheduled_at}
+                             onChange={(e) => setMForm(f => ({ ...f, scheduled_at: e.target.value }))} />
                     </div>
-                    <div style={styles.formRow}>
-                      <label style={styles.formLabel}>Player B</label>
-                      <select style={styles.formInput} value={mForm.player_b}
-                              onChange={(e) => setMForm(f => ({ ...f, player_b: e.target.value }))}>
-                        <option value="">— select —</option>
-                        {partsList.map(p => (
-                          <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                )}
-                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                  <label style={styles.formLabel}>Scheduled Time</label>
-                  <input style={styles.formInput} type="datetime-local" value={mForm.scheduled_at}
-                         onChange={(e) => setMForm(f => ({ ...f, scheduled_at: e.target.value }))} />
-                </div>
-              </div>
+                  </div>
+                );
+              })()}
             </div>
             <div style={styles.modalFooter}>
               <button onClick={() => setShowNewMatchModal(false)} style={styles.outlineBtn}>Cancel</button>
@@ -1340,8 +1433,19 @@ const TournamentsPage = () => {
                       <select style={styles.formInput} value={rForm.winner}
                               onChange={(e) => setRForm(f => ({ ...f, winner: e.target.value }))}>
                         <option value="">— select —</option>
-                        <option value={m.player_a_employee_id}>{getEmployeeName(m.player_a_employee_id)}</option>
-                        <option value={m.player_b_employee_id}>{getEmployeeName(m.player_b_employee_id)}</option>
+                        {/* Winner value = captain ID (FK-safe); label shows full team */}
+                        <option value={m.player_a_employee_id}>
+                          {(() => {
+                            const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
+                            return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team A';
+                          })()}
+                        </option>
+                        <option value={m.player_b_employee_id}>
+                          {(() => {
+                            const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
+                            return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team B';
+                          })()}
+                        </option>
                       </select>
                     </div>
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
@@ -1364,148 +1468,167 @@ const TournamentsPage = () => {
       {/* Final results modal — admin only */}
       {finalForm.length > 0 && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setFinalForm([]); }} style={styles.modalBackdrop}>
-          <div style={{ ...styles.modalCard, maxWidth: 680 }}>
+          <div style={{ ...styles.modalCard, maxWidth: 700 }}>
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>📣 Declare Final Results</h3>
               <button onClick={() => setFinalForm([])} style={styles.modalClose}>✕</button>
             </div>
-            <div style={{ padding: '1rem', maxHeight: '65vh', overflowY: 'auto' }}>
+            <div style={{ padding: '1rem', maxHeight: '62vh', overflowY: 'auto' }}>
 
               {/* Info banner */}
-              <div style={{ background: '#e3f2fd', borderRadius: 6, padding: '0.55rem 0.8rem', fontSize: '0.72rem', color: '#1565c0', marginBottom: '1rem', lineHeight: 1.5 }}>
-                ℹ️ Positions and stats are auto-filled from Bracket / Fixtures.
-                Only <strong>Prize Money (₹)</strong> needs to be entered. You can adjust any field if needed.
-                {finalForm.some(r => r.employee_id === '__3RD__') && (
-                  <span style={{ display: 'block', marginTop: '0.3rem', color: '#e65100' }}>
-                    ⚠️ No completed 3rd-place match found — please select the 3rd-place player manually below.
-                  </span>
-                )}
+              <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.55rem 0.75rem', fontSize: '0.72rem', color: '#1a3c6e', marginBottom: '0.9rem', lineHeight: 1.5 }}>
+                <strong>Auto-populated from bracket:</strong> Positions and match stats are taken from completed fixtures.
+                Only enter the <strong>prize money (₹)</strong> for each winner. Add 3rd place manually if needed.
               </div>
 
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                {finalForm.map((row, i) => {
-                  const posLabel = row.position === 1 ? '🥇 1st Place (Champion)' : row.position === 2 ? '🥈 2nd Place (Runner-up)' : '🥉 3rd Place';
-                  const posColor = row.position === 1 ? '#f9a825' : row.position === 2 ? '#607d8b' : '#d84315';
-                  const posBg    = row.position === 1 ? '#fff8e1' : row.position === 2 ? '#eceff1' : '#fff3e0';
-                  const isPlaceholder = row.employee_id === '__3RD__';
-                  return (
-                    <div key={i} style={{ border: `2px solid ${posColor}`, borderRadius: 8, overflow: 'hidden' }}>
-                      {/* Position header */}
-                      <div style={{ background: posBg, padding: '0.45rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.82rem', color: posColor }}>{posLabel}</span>
-                        {!isPlaceholder && (
-                          <span style={{ fontSize: '0.7rem', color: '#444', marginLeft: 'auto' }}>
-                            {row.department}
-                          </span>
-                        )}
-                      </div>
+              {/* Position cards — grouped by position so team members share one card */}
+              {(() => {
+                // Group rows by position
+                const positions = [...new Set(finalForm.map(r => r.position))].sort((a, b) => a - b);
+                return (
+                  <div style={{ display: 'grid', gap: '0.6rem' }}>
+                    {positions.map(pos => {
+                      const members = finalForm.filter(r => r.position === pos);
+                      const firstMember = members[0];
+                      const isManual = firstMember?._manual;
+                      const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `#${pos}`;
+                      const cardBg = pos === 1 ? '#fff8e1' : pos === 2 ? '#f5f5f5' : pos === 3 ? '#fff3e0' : '#fafafa';
+                      const borderColor = pos === 1 ? '#f9a825' : pos === 2 ? '#b0bec5' : pos === 3 ? '#d84315' : '#d0d0d0';
+                      // Shared prize amount — use first member's value
+                      const sharedPrize = firstMember?.prize_amount ?? '';
 
-                      <div style={{ padding: '0.7rem 0.8rem', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1.4fr', gap: '0.5rem', alignItems: 'end' }}>
-                        {/* Player name / picker for 3rd */}
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Player</label>
-                          {isPlaceholder ? (
-                            <select
-                              style={styles.formInput}
-                              value={row._selectedEmpId || ''}
-                              onChange={(e) => {
-                                const empId = e.target.value;
-                                const statsMap = {};
-                                for (const m of matchesForActive) {
-                                  if (m.status !== 'completed') continue;
-                                  [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean).forEach(pid => {
-                                    if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0 };
-                                    statsMap[pid].played += 1;
-                                    if (m.winner_employee_id === pid) statsMap[pid].won += 1;
-                                    else statsMap[pid].lost += 1;
-                                  });
-                                }
-                                const s = statsMap[empId] || { played: 0, won: 0, lost: 0 };
-                                setFinalForm(f => f.map((r, j) => j === i ? {
-                                  ...r,
-                                  employee_id: empId || '__3RD__',
-                                  _selectedEmpId: empId,
-                                  department: employees.find(e => e.employee_code === empId)?.department || '—',
-                                  matches_played: s.played,
-                                  wins: s.won,
-                                  losses: s.lost,
-                                  points: s.won * 3,
-                                } : r));
-                              }}
-                            >
-                              <option value="">— select 3rd place —</option>
-                              {partsList
-                                .filter(p => !finalForm.some((r, j) => j !== i && r.employee_id === p.employee_id))
-                                .map(p => (
-                                  <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                                ))}
-                            </select>
-                          ) : (
-                            <div style={{ ...styles.formInput, background: '#f5f5f5', color: '#1e1e2f', fontWeight: 700, cursor: 'default' }}>
-                              {getEmployeeName(row.employee_id)}
+                      return (
+                        <div key={pos} style={{ background: cardBg, border: `1.5px solid ${borderColor}`, borderRadius: 8, padding: '0.75rem 1rem' }}>
+
+                          {/* Header row: medal + position label + remove btn */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '1.25rem' }}>{medal}</span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1e2f' }}>
+                              {pos === 1 ? '1st Place' : pos === 2 ? '2nd Place' : pos === 3 ? '3rd Place' : `${pos}th Place`}
+                            </span>
+                            {isManual && (
+                              <button
+                                onClick={() => setFinalForm(f => f.filter(r => r.position !== pos))}
+                                style={{ ...styles.tinyIconBtn, color: '#c62828', borderColor: '#ffcdd2', fontSize: '0.7rem', marginLeft: 'auto' }}
+                                title="Remove this position"
+                              >✕ Remove</button>
+                            )}
+                          </div>
+
+                          {/* Player rows */}
+                          <div style={{ display: 'grid', gap: '0.35rem', marginBottom: '0.6rem' }}>
+                            {isManual ? (
+                              /* Manual 3rd: dropdown to pick player */
+                              <select
+                                style={{ ...styles.formInput, fontWeight: 600 }}
+                                value={firstMember?.employee_id || ''}
+                                onChange={(e) => {
+                                  const empId = e.target.value;
+                                  if (!empId) return;
+                                  const statsMap = {};
+                                  for (const m of matchesForActive) {
+                                    if (m.status !== 'completed') continue;
+                                    const aIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)]
+                                      .filter(Boolean).filter((v, idx, a) => a.indexOf(v) === idx);
+                                    const bIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)]
+                                      .filter(Boolean).filter((v, idx, a) => a.indexOf(v) === idx);
+                                    const aWon = m.winner_employee_id === m.player_a_employee_id;
+                                    [...aIds, ...bIds].forEach(pid => {
+                                      if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0, points: 0 };
+                                      statsMap[pid].played += 1;
+                                      const onA = aIds.includes(pid);
+                                      if ((onA && aWon) || (!onA && !aWon)) { statsMap[pid].won += 1; statsMap[pid].points += 3; }
+                                      else statsMap[pid].lost += 1;
+                                    });
+                                  }
+                                  const s = statsMap[empId] || { played: 0, won: 0, lost: 0, points: 0 };
+                                  const dept = employees.find(e => e.employee_code === empId)?.department || '—';
+                                  setFinalForm(f => f.map(r => r.position === pos && r._manual
+                                    ? { ...r, employee_id: empId, department: dept, matches_played: s.played, wins: s.won, losses: s.lost, points: s.points }
+                                    : r));
+                                }}
+                              >
+                                <option value="">{`— select ${pos}${pos === 1 ? 'st' : pos === 2 ? 'nd' : 'rd'} place player —`}</option>
+                                {partsList
+                                  .filter(p => !finalForm.some(r => r.position !== pos && r.employee_id === p.employee_id))
+                                  .map(p => (
+                                    <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                  ))}
+                              </select>
+                            ) : (
+                              /* Auto-populated: show each team member with their stats */
+                              members.map(member => (
+                                <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.3rem 0' }}>
+                                  {/* Name + dept */}
+                                  <div style={{ minWidth: 130, flex: 1 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e1e2f' }}>{getEmployeeName(member.employee_id)}</div>
+                                    <div style={{ fontSize: '0.65rem', color: '#777' }}>{member.department}</div>
+                                  </div>
+                                  {/* Per-player stats */}
+                                  <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                    {[
+                                      { label: 'Played', val: member.matches_played },
+                                      { label: 'Won',    val: member.wins },
+                                      { label: 'Lost',   val: member.losses },
+                                      { label: 'Pts',    val: member.points },
+                                    ].map(({ label, val }) => (
+                                      <div key={label} style={{ textAlign: 'center', minWidth: 36 }}>
+                                        <div style={{ fontSize: '0.58rem', color: '#999', textTransform: 'uppercase' }}>{label}</div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1a3c6e' }}>{val ?? 0}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          {/* Shared prize money input for this position */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderTop: `1px dashed ${borderColor}`, paddingTop: '0.5rem' }}>
+                            <label style={{ fontSize: '0.68rem', color: '#555', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                              Prize Money (₹) {members.length > 1 ? '— per player' : ''}
+                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #d0d0d0', borderRadius: 4, overflow: 'hidden', background: 'white' }}>
+                              <span style={{ padding: '0 0.35rem', color: '#888', fontSize: '0.75rem', background: '#f5f5f5', borderRight: '1px solid #d0d0d0', userSelect: 'none' }}>₹</span>
+                              <input
+                                style={{ ...styles.formInput, border: 'none', width: 90, padding: '0.28rem 0.4rem' }}
+                                type="number" min="0" placeholder="0"
+                                value={sharedPrize}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  // Apply same prize to all members of this position
+                                  setFinalForm(f => f.map(r => r.position === pos
+                                    ? { ...r, prize_amount: val, prize_description: val ? `₹${val}` : '' }
+                                    : r));
+                                }}
+                              />
                             </div>
-                          )}
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
-                        {/* Matches played — auto from bracket, editable */}
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Matches</label>
-                          <input style={{ ...styles.formInput, textAlign: 'center' }}
-                                 type="number" min="0" value={row.matches_played}
-                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, matches_played: parseInt(e.target.value, 10) || 0 } : r))} />
-                        </div>
-
-                        {/* Won */}
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Won</label>
-                          <input style={{ ...styles.formInput, textAlign: 'center' }}
-                                 type="number" min="0" value={row.wins}
-                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, wins: parseInt(e.target.value, 10) || 0 } : r))} />
-                        </div>
-
-                        {/* Lost */}
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Lost</label>
-                          <input style={{ ...styles.formInput, textAlign: 'center' }}
-                                 type="number" min="0" value={row.losses}
-                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, losses: parseInt(e.target.value, 10) || 0 } : r))} />
-                        </div>
-
-                        {/* Points */}
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Points</label>
-                          <input style={{ ...styles.formInput, textAlign: 'center' }}
-                                 type="number" min="0" value={row.points}
-                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, points: parseInt(e.target.value, 10) || 0 } : r))} />
-                        </div>
-
-                        {/* Prize Money — PRIMARY input for admin */}
-                        <div style={styles.formRow}>
-                          <label style={{ ...styles.formLabel, color: '#1a3c6e', fontWeight: 700 }}>Prize (₹) *</label>
-                          <input
-                            style={{ ...styles.formInput, borderColor: '#1a3c6e', fontWeight: 700 }}
-                            type="number" min="0" placeholder="e.g. 1000"
-                            value={row.prize_amount ?? ''}
-                            onChange={(e) => {
-                              const amt = parseInt(e.target.value, 10) || 0;
-                              setFinalForm(f => f.map((r, j) => j === i ? {
-                                ...r,
-                                prize_amount: amt,
-                                prize_description: amt > 0 ? `₹${amt.toLocaleString('en-IN')}` : r.prize_description,
-                              } : r));
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Prize description (auto-generated, still editable) */}
-                      <div style={{ padding: '0 0.8rem 0.7rem', display: 'grid', gridTemplateColumns: '1fr', gap: '0.3rem' }}>
-                        <label style={{ ...styles.formLabel, color: '#666' }}>Prize Label (auto-filled, editable)</label>
-                        <input style={{ ...styles.formInput, fontSize: '0.72rem' }}
-                               value={row.prize_description}
-                               onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, prize_description: e.target.value } : r))} />
-                      </div>
-                    </div>
+              {/* Add manual position buttons — only for positions not already present.
+                  Lets admin fill in podium slots when the bracket didn't have a Final
+                  or 3rd-place match (e.g. round-robin, or only 4 players). */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                {[1, 2, 3].filter(pos => !finalForm.some(r => r.position === pos)).map(pos => {
+                  const labels = { 1: '🥇 1st Place', 2: '🥈 2nd Place', 3: '🥉 3rd Place' };
+                  return (
+                    <button
+                      key={pos}
+                      onClick={() => setFinalForm(f => [...f, {
+                        employee_id: '', department: '—', position: pos,
+                        matches_played: 0, wins: 0, losses: 0, points: 0,
+                        prize_amount: '', prize_description: '', _manual: true,
+                      }])}
+                      style={{ ...styles.outlineBtn, flex: 1, fontSize: '0.72rem' }}
+                    >
+                      + Add {labels[pos]} (Manual)
+                    </button>
                   );
                 })}
               </div>
@@ -1514,17 +1637,14 @@ const TournamentsPage = () => {
             <div style={styles.modalFooter}>
               <button onClick={() => setFinalForm([])} style={styles.outlineBtn}>Cancel</button>
               <button
-                onClick={() => {
-                  // Validate: no placeholder 3rd-place left unselected
-                  const unresolved = finalForm.find(r => r.employee_id === '__3RD__');
-                  if (unresolved) {
-                    alert('Please select the 3rd place player before declaring.');
-                    return;
-                  }
-                  handleDeclareFinal();
+                onClick={handleDeclareFinal}
+                disabled={finalForm.some(r => r.position === 3 && r._manual && !r.employee_id)}
+                style={{
+                  ...styles.navyBtn,
+                  opacity: finalForm.some(r => r.position === 3 && r._manual && !r.employee_id) ? 0.5 : 1,
+                  cursor: finalForm.some(r => r.position === 3 && r._manual && !r.employee_id) ? 'not-allowed' : 'pointer',
                 }}
-                style={styles.navyBtn}
-              >📣 Declare Winners</button>
+              >📣 Declare</button>
             </div>
           </div>
         </div>
