@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
+import { useCertificate } from '../hooks/useCertificate';
 
 // Confirm-delete modal (admin action on a tournament).
 const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
@@ -177,6 +178,8 @@ const TournamentsPage = () => {
     getEmployeeName,
   } = useApp();
   const { showToast } = useToast();
+  const { generateCertificate } = useCertificate();
+  const [certPrinting, setCertPrinting] = useState(null); // tracks which row is printing
 
   const [sub, setSub] = useState('active');
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
@@ -510,8 +513,8 @@ const TournamentsPage = () => {
 
           <div style={styles.bracketGrid}>
             {/* Quarter finals */}
-            <div style={{ ...styles.bracketCol, background: '#f1613d' }}>
-              <div style={{ ...styles.bracketColHeader, background: '#6286e8' }}>QUARTER FINAL</div>
+            <div style={styles.bracketCol}>
+              <div style={styles.bracketColHeader}>QUARTER FINAL</div>
               <div style={styles.bracketColBody}>
                 {qf.length === 0 ? <div style={styles.emptyCol}>No QF matches yet</div> : qf.map(renderMatch)}
               </div>
@@ -705,18 +708,69 @@ const TournamentsPage = () => {
             {isAdmin() && (
               <button
                 onClick={() => {
-                  const seed = partsList.map((p, i) => ({
-                    employee_id: p.employee_id,
-                    department: employees.find(e => e.employee_code === p.employee_id)?.department || '—',
-                    position: i + 1,
-                    matches_played: p.matches_played,
-                    wins: p.wins,
-                    losses: p.losses,
-                    points: p.points,
-                    prize_description: i === 0 ? '₹1,000 + Trophy' : i === 1 ? '₹500 + Trophy' : i === 2 ? '₹300 + Medal' : 'Participation',
-                    prize_amount: i === 0 ? 1000 : i === 1 ? 500 : i === 2 ? 300 : 0,
-                  }));
-                  setFinalForm(seed);
+                  // ── Derive positions from bracket matches ──────────────
+                  // Build per-player stats from all completed matches
+                  const statsMap = {};
+                  for (const m of matchesForActive) {
+                    if (m.status !== 'completed') continue;
+                    const players = [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean);
+                    players.forEach(pid => {
+                      if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0 };
+                      statsMap[pid].played += 1;
+                      if (m.winner_employee_id === pid) statsMap[pid].won += 1;
+                      else statsMap[pid].lost += 1;
+                    });
+                  }
+
+                  const mkRow = (empId, position, prizeAmt, prizeLabel) => {
+                    const s = statsMap[empId] || { played: 0, won: 0, lost: 0 };
+                    return {
+                      employee_id: empId,
+                      department: employees.find(e => e.employee_code === empId)?.department || '—',
+                      position,
+                      matches_played: s.played,
+                      wins: s.won,
+                      losses: s.lost,
+                      points: s.won * 3,
+                      prize_amount: prizeAmt,
+                      prize_description: prizeLabel,
+                    };
+                  };
+
+                  // Find the Final match
+                  const finalMatch = matchesForActive.find(m => m.round === 'F' && m.status === 'completed');
+                  // Find the 3rd-place match
+                  const thirdMatch = matchesForActive.find(m => m.round === '3RD' && m.status === 'completed');
+
+                  const rows = [];
+
+                  if (finalMatch) {
+                    const winner = finalMatch.winner_employee_id;
+                    const loser = [finalMatch.player_a_employee_id, finalMatch.player_b_employee_id]
+                      .find(id => id && id !== winner);
+                    if (winner) rows.push(mkRow(winner, 1, 1000, '₹1,000 + Trophy'));
+                    if (loser)  rows.push(mkRow(loser,  2, 500,  '₹500 + Trophy'));
+                  }
+
+                  if (thirdMatch) {
+                    const thirdWinner = thirdMatch.winner_employee_id;
+                    if (thirdWinner) rows.push(mkRow(thirdWinner, 3, 300, '₹300 + Medal'));
+                  } else {
+                    // No 3rd-place match yet — add a placeholder so admin can pick manually
+                    rows.push({
+                      employee_id: '__3RD__',
+                      department: '—',
+                      position: 3,
+                      matches_played: 0,
+                      wins: 0,
+                      losses: 0,
+                      points: 0,
+                      prize_amount: 300,
+                      prize_description: '₹300 + Medal',
+                    });
+                  }
+
+                  setFinalForm(rows);
                 }}
                 style={styles.navyBtn}
               >📣 Declare Winners</button>
@@ -783,7 +837,48 @@ const TournamentsPage = () => {
                     <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{r.points}</td>
                     <td style={styles.td}>{r.prize_description || '—'}</td>
                     <td style={styles.td}>
-                      <button style={styles.tinyEnterBtn}>🖨 Print</button>
+                      {/* Admin: can download certificate for ANY participant.
+                          Non-admin: can only download their OWN certificate. */}
+                      {(isAdmin() || r.employee_id?.toUpperCase() === currentEmpId.toUpperCase()) ? (
+                        <button
+                          disabled={certPrinting === r.id}
+                          onClick={async () => {
+                            setCertPrinting(r.id);
+                            const result = await generateCertificate({
+                              employeeName:   getEmployeeName(r.employee_id),
+                              employeeId:     r.employee_id,
+                              tournamentId:   activeTournament,
+                              tournamentName: activeTournamentRecord?.name || '',
+                              position:       r.position,
+                              issuedBy:       currentEmpId,
+                            });
+                            setCertPrinting(null);
+                            if (result.success) {
+                              showToast(
+                                isAdmin() && r.employee_id?.toUpperCase() !== currentEmpId.toUpperCase()
+                                  ? `Certificate downloaded for ${getEmployeeName(r.employee_id)}!`
+                                  : 'Your certificate has been downloaded!'
+                              );
+                            } else {
+                              showToast(result.error || 'Failed to generate certificate', 'error');
+                            }
+                          }}
+                          style={{
+                            ...styles.tinyEnterBtn,
+                            background: certPrinting === r.id ? '#888' : '#1a3c6e',
+                            opacity: certPrinting === r.id ? 0.7 : 1,
+                            cursor: certPrinting === r.id ? 'wait' : 'pointer',
+                            minWidth: 90,
+                          }}
+                        >
+                          {certPrinting === r.id ? '⏳ Generating…' : '🏅 Download'}
+                        </button>
+                      ) : (
+                        <span
+                          style={{ fontSize: '0.66rem', color: '#bbb' }}
+                          title="Certificate available only for your own results"
+                        >—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1266,61 +1361,170 @@ const TournamentsPage = () => {
         </div>
       )}
 
-      {/* Final results modal */}
+      {/* Final results modal — admin only */}
       {finalForm.length > 0 && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setFinalForm([]); }} style={styles.modalBackdrop}>
-          <div style={{ ...styles.modalCard, maxWidth: 720 }}>
+          <div style={{ ...styles.modalCard, maxWidth: 680 }}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Declare Final Results</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>📣 Declare Final Results</h3>
               <button onClick={() => setFinalForm([])} style={styles.modalClose}>✕</button>
             </div>
-            <div style={{ padding: '1rem', maxHeight: '60vh', overflowY: 'auto' }}>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.theadRow}>
-                    {['Position','Player','Department','Matches','Won','Lost','Points','Prize'].map(h => (
-                      <th key={h} style={styles.th}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {finalForm.map((row, i) => (
-                    <tr key={row.employee_id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={styles.td}>{row.position}</td>
-                      <td style={styles.td}><strong>{getEmployeeName(row.employee_id)}</strong></td>
-                      <td style={styles.td}>{row.department}</td>
-                      <td style={styles.td}>
-                        <input style={{ ...styles.formInput, width: 60, padding: '0.18rem 0.35rem' }}
-                               type="number" min="0" value={row.matches_played}
-                               onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, matches_played: parseInt(e.target.value, 10) || 0 } : r))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={{ ...styles.formInput, width: 60, padding: '0.18rem 0.35rem' }}
-                               type="number" min="0" value={row.wins}
-                               onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, wins: parseInt(e.target.value, 10) || 0 } : r))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={{ ...styles.formInput, width: 60, padding: '0.18rem 0.35rem' }}
-                               type="number" min="0" value={row.losses}
-                               onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, losses: parseInt(e.target.value, 10) || 0 } : r))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={{ ...styles.formInput, width: 60, padding: '0.18rem 0.35rem' }}
-                               type="number" min="0" value={row.points}
-                               onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, points: parseInt(e.target.value, 10) || 0 } : r))} />
-                      </td>
-                      <td style={styles.td}>
-                        <input style={{ ...styles.formInput, padding: '0.18rem 0.35rem' }} value={row.prize_description}
+            <div style={{ padding: '1rem', maxHeight: '65vh', overflowY: 'auto' }}>
+
+              {/* Info banner */}
+              <div style={{ background: '#e3f2fd', borderRadius: 6, padding: '0.55rem 0.8rem', fontSize: '0.72rem', color: '#1565c0', marginBottom: '1rem', lineHeight: 1.5 }}>
+                ℹ️ Positions and stats are auto-filled from Bracket / Fixtures.
+                Only <strong>Prize Money (₹)</strong> needs to be entered. You can adjust any field if needed.
+                {finalForm.some(r => r.employee_id === '__3RD__') && (
+                  <span style={{ display: 'block', marginTop: '0.3rem', color: '#e65100' }}>
+                    ⚠️ No completed 3rd-place match found — please select the 3rd-place player manually below.
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {finalForm.map((row, i) => {
+                  const posLabel = row.position === 1 ? '🥇 1st Place (Champion)' : row.position === 2 ? '🥈 2nd Place (Runner-up)' : '🥉 3rd Place';
+                  const posColor = row.position === 1 ? '#f9a825' : row.position === 2 ? '#607d8b' : '#d84315';
+                  const posBg    = row.position === 1 ? '#fff8e1' : row.position === 2 ? '#eceff1' : '#fff3e0';
+                  const isPlaceholder = row.employee_id === '__3RD__';
+                  return (
+                    <div key={i} style={{ border: `2px solid ${posColor}`, borderRadius: 8, overflow: 'hidden' }}>
+                      {/* Position header */}
+                      <div style={{ background: posBg, padding: '0.45rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.82rem', color: posColor }}>{posLabel}</span>
+                        {!isPlaceholder && (
+                          <span style={{ fontSize: '0.7rem', color: '#444', marginLeft: 'auto' }}>
+                            {row.department}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ padding: '0.7rem 0.8rem', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1.4fr', gap: '0.5rem', alignItems: 'end' }}>
+                        {/* Player name / picker for 3rd */}
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>Player</label>
+                          {isPlaceholder ? (
+                            <select
+                              style={styles.formInput}
+                              value={row._selectedEmpId || ''}
+                              onChange={(e) => {
+                                const empId = e.target.value;
+                                const statsMap = {};
+                                for (const m of matchesForActive) {
+                                  if (m.status !== 'completed') continue;
+                                  [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean).forEach(pid => {
+                                    if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0 };
+                                    statsMap[pid].played += 1;
+                                    if (m.winner_employee_id === pid) statsMap[pid].won += 1;
+                                    else statsMap[pid].lost += 1;
+                                  });
+                                }
+                                const s = statsMap[empId] || { played: 0, won: 0, lost: 0 };
+                                setFinalForm(f => f.map((r, j) => j === i ? {
+                                  ...r,
+                                  employee_id: empId || '__3RD__',
+                                  _selectedEmpId: empId,
+                                  department: employees.find(e => e.employee_code === empId)?.department || '—',
+                                  matches_played: s.played,
+                                  wins: s.won,
+                                  losses: s.lost,
+                                  points: s.won * 3,
+                                } : r));
+                              }}
+                            >
+                              <option value="">— select 3rd place —</option>
+                              {partsList
+                                .filter(p => !finalForm.some((r, j) => j !== i && r.employee_id === p.employee_id))
+                                .map(p => (
+                                  <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                ))}
+                            </select>
+                          ) : (
+                            <div style={{ ...styles.formInput, background: '#f5f5f5', color: '#1e1e2f', fontWeight: 700, cursor: 'default' }}>
+                              {getEmployeeName(row.employee_id)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Matches played — auto from bracket, editable */}
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>Matches</label>
+                          <input style={{ ...styles.formInput, textAlign: 'center' }}
+                                 type="number" min="0" value={row.matches_played}
+                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, matches_played: parseInt(e.target.value, 10) || 0 } : r))} />
+                        </div>
+
+                        {/* Won */}
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>Won</label>
+                          <input style={{ ...styles.formInput, textAlign: 'center' }}
+                                 type="number" min="0" value={row.wins}
+                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, wins: parseInt(e.target.value, 10) || 0 } : r))} />
+                        </div>
+
+                        {/* Lost */}
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>Lost</label>
+                          <input style={{ ...styles.formInput, textAlign: 'center' }}
+                                 type="number" min="0" value={row.losses}
+                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, losses: parseInt(e.target.value, 10) || 0 } : r))} />
+                        </div>
+
+                        {/* Points */}
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>Points</label>
+                          <input style={{ ...styles.formInput, textAlign: 'center' }}
+                                 type="number" min="0" value={row.points}
+                                 onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, points: parseInt(e.target.value, 10) || 0 } : r))} />
+                        </div>
+
+                        {/* Prize Money — PRIMARY input for admin */}
+                        <div style={styles.formRow}>
+                          <label style={{ ...styles.formLabel, color: '#1a3c6e', fontWeight: 700 }}>Prize (₹) *</label>
+                          <input
+                            style={{ ...styles.formInput, borderColor: '#1a3c6e', fontWeight: 700 }}
+                            type="number" min="0" placeholder="e.g. 1000"
+                            value={row.prize_amount ?? ''}
+                            onChange={(e) => {
+                              const amt = parseInt(e.target.value, 10) || 0;
+                              setFinalForm(f => f.map((r, j) => j === i ? {
+                                ...r,
+                                prize_amount: amt,
+                                prize_description: amt > 0 ? `₹${amt.toLocaleString('en-IN')}` : r.prize_description,
+                              } : r));
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Prize description (auto-generated, still editable) */}
+                      <div style={{ padding: '0 0.8rem 0.7rem', display: 'grid', gridTemplateColumns: '1fr', gap: '0.3rem' }}>
+                        <label style={{ ...styles.formLabel, color: '#666' }}>Prize Label (auto-filled, editable)</label>
+                        <input style={{ ...styles.formInput, fontSize: '0.72rem' }}
+                               value={row.prize_description}
                                onChange={(e) => setFinalForm(f => f.map((r, j) => j === i ? { ...r, prize_description: e.target.value } : r))} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+
             <div style={styles.modalFooter}>
               <button onClick={() => setFinalForm([])} style={styles.outlineBtn}>Cancel</button>
-              <button onClick={handleDeclareFinal} style={styles.navyBtn}>📣 Declare</button>
+              <button
+                onClick={() => {
+                  // Validate: no placeholder 3rd-place left unselected
+                  const unresolved = finalForm.find(r => r.employee_id === '__3RD__');
+                  if (unresolved) {
+                    alert('Please select the 3rd place player before declaring.');
+                    return;
+                  }
+                  handleDeclareFinal();
+                }}
+                style={styles.navyBtn}
+              >📣 Declare Winners</button>
             </div>
           </div>
         </div>
@@ -1632,7 +1836,7 @@ const styles = {
 
   bracketGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', alignItems: 'stretch' },
   bracketCol: { display: 'flex', flexDirection: 'column' },
-  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
+  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
   bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100 },
   emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic' },
   matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem' },
