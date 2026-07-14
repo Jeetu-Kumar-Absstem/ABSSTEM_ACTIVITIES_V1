@@ -34,6 +34,9 @@ where status = 'completed'
 order by end_date desc nulls last, start_date desc;
 
 -- Leaderboard enriched with rank, employee name & department.
+-- The leaderboard table now keeps TWO rows per employee: one per-game and one
+-- overall ('all'). The view exposes the overall row as the single entry per
+-- player; use the raw `leaderboard` table when you need per-game breakdowns.
 create or replace view public.leaderboard_with_rank as
 select
   row_number() over (order by lb.total_points desc, lb.tournament_wins desc, lb.match_wins desc) as rank,
@@ -56,6 +59,7 @@ select
   lb.updated_at
 from public.leaderboard lb
 left join public.employees e on e.employee_code = lb.employee_id
+where lb.game = 'all'
 order by lb.total_points desc, lb.tournament_wins desc, lb.match_wins desc;
 
 -- Champions hall of fame (every tournament's 1st / 2nd / 3rd row, joined back

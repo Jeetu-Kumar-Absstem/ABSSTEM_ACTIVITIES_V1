@@ -3,27 +3,19 @@
 -- Auto-award / revoke participation points when players register or withdraw.
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Helper: get the game for a tournament
--- (used inside the trigger to know which game key to pass)
+-- Participation points are an OVERALL metric (not per-game), so the trigger
+-- always writes to the (employee_id, 'all') row in the leaderboard.
 
 CREATE OR REPLACE FUNCTION public.leaderboard_on_participant_change()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
-DECLARE
-  v_game text;
 BEGIN
-  -- Fetch the game for this tournament
-  SELECT lower(coalesce(game, 'all'))
-    INTO v_game
-    FROM public.tournaments
-   WHERE id = coalesce(NEW.tournament_id, OLD.tournament_id);
-
   -- INSERT or status changed TO active → award participation
   IF (TG_OP = 'INSERT' AND NEW.status != 'withdrawn') THEN
     PERFORM public.leaderboard_apply(
       NEW.employee_id,
-      v_game,
+      'all',
       '{"participations": 1}'::jsonb
     );
 
@@ -33,7 +25,7 @@ BEGIN
          AND NEW.status = 'withdrawn') THEN
     PERFORM public.leaderboard_apply(
       NEW.employee_id,
-      v_game,
+      'all',
       '{"participations": -1}'::jsonb
     );
 
@@ -43,7 +35,7 @@ BEGIN
          AND NEW.status != 'withdrawn') THEN
     PERFORM public.leaderboard_apply(
       NEW.employee_id,
-      v_game,
+      'all',
       '{"participations": 1}'::jsonb
     );
 
@@ -51,7 +43,7 @@ BEGIN
   ELSIF (TG_OP = 'DELETE' AND OLD.status != 'withdrawn') THEN
     PERFORM public.leaderboard_apply(
       OLD.employee_id,
-      v_game,
+      'all',
       '{"participations": -1}'::jsonb
     );
   END IF;
@@ -67,8 +59,8 @@ FOR EACH ROW EXECUTE FUNCTION public.leaderboard_on_participant_change();
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- BACKFILL: award participation points for all existing active registrations
--- that are not yet in the leaderboard.
+-- BACKFILL: award participation points for all existing active registrations.
+-- Writes to the (employee_id, 'all') row only.
 -- Run once; safe to re-run (leaderboard_apply uses ON CONFLICT DO UPDATE).
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -77,14 +69,13 @@ DECLARE
   rec RECORD;
 BEGIN
   FOR rec IN
-    SELECT tp.employee_id, lower(coalesce(t.game, 'all')) AS game
+    SELECT tp.employee_id
       FROM public.tournament_participants tp
-      JOIN public.tournaments t ON t.id = tp.tournament_id
      WHERE tp.status != 'withdrawn'
   LOOP
     PERFORM public.leaderboard_apply(
       rec.employee_id,
-      rec.game,
+      'all',
       '{"participations": 1}'::jsonb
     );
   END LOOP;

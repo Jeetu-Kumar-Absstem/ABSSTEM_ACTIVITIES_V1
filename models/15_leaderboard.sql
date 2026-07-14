@@ -74,6 +74,18 @@ before update on public.leaderboard
 for each row execute function public.touch_updated_at();
 
 -- Points calculator — apply achievement deltas to a (employee, game) row.
+-- Always updates TWO rows in one transaction:
+--   1. The per-game row  (game = lower(p_game), default 'all')
+--   2. The overall row   (game = 'all')
+-- This gives a single "overall" leaderboard entry per employee while still
+-- preserving per-game breakdowns if anyone wants to filter by game later.
+--
+-- SECURITY DEFINER: runs with the function owner's privileges so a
+-- non-admin user can still trigger a leaderboard update indirectly
+-- (e.g. via the trg_leaderboard_participant trigger when they register
+-- for a tournament). Without this, the RLS policy on `leaderboard`
+-- would block non-admin writes and the trigger would error out with
+-- "new row violates row-level security policy for table 'leaderboard'".
 create or replace function public.leaderboard_apply(
   p_employee_id text,
   p_game text,
@@ -81,6 +93,8 @@ create or replace function public.leaderboard_apply(
 )
 returns void
 language plpgsql
+security definer
+set search_path = public
 as $$
 declare
   v_game text := lower(coalesce(p_game, 'all'));
@@ -106,6 +120,7 @@ begin
     return;
   end if;
 
+  -- 1. Per-game row (game = v_game, defaults to 'all' if no game given)
   insert into public.leaderboard (
     employee_id, game, total_points,
     tournament_wins, tournament_seconds, tournament_thirds,
@@ -134,5 +149,43 @@ begin
                            when v_points_delta <> 0 then now()
                            else public.leaderboard.last_activity_at
                          end;
+
+  -- 2. Overall aggregate row (game = 'all').
+  -- Skip if v_game is already 'all' to avoid double-applying the delta.
+  if v_game <> 'all' then
+    insert into public.leaderboard (
+      employee_id, game, total_points,
+      tournament_wins, tournament_seconds, tournament_thirds,
+      match_wins, match_losses, draws,
+      participations, rule_violations, no_shows,
+      last_activity_at
+    )
+    values (
+      upper(p_employee_id), 'all', v_points_delta,
+      v_tw, v_ts, v_tt, v_mw, v_ml, v_dr, v_pa, v_rv, v_ns,
+      case when v_points_delta <> 0 then now() else null end
+    )
+    on conflict (employee_id, game) do update
+    set
+      total_points       = public.leaderboard.total_points + v_points_delta,
+      tournament_wins    = public.leaderboard.tournament_wins + v_tw,
+      tournament_seconds = public.leaderboard.tournament_seconds + v_ts,
+      tournament_thirds  = public.leaderboard.tournament_thirds + v_tt,
+      match_wins         = public.leaderboard.match_wins + v_mw,
+      match_losses       = public.leaderboard.match_losses + v_ml,
+      draws              = public.leaderboard.draws + v_dr,
+      participations     = public.leaderboard.participations + v_pa,
+      rule_violations    = public.leaderboard.rule_violations + v_rv,
+      no_shows           = public.leaderboard.no_shows + v_ns,
+      last_activity_at   = case
+                             when v_points_delta <> 0 then now()
+                             else public.leaderboard.last_activity_at
+                           end;
+  end if;
 end;
 $$;
+
+-- Grant EXECUTE to authenticated users. The function is SECURITY DEFINER so
+-- it runs with the owner's (postgres) privileges — this grant only lets
+-- users invoke it, not bypass its internal logic or RLS on the base tables.
+GRANT EXECUTE ON FUNCTION public.leaderboard_apply TO authenticated;

@@ -33,14 +33,13 @@ const LeaderboardPage = () => {
 
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
-  const [gameFilter, setGameFilter] = useState('all');
   const [sortBy, setSortBy] = useState('rank'); // rank | points | wins | participations | recent
   const [hoveredMetric, setHoveredMetric] = useState(null);
 
   // Initial load happens in AppProvider; this page just reads `leaderboard` from
   // context. The Refresh button below calls loadLeaderboard() to re-fetch on demand.
 
-  // Derive department & game lists from the actual data.
+  // Derive department list from the actual data.
   const departments = useMemo(() => {
     const set = new Set(
       (leaderboard || [])
@@ -51,17 +50,12 @@ const LeaderboardPage = () => {
     return Array.from(set).sort();
   }, [leaderboard, employees]);
 
-  const games = useMemo(() => {
-    const set = new Set((leaderboard || []).map((r) => r.game).filter(Boolean));
-    return Array.from(set).sort();
-  }, [leaderboard]);
-
-  // Filter & sort
+  // Filter & sort.
+  // The view only returns 'all' rows (one per employee) so no game filter needed.
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     let rows = (leaderboard || []).filter((r) => {
       if (deptFilter !== 'all' && r.department !== deptFilter) return false;
-      if (gameFilter !== 'all' && (r.game || 'all') !== gameFilter) return false;
       if (!q) return true;
       return (
         (r.employee_name || '').toLowerCase().includes(q) ||
@@ -91,7 +85,7 @@ const LeaderboardPage = () => {
       return (a.rank || 0) - (b.rank || 0);
     });
     return rows;
-  }, [leaderboard, search, deptFilter, gameFilter, sortBy]);
+  }, [leaderboard, search, deptFilter, sortBy]);
 
   // Stats for the top summary row.
   const stats = useMemo(() => {
@@ -134,7 +128,7 @@ const LeaderboardPage = () => {
       return;
     }
     const headers = [
-      'Rank', 'Employee ID', 'Name', 'Department', 'Game',
+      'Rank', 'Employee ID', 'Name', 'Department',
       'Total Points', 'Tournament Wins', 'Tournament 2nd', 'Tournament 3rd',
       'Match Wins', 'Match Losses', 'Draws', 'Participations',
       'Rule Violations', 'No Shows', 'Last Activity',
@@ -142,7 +136,7 @@ const LeaderboardPage = () => {
     const lines = [headers.join(',')];
     filteredRows.forEach((r) => {
       lines.push([
-        r.rank, r.employee_id, JSON.stringify(r.employee_name || ''), r.department || '', r.game || 'all',
+        r.rank, r.employee_id, JSON.stringify(r.employee_name || ''), r.department || '',
         r.total_points, r.tournament_wins, r.tournament_seconds, r.tournament_thirds,
         r.match_wins, r.match_losses, r.draws, r.participations,
         r.rule_violations, r.no_shows, r.last_activity_at || '',
@@ -252,10 +246,6 @@ const LeaderboardPage = () => {
             <option value="all">All Departments</option>
             {departments.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
-          <select value={gameFilter} onChange={(e) => setGameFilter(e.target.value)} style={styles.filterInput}>
-            <option value="all">All Games</option>
-            {games.map((g) => <option key={g} value={g}>{g === 'all' ? 'Overall' : g}</option>)}
-          </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={styles.filterInput}>
             <option value="rank">Sort: Rank</option>
             <option value="points">Sort: Total Points</option>
@@ -269,7 +259,7 @@ const LeaderboardPage = () => {
           <table style={styles.table}>
             <thead>
               <tr style={styles.theadRow}>
-                {['Rank','Player','Department','Game','Pts','🏆🥈🥉','Match W/L/D','Part.','Violations','Last Active'].map((h) => (
+                {['Rank','Player','Department','Pts','🏆🥈🥉','Match W/L/D','Part.','Violations','Last Active'].map((h) => (
                   <th key={h} style={styles.th}>{h}</th>
                 ))}
               </tr>
@@ -277,7 +267,7 @@ const LeaderboardPage = () => {
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan="10" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
+                  <td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
                     No players match your filters yet. As matches and tournaments wrap up, leaderboard points will appear here.
                   </td>
                 </tr>
@@ -286,7 +276,7 @@ const LeaderboardPage = () => {
                 const rankBadge = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`;
                 return (
                   <tr
-                    key={`${r.employee_id}-${r.game}`}
+                    key={r.employee_id}
                     style={{
                       borderBottom: '1px solid #eee',
                       background: isMe ? '#fff8e1' : 'transparent',
@@ -300,11 +290,6 @@ const LeaderboardPage = () => {
                       <div style={{ fontSize: '0.62rem', color: '#888' }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
                     </td>
                     <td style={styles.td}>{r.department || '—'}</td>
-                    <td style={styles.td}>
-                      <span style={{ ...styles.tinyChip, background: r.game === 'all' ? '#e3f2fd' : '#fff3e0', color: r.game === 'all' ? '#1565c0' : '#e65100' }}>
-                        {r.game === 'all' ? 'Overall' : r.game}
-                      </span>
-                    </td>
                     <td style={{ ...styles.td, fontWeight: 800, color: '#1a3c6e' }}>{r.total_points}</td>
                     <td style={styles.td}>
                       <div style={{ display: 'flex', gap: 4, fontSize: '0.7rem' }}>
