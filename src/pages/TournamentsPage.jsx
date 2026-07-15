@@ -172,6 +172,7 @@ const TournamentsPage = () => {
     recordMatchResult,
     declareFinalResults,
     unregisterFromTournament,
+    updateTournamentMatch,
     getMatchesByTournament,
     getParticipantsByTournament,
     getResultsByTournament,
@@ -202,6 +203,9 @@ const TournamentsPage = () => {
   const [finalForm, setFinalForm] = useState([]);
   const [tournamentToDelete, setTournamentToDelete] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  // editMatchId: ID of the match being edited by admin in the bracket/fixtures
+  const [editMatchId, setEditMatchId] = useState(null);
+  const [eForm, setEForm] = useState({ match_code: '', round: 'QF', match_number: 1, scheduled_at: '', team_a: [''], team_b: [''] });
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -394,13 +398,11 @@ const TournamentsPage = () => {
             </tbody>
           </table>
         </div>
-        {!isAdmin() && (
-          <div style={{ marginTop: '0.7rem', textAlign: 'right' }}>
+        <div style={{ marginTop: '0.7rem', textAlign: 'right' }}>
             <button onClick={() => setShowRegisterModal(true)} style={styles.navyBtn}>
               🏆 Register for Multiple Tournaments
             </button>
           </div>
-        )}
       </div>
     );
   };
@@ -488,6 +490,15 @@ const TournamentsPage = () => {
           {canEditMatch(m) && (
             <button onClick={() => openResultModal(m)} style={styles.tinyEnterBtn}>
               {m.status === 'completed' ? '✎ Edit' : '⏎ Enter Result'}
+            </button>
+          )}
+          {isAdmin() && (
+            <button
+              onClick={() => openEditMatchModal(m)}
+              style={{ ...styles.tinyEnterBtn, background: '#5c6bc0', marginTop: '0.25rem' }}
+              title="Edit match players / schedule"
+            >
+              ✎ Edit Match
             </button>
           )}
         </div>
@@ -1061,6 +1072,62 @@ const TournamentsPage = () => {
     }
   };
 
+  // ── Edit match (admin) — pre-fills eForm from the existing match ─────────
+  const openEditMatchModal = (match) => {
+    const ppt = activeTournamentRecord?.players_per_team || 1;
+    const teamA = [
+      match.player_a_employee_id,
+      ...(match.team_a_players || []).map(p => p.employee_id).filter(id => id !== match.player_a_employee_id),
+    ].filter(Boolean);
+    const teamB = [
+      match.player_b_employee_id,
+      ...(match.team_b_players || []).map(p => p.employee_id).filter(id => id !== match.player_b_employee_id),
+    ].filter(Boolean);
+
+    // Pad arrays to players_per_team length so all slots are rendered
+    const pad = (arr, len) => [...arr, ...Array(Math.max(0, len - arr.length)).fill('')];
+
+    setEForm({
+      match_code: match.match_code || '',
+      round: match.round || 'QF',
+      match_number: match.match_number || 1,
+      scheduled_at: match.scheduled_at
+        ? new Date(match.scheduled_at).toISOString().slice(0, 16)
+        : '',
+      team_a: pad(teamA, ppt),
+      team_b: pad(teamB, ppt),
+    });
+    setEditMatchId(match.id);
+  };
+
+  const handleUpdateMatch = async () => {
+    if (!editMatchId) return;
+    const ppt = activeTournamentRecord?.players_per_team || 1;
+    const teamA = (eForm.team_a || []).filter(Boolean);
+    const teamB = (eForm.team_b || []).filter(Boolean);
+
+    if (teamA.length === 0 || teamB.length === 0) {
+      showToast('At least one player per team is required', 'error');
+      return;
+    }
+
+    const result = await updateTournamentMatch(editMatchId, {
+      match_code: eForm.match_code,
+      round: eForm.round,
+      match_number: parseInt(eForm.match_number, 10) || 1,
+      scheduled_at: eForm.scheduled_at || null,
+      team_a_players: teamA,
+      team_b_players: teamB,
+    });
+
+    if (result.success) {
+      showToast('Match updated');
+      setEditMatchId(null);
+    } else {
+      showToast(result.error || 'Failed to update match', 'error');
+    }
+  };
+
   const openNewMatchModal = (round) => {
     const ppt = activeTournamentRecord?.players_per_team || 1;
     setMForm({
@@ -1399,6 +1466,128 @@ const TournamentsPage = () => {
             <div style={styles.modalFooter}>
               <button onClick={() => setShowNewMatchModal(false)} style={styles.outlineBtn}>Cancel</button>
               <button onClick={handleCreateMatch} style={styles.navyBtn}>Add Match</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Match Modal (admin only) */}
+      {editMatchId && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setEditMatchId(null); }} style={styles.modalBackdrop}>
+          <div style={styles.modalCard}>
+            <div style={styles.modalHeader}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>✎ Edit Match</h3>
+              <button onClick={() => setEditMatchId(null)} style={styles.modalClose}>✕</button>
+            </div>
+            <div style={{ padding: '1rem' }}>
+              {(() => {
+                const ppt = activeTournamentRecord?.players_per_team || 1;
+                const allSelected = [
+                  ...(eForm.team_a || []),
+                  ...(eForm.team_b || []),
+                ].filter(Boolean);
+
+                const availableFor = (team, slotIdx) =>
+                  partsList.filter(p => {
+                    const id = p.employee_id;
+                    const currentVal = team === 'A' ? eForm.team_a[slotIdx] : eForm.team_b[slotIdx];
+                    if (id === currentVal) return true;
+                    return !allSelected.includes(id);
+                  });
+
+                const setSlot = (team, idx, val) => {
+                  setEForm(f => {
+                    const arr = team === 'A' ? [...(f.team_a || [])] : [...(f.team_b || [])];
+                    arr[idx] = val;
+                    return team === 'A' ? { ...f, team_a: arr } : { ...f, team_b: arr };
+                  });
+                };
+
+                return (
+                  <div style={styles.formGrid}>
+                    <div style={styles.formRow}>
+                      <label style={styles.formLabel}>Round</label>
+                      <select style={styles.formInput} value={eForm.round}
+                              onChange={(e) => setEForm(f => ({ ...f, round: e.target.value }))}>
+                        <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
+                      </select>
+                    </div>
+                    <div style={styles.formRow}>
+                      <label style={styles.formLabel}>Match Code</label>
+                      <input style={styles.formInput} value={eForm.match_code}
+                             onChange={(e) => setEForm(f => ({ ...f, match_code: e.target.value }))} />
+                    </div>
+
+                    {/* Team A */}
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' }}>
+                          🔵 Team A
+                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
+                          {Array.from({ length: ppt }).map((_, idx) => (
+                            <div key={idx} style={styles.formRow}>
+                              <label style={styles.formLabel}>
+                                {ppt === 1 ? 'Player A *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1} (optional)`}
+                              </label>
+                              <select
+                                style={styles.formInput}
+                                value={(eForm.team_a || [])[idx] || ''}
+                                onChange={(e) => setSlot('A', idx, e.target.value)}
+                              >
+                                <option value="">{idx === 0 ? '— select —' : '— none —'}</option>
+                                {availableFor('A', idx).map(p => (
+                                  <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Team B */}
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' }}>
+                          🟠 Team B
+                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
+                          {Array.from({ length: ppt }).map((_, idx) => (
+                            <div key={idx} style={styles.formRow}>
+                              <label style={styles.formLabel}>
+                                {ppt === 1 ? 'Player B *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1} (optional)`}
+                              </label>
+                              <select
+                                style={styles.formInput}
+                                value={(eForm.team_b || [])[idx] || ''}
+                                onChange={(e) => setSlot('B', idx, e.target.value)}
+                              >
+                                <option value="">{idx === 0 ? '— select —' : '— none —'}</option>
+                                {availableFor('B', idx).map(p => (
+                                  <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <label style={styles.formLabel}>Scheduled Time</label>
+                      <input style={styles.formInput} type="datetime-local" value={eForm.scheduled_at}
+                             onChange={(e) => setEForm(f => ({ ...f, scheduled_at: e.target.value }))} />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={() => setEditMatchId(null)} style={styles.outlineBtn}>Cancel</button>
+              <button onClick={handleUpdateMatch} style={styles.navyBtn}>Save Changes</button>
             </div>
           </div>
         </div>

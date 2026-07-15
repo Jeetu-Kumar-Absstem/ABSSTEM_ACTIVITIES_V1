@@ -946,6 +946,8 @@ export const AppProvider = ({ children }) => {
 
   // Convenience wrapper: finds the active participant row by tournamentId +
   // employeeId, then delegates to withdrawFromTournament.
+  // Also deducts the 2 participation points that were awarded on registration
+  // via the DB trigger trg_leaderboard_participant.
   const unregisterFromTournament = async (tournamentId, employeeId) => {
     try {
       const participant = tournamentParticipants.find(
@@ -957,7 +959,18 @@ export const AppProvider = ({ children }) => {
       if (!participant) {
         return { success: false, error: 'You are not registered for this tournament' };
       }
-      return await withdrawFromTournament(participant.id);
+
+      const result = await withdrawFromTournament(participant.id);
+      if (!result.success) return result;
+
+      // The DB trigger trg_leaderboard_participant handles the participation-point
+      // deduction when status flips to 'withdrawn' — exactly the same pattern as
+      // registration (where the trigger awards the point and JS does NOT call
+      // leaderboard_apply to avoid doubling). Just reload the leaderboard so the
+      // UI reflects the updated score.
+      await loadLeaderboard();
+
+      return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -1007,6 +1020,52 @@ export const AppProvider = ({ children }) => {
 
       await loadTournamentMatches();
       return { success: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Update match players / schedule (admin only).
+  // Replaces the junction-table rows for both teams atomically:
+  // delete all existing rows for this match then re-insert.
+  const updateTournamentMatch = async (matchId, matchData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can edit matches' };
+    }
+    try {
+      const captainA = (matchData.team_a_players || [])[0] || null;
+      const captainB = (matchData.team_b_players || [])[0] || null;
+
+      const { error: updateErr } = await supabase
+        .from('tournament_matches')
+        .update({
+          match_code: matchData.match_code,
+          round: matchData.round,
+          match_number: matchData.match_number,
+          player_a_employee_id: captainA,
+          player_b_employee_id: captainB,
+          scheduled_at: matchData.scheduled_at || null,
+        })
+        .match({ id: matchId });
+      if (updateErr) throw updateErr;
+
+      // Replace junction-table rows for this match.
+      try {
+        await supabase.from('tournament_match_players').delete().eq('match_id', matchId);
+        const playerRows = [];
+        (matchData.team_a_players || []).forEach((empId, idx) => {
+          if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'A', position: idx + 1 });
+        });
+        (matchData.team_b_players || []).forEach((empId, idx) => {
+          if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'B', position: idx + 1 });
+        });
+        if (playerRows.length > 0) {
+          await supabase.from('tournament_match_players').insert(playerRows);
+        }
+      } catch (_) { /* degrade gracefully if junction table not yet created */ }
+
+      await loadTournamentMatches();
+      return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -1481,6 +1540,7 @@ export const AppProvider = ({ children }) => {
     withdrawFromTournament,
     unregisterFromTournament,
     addTournamentMatch,
+    updateTournamentMatch,
     recordMatchResult,
     declareFinalResults,
     getUpcomingEvents,
