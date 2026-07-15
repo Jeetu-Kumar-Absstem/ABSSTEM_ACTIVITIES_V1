@@ -1071,6 +1071,30 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Delete a match and its junction-table rows (admin only).
+  const deleteTournamentMatch = async (matchId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can delete matches' };
+    }
+    try {
+      // Remove junction rows first (FK constraint), then the match row.
+      try {
+        await supabase.from('tournament_match_players').delete().eq('match_id', matchId);
+      } catch (_) { /* degrade gracefully */ }
+
+      const { error } = await supabase
+        .from('tournament_matches')
+        .delete()
+        .match({ id: matchId });
+      if (error) throw error;
+
+      await loadTournamentMatches();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   const recordMatchResult = async (matchId, resultData) => {
     try {
       const match = tournamentMatches.find(m => m.id === matchId);
@@ -1541,6 +1565,7 @@ export const AppProvider = ({ children }) => {
     unregisterFromTournament,
     addTournamentMatch,
     updateTournamentMatch,
+    deleteTournamentMatch,
     recordMatchResult,
     declareFinalResults,
     getUpcomingEvents,
