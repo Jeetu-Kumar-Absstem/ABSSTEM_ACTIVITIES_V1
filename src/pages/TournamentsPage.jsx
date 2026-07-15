@@ -173,6 +173,7 @@ const TournamentsPage = () => {
     declareFinalResults,
     unregisterFromTournament,
     updateTournamentMatch,
+    deleteTournamentMatch,
     getMatchesByTournament,
     getParticipantsByTournament,
     getResultsByTournament,
@@ -206,6 +207,8 @@ const TournamentsPage = () => {
   // editMatchId: ID of the match being edited by admin in the bracket/fixtures
   const [editMatchId, setEditMatchId] = useState(null);
   const [eForm, setEForm] = useState({ match_code: '', round: 'QF', match_number: 1, scheduled_at: '', team_a: [''], team_b: [''] });
+  // matchToDelete: match pending admin delete confirmation
+  const [matchToDelete, setMatchToDelete] = useState(null);
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -488,18 +491,23 @@ const TournamentsPage = () => {
             {m.status === 'completed' ? '✓ Final' : m.status === 'live' ? '● Live' : '⏳ Pending'}
           </div>
           {canEditMatch(m) && (
-            <button onClick={() => openResultModal(m)} style={styles.tinyEnterBtn}>
-              {m.status === 'completed' ? '✎ Edit' : '⏎ Enter Result'}
+            <button onClick={() => openResultModal(m)} style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}>
+              {m.status === 'completed' ? '✎ Edit Result' : '⏎ Enter Result'}
             </button>
           )}
           {isAdmin() && (
-            <button
-              onClick={() => openEditMatchModal(m)}
-              style={{ ...styles.tinyEnterBtn, background: '#5c6bc0', marginTop: '0.25rem' }}
-              title="Edit match players / schedule"
-            >
-              ✎ Edit Match
-            </button>
+            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
+              <button
+                onClick={() => openEditMatchModal(m)}
+                style={{ ...styles.tinyEnterBtn, background: '#5c6bc0', flex: 1 }}
+                title="Edit match players / schedule"
+              >✎ Edit</button>
+              <button
+                onClick={() => setMatchToDelete(m)}
+                style={{ ...styles.tinyEnterBtn, background: '#c62828', flex: 1 }}
+                title="Delete this match"
+              >🗑 Delete</button>
+            </div>
           )}
         </div>
       );
@@ -669,14 +677,14 @@ const TournamentsPage = () => {
           <table style={styles.table}>
             <thead>
               <tr style={styles.theadRow}>
-                {['Round','Match','Player A','Score A','Score B','Player B','Played','Status','Action'].map((h, i) => (
+                {['Round','Match','Player A','Score A','Score B','Player B','Played','Status','Result','Admin'].map((h, i) => (
                   <th key={i} style={styles.th}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {matchesForActive.length === 0 ? (
-                <tr><td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>No matches scheduled.</td></tr>
+                <tr><td colSpan="10" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>No matches scheduled.</td></tr>
               ) : matchesForActive.map((m) => {
                 const allowed = canEditMatch(m);
                 return (
@@ -700,16 +708,33 @@ const TournamentsPage = () => {
                       ...styles.tinyChip,
                     }}>{m.status}</span>
                   </td>
+                  {/* Result entry — players or admin */}
                   <td style={styles.td}>
                     {allowed ? (
                       <button onClick={() => openResultModal(m)} style={styles.tinyEnterBtn}>
-                        {m.status === 'completed' ? '✎ Edit' : '⏎ Enter Result'}
+                        {m.status === 'completed' ? '✎ Result' : '⏎ Enter'}
                       </button>
                     ) : (
-                      <span
-                        style={{ fontSize: '0.62rem', color: '#bbb' }}
-                        title="Only the two players in this match (or an admin) can enter results"
-                      >🔒</span>
+                      <span style={{ fontSize: '0.62rem', color: '#bbb' }} title="Only the two players in this match (or an admin) can enter results">🔒</span>
+                    )}
+                  </td>
+                  {/* Admin-only: edit match players/schedule + delete */}
+                  <td style={styles.td}>
+                    {isAdmin() ? (
+                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <button
+                          onClick={() => openEditMatchModal(m)}
+                          style={{ ...styles.tinyIconBtn, color: '#5c6bc0', borderColor: '#c5cae9' }}
+                          title="Edit match players / schedule"
+                        >✎</button>
+                        <button
+                          onClick={() => setMatchToDelete(m)}
+                          style={{ ...styles.tinyIconBtn, color: '#c62828', borderColor: '#ffcdd2' }}
+                          title="Delete this match"
+                        >🗑</button>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '0.62rem', color: '#bbb' }}>—</span>
                     )}
                   </td>
                 </tr>
@@ -1092,7 +1117,18 @@ const TournamentsPage = () => {
       round: match.round || 'QF',
       match_number: match.match_number || 1,
       scheduled_at: match.scheduled_at
-        ? new Date(match.scheduled_at).toISOString().slice(0, 16)
+        ? (() => {
+            // datetime-local input expects "YYYY-MM-DDTHH:mm" in local time.
+            // Format the stored UTC value in IST (Asia/Kolkata) for the input.
+            const d = new Date(match.scheduled_at);
+            const parts = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Kolkata',
+              year: 'numeric', month: '2-digit', day: '2-digit',
+              hour: '2-digit', minute: '2-digit', hour12: false,
+            }).formatToParts(d);
+            const get = (type) => parts.find(p => p.type === type)?.value ?? '00';
+            return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+          })()
         : '',
       team_a: pad(teamA, ppt),
       team_b: pad(teamB, ppt),
@@ -1115,7 +1151,9 @@ const TournamentsPage = () => {
       match_code: eForm.match_code,
       round: eForm.round,
       match_number: parseInt(eForm.match_number, 10) || 1,
-      scheduled_at: eForm.scheduled_at || null,
+      scheduled_at: eForm.scheduled_at
+        ? new Date(eForm.scheduled_at + ':00+05:30').toISOString()
+        : null,
       team_a_players: teamA,
       team_b_players: teamB,
     });
@@ -1125,6 +1163,17 @@ const TournamentsPage = () => {
       setEditMatchId(null);
     } else {
       showToast(result.error || 'Failed to update match', 'error');
+    }
+  };
+
+  const handleDeleteMatch = async () => {
+    if (!matchToDelete) return;
+    const result = await deleteTournamentMatch(matchToDelete.id);
+    if (result.success) {
+      showToast(`Match "${matchToDelete.match_code || `M${matchToDelete.match_number}`}" deleted`, 'warning');
+      setMatchToDelete(null);
+    } else {
+      showToast(result.error || 'Failed to delete match', 'error');
     }
   };
 
@@ -1166,7 +1215,9 @@ const TournamentsPage = () => {
       match_number: parseInt(mForm.match_number, 10) || 1,
       player_a_employee_id: captainA,
       player_b_employee_id: captainB,
-      scheduled_at: mForm.scheduled_at || null,
+      scheduled_at: mForm.scheduled_at
+        ? new Date(mForm.scheduled_at + ':00+05:30').toISOString()
+        : null,
       // Full rosters for junction table
       team_a_players: teamA,
       team_b_players: teamB,
@@ -1839,6 +1890,35 @@ const TournamentsPage = () => {
         </div>
       )}
 
+      {/* Delete Match confirm modal (admin only) */}
+      {matchToDelete && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setMatchToDelete(null); }}
+          style={styles.modalBackdrop}
+        >
+          <div style={{ ...styles.modalCard, maxWidth: 420 }}>
+            <div style={{ ...styles.modalHeader, background: '#c62828' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Delete Match</h3>
+              <button onClick={() => setMatchToDelete(null)} style={styles.modalClose}>✕</button>
+            </div>
+            <div style={{ padding: '1rem', fontSize: '0.78rem', color: '#333' }}>
+              <p style={{ margin: '0 0 0.5rem 0' }}>
+                Are you sure you want to delete match{' '}
+                <strong>{matchToDelete.match_code || `M${matchToDelete.match_number}`}</strong>
+                {' '}({matchToDelete.round})?
+              </p>
+              <p style={{ margin: 0, color: '#c62828', fontSize: '0.72rem' }}>
+                This will also remove all player assignments for this match. This cannot be undone.
+              </p>
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={() => setMatchToDelete(null)} style={styles.outlineBtn}>Cancel</button>
+              <button onClick={handleDeleteMatch} style={styles.dangerBtn}>🗑 Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete tournament confirm modal (admin) */}
       {tournamentToDelete && (
         <ConfirmDeleteModal
@@ -2002,7 +2082,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
               </div>
               {linkedMatch.scheduled_at && (
                 <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: '0.2rem' }}>
-                  🕐 {new Date(linkedMatch.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  🕐 {new Date(linkedMatch.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                 </div>
               )}
             </div>
@@ -2048,7 +2128,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
               </div>
               {linkedMatch.scheduled_at && (
                 <div style={{ fontSize: '0.65rem', color: '#555', marginTop: '0.2rem' }}>
-                  Scheduled: {new Date(linkedMatch.scheduled_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  Scheduled: {new Date(linkedMatch.scheduled_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}
                 </div>
               )}
               <button
@@ -2095,7 +2175,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
             ) : todaySchedule.map(m => (
               <div key={m.id} style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid #eee', fontSize: '0.74rem' }}>
                 <div style={{ fontWeight: 700, color: '#1a3c6e' }}>
-                  {m.scheduled_at ? new Date(m.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'} — {m.match_code || `Match ${m.match_number}`}
+                  {m.scheduled_at ? new Date(m.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : 'TBD'} — {m.match_code || `Match ${m.match_number}`}
                 </div>
                 <div style={{ color: '#666' }}>
                   {m.player_a_employee_id
