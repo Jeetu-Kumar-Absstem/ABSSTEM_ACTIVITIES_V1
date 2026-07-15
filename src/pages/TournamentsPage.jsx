@@ -540,28 +540,28 @@ const TournamentsPage = () => {
           <div style={styles.bracketGrid}>
             {/* Quarter finals */}
             <div style={styles.bracketCol}>
-              <div style={styles.bracketColHeader}>QUARTER FINAL</div>
+              <div style={{ ...styles.bracketColHeader, background: '#c81c1c' }}>QUARTER FINAL</div>
               <div style={styles.bracketColBody}>
                 {qf.length === 0 ? <div style={styles.emptyCol}>No QF matches yet</div> : qf.map(renderMatch)}
               </div>
             </div>
             {/* Semi finals */}
             <div style={styles.bracketCol}>
-              <div style={styles.bracketColHeader}>SEMI FINAL</div>
+              <div style={{ ...styles.bracketColHeader, background: '#618ff4' }}>SEMI FINAL</div>
               <div style={styles.bracketColBody}>
                 {sf.length === 0 ? <div style={styles.emptyCol}>No SF matches yet</div> : sf.map(renderMatch)}
               </div>
             </div>
             {/* Final */}
             <div style={styles.bracketCol}>
-              <div style={styles.bracketColHeader}>🏆 FINAL</div>
+              <div style={{ ...styles.bracketColHeader, background: '#fbdd65' }}>🏆 FINAL</div>
               <div style={styles.bracketColBody}>
                 {f.length === 0 ? <div style={styles.emptyCol}>No final yet</div> : f.map(renderMatch)}
               </div>
             </div>
             {/* 3rd place */}
             <div style={styles.bracketCol}>
-              <div style={styles.bracketColHeader}>3RD PLACE</div>
+              <div style={{ ...styles.bracketColHeader, background: '#59f0a5' }}>3RD PLACE</div>
               <div style={styles.bracketColBody}>
                 {tp.length === 0 ? <div style={styles.emptyCol}>No 3rd-place match yet</div> : tp.map(renderMatch)}
               </div>
@@ -1956,7 +1956,7 @@ const styles = {
 
   bracketGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', alignItems: 'stretch' },
   bracketCol: { display: 'flex', flexDirection: 'column' },
-  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
+  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
   bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100 },
   emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic' },
   matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem' },
