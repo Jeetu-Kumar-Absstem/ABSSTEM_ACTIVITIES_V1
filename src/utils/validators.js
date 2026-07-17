@@ -1,50 +1,37 @@
 // src/utils/validators.js
 
 /**
- * Validate Employee ID format: 4 letters + 4 digits
- * Example: ABCD1234, XYZW5678
+ * Validate Employee ID format:
+ * - 3 to 5 letters followed by 3 to 4 digits
+ * Examples: ABC123, ABC1234, ABCD1234, ABCDE123
  */
 export const validateEmpId = (id) => {
-  if (!id || id.length !== 8) return false;
-  const firstFour = id.slice(0, 4);
-  const lastFour = id.slice(4, 8);
-  const isFirstFourLetters = /^[a-zA-Z]{4}$/.test(firstFour);
-  const isLastFourDigits = /^[0-9]{4}$/.test(lastFour);
-  return isFirstFourLetters && isLastFourDigits;
+  if (!id) return false;
+  return /^[A-Za-z]{3,5}[0-9]{3,4}$/.test(String(id).trim());
 };
 
 /**
- * Format Employee ID as user types
- * - First 4 chars: letters only (A-Z)
- * - Last 4 chars: digits only (0-9)
+ * Format Employee ID as user types.
+ * Keeps the alphabetic prefix first, then up to 4 trailing digits.
  */
 export const formatEmpId = (value) => {
-  // Remove any non-alphanumeric characters
-  let cleaned = value.replace(/[^a-zA-Z0-9]/g, '');
-  
-  let formatted = '';
-  let letterIndex = 0;
-  let digitIndex = 0;
-  
-  for (let i = 0; i < cleaned.length && formatted.length < 8; i++) {
-    const char = cleaned[i];
-    
-    if (formatted.length < 4) {
-      // First 4 chars: letters only
-      if (/[a-zA-Z]/.test(char)) {
-        formatted += char.toUpperCase();
+  const cleaned = String(value || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  let letters = '';
+  let digits = '';
+
+  for (const char of cleaned) {
+    if (/[A-Z]/.test(char)) {
+      if (letters.length < 5 && digits.length === 0) {
+        letters += char;
       }
-      // If not a letter, skip it (don't add)
-    } else {
-      // Last 4 chars: digits only
-      if (/[0-9]/.test(char)) {
-        formatted += char;
+    } else if (/[0-9]/.test(char)) {
+      if (letters.length >= 3 && digits.length < 4) {
+        digits += char;
       }
-      // If not a digit, skip it
     }
   }
-  
-  return formatted;
+
+  return `${letters}${digits}`;
 };
 
 /**

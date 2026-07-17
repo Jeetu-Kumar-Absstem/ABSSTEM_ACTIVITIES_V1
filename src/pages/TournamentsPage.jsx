@@ -32,7 +32,7 @@ const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
 );
 
 // Batch-register modal: pick one or more active tournaments in a single click.
-const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCancel, onSubmit }) => {
+const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pendingByTournament, isAdminUser, onCancel, onSubmit }) => {
   // Open, accepting-registration, not-full, not-already-registered.
   const eligible = tournaments.filter(t => {
     if (t.status === 'completed' || t.status === 'cancelled') return false;
@@ -41,8 +41,11 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
     if (t.start_date && new Date(t.start_date) <= new Date()) return false;
     const parts = partsByTournament[t.id] || [];
     if (parts.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase())) return false;
+    const pending = pendingByTournament[t.id] || [];
+    if (pending.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase())) return false;
     const cap = t.max_participants || 8;
-    return parts.length < cap;
+    if (isAdminUser && parts.length >= cap) return false;
+    return true;
   });
   const [selected, setSelected] = useState(() => new Set(eligible.map(t => t.id)));
 
@@ -108,7 +111,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
           <span style={{ flex: 1, fontSize: '0.7rem', color: '#666' }}>
             {selected.size} selected
           </span>
-          <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
+            <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
           <button
             onClick={() => onSubmit([...selected])}
             disabled={selected.size === 0 || !currentEmpId}
@@ -117,7 +120,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
               opacity: selected.size === 0 || !currentEmpId ? 0.5 : 1,
               cursor: selected.size === 0 || !currentEmpId ? 'not-allowed' : 'pointer',
             }}
-          >Register</button>
+          >{isAdminUser ? 'Register' : 'Request'}</button>
         </div>
       </div>
     </div>
@@ -238,7 +241,16 @@ const TournamentsPage = () => {
   const partsByTournament = useMemo(() => {
     const map = {};
     for (const p of tournamentParticipants) {
-      if (p.status === 'withdrawn') continue;
+      if (p.status !== 'registered' && p.status !== 'active' && p.status !== 'semi_finalist' && p.status !== 'finalist' && p.status !== 'eliminated') continue;
+      if (!map[p.tournament_id]) map[p.tournament_id] = [];
+      map[p.tournament_id].push(p);
+    }
+    return map;
+  }, [tournamentParticipants]);
+  const pendingByTournament = useMemo(() => {
+    const map = {};
+    for (const p of tournamentParticipants) {
+      if (String(p.status || '').toLowerCase() !== 'pending') continue;
       if (!map[p.tournament_id]) map[p.tournament_id] = [];
       map[p.tournament_id].push(p);
     }
@@ -320,18 +332,22 @@ const TournamentsPage = () => {
                 const alreadyRegistered = (partsByTournament[t.id] || []).some(
                   p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
                 );
-                // Per-row "Register" button: shown when registration is open,
-                // start date hasn't passed, tournament is not done, and the user hasn't joined yet.
-                const canRegister = !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !isFull && !!currentEmpId;
+                const hasPendingRequest = (pendingByTournament[t.id] || []).some(
+                  p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
+                );
+                const canRequest = !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !hasPendingRequest && !!currentEmpId;
+                const canRegister = isAdmin() ? canRequest && !isFull : canRequest;
                 const regLabel = alreadyRegistered
                   ? '✓ Registered'
-                  : isFull
-                    ? '🔒 Full'
+                  : hasPendingRequest
+                    ? '⏳ Waiting'
                     : isCompleted
                       ? '—'
                       : startDatePassed
                         ? 'Started'
-                        : regOpen ? '🏆 Register' : 'Closed';
+                        : isAdmin()
+                          ? (isFull ? '🔒 Full' : '🏆 Register')
+                          : '📝 Request';
                 return (
                   <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={styles.td}><strong>{t.code}</strong></td>
@@ -348,16 +364,17 @@ const TournamentsPage = () => {
                         disabled={!canRegister}
                         style={{
                           ...styles.tinyEnterBtn,
-                          background: alreadyRegistered ? '#388e3c' : isFull || isCompleted || startDatePassed ? '#9e9e9e' : '#1a3c6e',
-                          opacity: canRegister || alreadyRegistered ? 1 : 0.6,
-                          cursor: canRegister || alreadyRegistered ? 'pointer' : 'not-allowed',
+                          background: alreadyRegistered ? '#388e3c' : hasPendingRequest ? '#f9a825' : isCompleted || startDatePassed || (isAdmin() && isFull) ? '#9e9e9e' : '#1a3c6e',
+                          opacity: canRegister || alreadyRegistered || hasPendingRequest ? 1 : 0.6,
+                          cursor: canRegister || alreadyRegistered || hasPendingRequest ? 'pointer' : 'not-allowed',
                         }}
                         title={
                           alreadyRegistered ? 'You are already registered'
-                          : isFull ? 'Tournament is full'
+                          : hasPendingRequest ? 'Your request is waiting for admin approval'
+                          : isAdmin() && isFull ? 'Tournament is full'
                           : isCompleted ? 'Tournament is closed'
                           : startDatePassed ? 'Registration closed — tournament has started'
-                          : regOpen ? 'Click to register'
+                          : regOpen ? (isAdmin() ? 'Click to register' : 'Click to request approval')
                           : 'Registration closed'
                         }
                       >{regLabel}</button>
@@ -403,7 +420,7 @@ const TournamentsPage = () => {
         </div>
         <div style={{ marginTop: '0.7rem', textAlign: 'right' }}>
             <button onClick={() => setShowRegisterModal(true)} style={styles.navyBtn}>
-              🏆 Register for Multiple Tournaments
+              {isAdmin() ? '🏆 Register for Multiple Tournaments' : '📝 Request Multiple Tournaments'}
             </button>
           </div>
       </div>
@@ -997,7 +1014,11 @@ const TournamentsPage = () => {
     const result = await registerForTournament(tournamentId, currentEmpId);
     if (result.success) {
       const t = tournaments.find(x => x.id === tournamentId);
-      showToast(`Registered for "${t?.name || 'tournament'}"!`);
+      showToast(
+        result.pending
+          ? `Request sent for "${t?.name || 'tournament'}". Waiting for approval.`
+          : `Registered for "${t?.name || 'tournament'}"!`
+      );
     } else {
       showToast(result.error || 'Failed to register', 'error');
     }
@@ -1035,11 +1056,18 @@ const TournamentsPage = () => {
     }
 
     if (successCount > 0 && failures.length === 0) {
-      showToast(`Registered for ${successCount} tournament${successCount > 1 ? 's' : ''}!`);
+      showToast(
+        isAdmin()
+          ? `Registered for ${successCount} tournament${successCount > 1 ? 's' : ''}!`
+          : `Request sent for ${successCount} tournament${successCount > 1 ? 's' : ''}!`
+      );
       setShowRegisterModal(false);
     } else if (successCount > 0 && failures.length > 0) {
       const t = tournaments.find(x => x.id === failures[0].id);
-      showToast(`Registered for ${successCount}. "${t?.name}" failed: ${failures[0].error}`, 'warning');
+      showToast(
+        `${isAdmin() ? 'Registered' : 'Requested'} for ${successCount}. "${t?.name}" failed: ${failures[0].error}`,
+        'warning'
+      );
       setShowRegisterModal(false);
     } else {
       const t = tournaments.find(x => x.id === failures[0].id);
@@ -1930,10 +1958,12 @@ const TournamentsPage = () => {
 
       {/* Batch register modal — pick one or more active tournaments */}
       {showRegisterModal && (
-        <BatchRegisterModal
+      <BatchRegisterModal
           tournaments={tournaments}
           currentEmpId={currentEmpId}
           partsByTournament={partsByTournament}
+          pendingByTournament={pendingByTournament}
+          isAdminUser={isAdmin()}
           onCancel={() => setShowRegisterModal(false)}
           onSubmit={handleBatchRegister}
         />

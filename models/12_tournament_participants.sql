@@ -15,8 +15,15 @@ create table if not exists public.tournament_participants (
   registered_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tournament_id, employee_id),
-  check (status in ('registered', 'active', 'semi_finalist', 'finalist', 'eliminated', 'withdrawn'))
+  check (status in ('registered', 'active', 'semi_finalist', 'finalist', 'eliminated', 'withdrawn', 'pending'))
 );
+
+alter table if exists public.tournament_participants
+  drop constraint if exists tournament_participants_status_check;
+
+alter table if exists public.tournament_participants
+  add constraint tournament_participants_status_check
+  check (status in ('registered', 'active', 'semi_finalist', 'finalist', 'eliminated', 'withdrawn', 'pending'));
 
 create index if not exists tournament_participants_tournament_idx on public.tournament_participants (tournament_id);
 create index if not exists tournament_participants_employee_idx on public.tournament_participants (employee_id);

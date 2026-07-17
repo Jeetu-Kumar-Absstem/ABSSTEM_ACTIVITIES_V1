@@ -11,6 +11,13 @@ import {
 } from '../utils/helpers';
 
 const AppContext = createContext();
+const APPROVED_TOURNAMENT_STATUSES = new Set([
+  'registered',
+  'active',
+  'semi_finalist',
+  'finalist',
+  'eliminated',
+]);
 
 export const useApp = () => useContext(AppContext);
 
@@ -46,6 +53,14 @@ export const AppProvider = ({ children }) => {
       '';
     return isAdminId(empId);
   };
+
+  const getCurrentEmpId = () =>
+    String(
+      currentUser?.user_metadata?.emp_id ||
+      currentUser?.user_metadata?.employee_code ||
+      currentUser?.user_metadata?.empId ||
+      ''
+    ).trim().toUpperCase();
 
   const mapGameRow = (game) => ({
     id: String(game.id),
@@ -431,12 +446,13 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // Add booking function
-  const addBooking = async (day, slotId, playerName) => {
+  const addBooking = async (day, slotId) => {
     try {
       await cleanupOldBookings();
       const user = await supabase.auth.getUser();
       const userId = user.data.user?.id;
       const empId = user.data.user?.user_metadata?.emp_id || user.data.user?.user_metadata?.employee_code || currentUser?.user_metadata?.emp_id || '';
+      const normalizedEmpId = String(empId || '').trim().toUpperCase();
 
       const gameRecord = games.find(g => String(g.id) === String(selectedGame) || g.name === selectedGame);
       if (gameRecord && gameRecord.active === false) {
@@ -454,7 +470,7 @@ export const AppProvider = ({ children }) => {
       }
 
       const bannedForGame = bans.some(b => 
-        (b.employee_id === empId || b.employee === playerName) &&
+        (String(b.employee_id || '').toUpperCase() === normalizedEmpId || b.employee === normalizedEmpId) &&
         b.active !== false &&
         new Date(b.until_date) > new Date() &&
         (String(b.game) === String(selectedGame) || b.game === gameRecord?.name || b.game === 'All Games')
@@ -469,9 +485,9 @@ export const AppProvider = ({ children }) => {
         .insert([{ 
           day, 
           slot_id: slotId, 
-          player_name: playerName,
+          player_name: normalizedEmpId,
           user_id: userId,
-          employee_id: empId,
+          employee_id: normalizedEmpId,
           game: String(selectedGame),
           booked_at: new Date().toISOString()
         }])
@@ -483,9 +499,9 @@ export const AppProvider = ({ children }) => {
       if (!newBookings[day]) newBookings[day] = {};
       if (!newBookings[day][slotId]) newBookings[day][slotId] = [];
       newBookings[day][slotId].push({
-        name: playerName,
+        name: normalizedEmpId,
         user_id: userId,
-        employee_id: empId,
+        employee_id: normalizedEmpId,
         booking_id: data[0]?.id,
         game: String(data[0]?.game ?? selectedGame),
         booked_at: data[0]?.booked_at,
@@ -861,7 +877,14 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // ── Tournament participation (any auth user can self-register) ──────────
+  const getTournamentApprovedParticipants = (tournamentId) =>
+    tournamentParticipants.filter(
+      (p) =>
+        p.tournament_id === tournamentId &&
+        APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase())
+    );
+
+  // ── Tournament participation (admin approves non-admin requests) ─────────
   const registerForTournament = async (tournamentId, employeeId) => {
     try {
       const tournament = tournaments.find(t => t.id === tournamentId);
@@ -875,41 +898,82 @@ export const AppProvider = ({ children }) => {
       if (tournament.start_date && new Date(tournament.start_date) <= new Date()) {
         return { success: false, error: 'Registration is closed — tournament has already started' };
       }
-      const registeredCount = tournamentParticipants.filter(
-        p => p.tournament_id === tournamentId && p.status !== 'withdrawn'
-      ).length;
-      if (registeredCount >= (tournament.max_participants || 8)) {
-        return { success: false, error: 'Tournament is full' };
+      const normalizedEmpId = String(employeeId || getCurrentEmpId()).trim().toUpperCase();
+      if (!normalizedEmpId) {
+        return { success: false, error: 'Your profile is missing an employee ID' };
       }
-
-      const nextSeed = (tournamentParticipants.filter(p => p.tournament_id === tournamentId).length || 0) + 1;
-
-      // If the player previously unregistered, a withdrawn row still exists.
-      // UPDATE it back to 'registered' to avoid the unique(tournament_id, employee_id) conflict.
-      const existingWithdrawn = tournamentParticipants.find(
+      const userIsAdmin = isAdmin();
+      const approvedParticipants = getTournamentApprovedParticipants(tournamentId);
+      const pendingParticipant = tournamentParticipants.find(
         p =>
           p.tournament_id === tournamentId &&
-          p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
-          p.status === 'withdrawn'
+          p.employee_id?.toUpperCase() === normalizedEmpId &&
+          String(p.status || '').toLowerCase() === 'pending'
       );
+      const registeredParticipant = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === normalizedEmpId &&
+          APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase())
+      );
+      const withdrawnParticipant = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === normalizedEmpId &&
+          String(p.status || '').toLowerCase() === 'withdrawn'
+      );
+
+      if (userIsAdmin) {
+        if (approvedParticipants.length >= (tournament.max_participants || 8)) {
+          return { success: false, error: 'Tournament is full' };
+        }
+      }
+
+      const nextSeed = approvedParticipants.length + 1;
+
+      // If the player previously unregistered, a withdrawn row still exists.
+      // UPDATE it back to the latest request state to avoid unique conflicts.
+      const existingWithdrawn = withdrawnParticipant;
 
       let data;
       if (existingWithdrawn) {
         const { data: updated, error: updateErr } = await supabase
           .from('tournament_participants')
-          .update({ status: 'registered', seed: nextSeed })
+          .update({
+            status: userIsAdmin ? 'registered' : 'pending',
+            seed: userIsAdmin ? nextSeed : null,
+          })
           .match({ id: existingWithdrawn.id })
           .select();
         if (updateErr) throw updateErr;
         data = updated;
+      } else if (pendingParticipant) {
+        if (userIsAdmin) {
+          const { data: updated, error: updateErr } = await supabase
+            .from('tournament_participants')
+            .update({ status: 'registered', seed: nextSeed })
+            .match({ id: pendingParticipant.id })
+            .select();
+          if (updateErr) throw updateErr;
+          data = updated;
+        } else {
+          return { success: true, pending: true, data: pendingParticipant };
+        }
+      } else if (registeredParticipant) {
+        return {
+          success: false,
+          error: registeredParticipant.status === 'pending'
+            ? 'Your registration is already pending approval'
+            : 'You are already registered for this tournament',
+        };
       } else {
         const { data: inserted, error: insertErr } = await supabase
           .from('tournament_participants')
           .insert([{
             tournament_id: tournamentId,
-            employee_id: employeeId,
+            employee_id: normalizedEmpId,
             seed: nextSeed,
-            status: 'registered',
+            status: userIsAdmin ? 'registered' : 'pending',
           }])
           .select();
         if (insertErr) throw insertErr;
@@ -918,12 +982,54 @@ export const AppProvider = ({ children }) => {
 
       await loadTournamentParticipants();
 
-      // Refresh the leaderboard so the UI shows the new participation row.
-      // The DB trigger trg_leaderboard_participant (model 16) is the primary
-      // path for awarding the +1 participation. We do NOT call
-      // leaderboard_apply here in JS — that previously caused doubling.
-      await loadLeaderboard();
+      if (userIsAdmin) {
+        // Refresh the leaderboard so the UI stays in sync with any other
+        // tournament-related score changes. Participation itself no longer
+        // awards points.
+        await loadLeaderboard();
+        return { success: true, data: data?.[0] || null };
+      }
 
+      return { success: true, pending: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const approveTournamentRegistration = async (participantId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can approve tournament registrations' };
+    }
+
+    try {
+      const participant = tournamentParticipants.find((p) => p.id === participantId);
+      if (!participant) {
+        return { success: false, error: 'Registration request not found' };
+      }
+      if (String(participant.status || '').toLowerCase() !== 'pending') {
+        return { success: false, error: 'Only pending requests can be approved' };
+      }
+
+      const tournament = tournaments.find((t) => t.id === participant.tournament_id);
+      if (!tournament) {
+        return { success: false, error: 'Tournament not found' };
+      }
+
+      const approvedParticipants = getTournamentApprovedParticipants(participant.tournament_id);
+      if (approvedParticipants.length >= (tournament.max_participants || 8)) {
+        return { success: false, error: 'Tournament is full' };
+      }
+
+      const nextSeed = approvedParticipants.length + 1;
+      const { data, error } = await supabase
+        .from('tournament_participants')
+        .update({ status: 'registered', seed: nextSeed })
+        .match({ id: participantId })
+        .select();
+      if (error) throw error;
+
+      await loadTournamentParticipants();
+      await loadLeaderboard();
       return { success: true, data: data?.[0] || null };
     } catch (err) {
       return { success: false, error: err.message };
@@ -963,11 +1069,8 @@ export const AppProvider = ({ children }) => {
       const result = await withdrawFromTournament(participant.id);
       if (!result.success) return result;
 
-      // The DB trigger trg_leaderboard_participant handles the participation-point
-      // deduction when status flips to 'withdrawn' — exactly the same pattern as
-      // registration (where the trigger awards the point and JS does NOT call
-      // leaderboard_apply to avoid doubling). Just reload the leaderboard so the
-      // UI reflects the updated score.
+      // Participation no longer affects points, so just reload the leaderboard
+      // to keep the UI consistent after status changes.
       await loadLeaderboard();
 
       return { success: true };
@@ -1404,7 +1507,7 @@ export const AppProvider = ({ children }) => {
 
   const getParticipantsByTournament = (tournamentId) =>
     tournamentParticipants
-      .filter(p => p.tournament_id === tournamentId && p.status !== 'withdrawn')
+      .filter((p) => p.tournament_id === tournamentId && APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase()))
       .sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
   const getResultsByTournament = (tournamentId) =>
@@ -1561,6 +1664,7 @@ export const AppProvider = ({ children }) => {
     updateTournament,
     deleteTournament,
     registerForTournament,
+    approveTournamentRegistration,
     withdrawFromTournament,
     unregisterFromTournament,
     addTournamentMatch,

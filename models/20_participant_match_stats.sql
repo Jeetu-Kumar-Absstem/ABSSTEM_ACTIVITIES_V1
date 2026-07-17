@@ -39,7 +39,7 @@ BEGIN
     SET matches_played = matches_played + 1
     WHERE tournament_id = p_tournament_id
       AND employee_id IN (p_winner_id, p_loser_id)
-      AND status != 'withdrawn';
+      AND status IN ('registered', 'active', 'semi_finalist', 'finalist', 'eliminated');
   END IF;
 
   -- Increment wins for the winner
@@ -48,7 +48,7 @@ BEGIN
     SET wins = wins + 1
     WHERE tournament_id = p_tournament_id
       AND employee_id = p_winner_id
-      AND status != 'withdrawn';
+      AND status IN ('registered', 'active', 'semi_finalist', 'finalist', 'eliminated');
   END IF;
 
   -- Increment losses for the loser
@@ -57,7 +57,7 @@ BEGIN
     SET losses = losses + 1
     WHERE tournament_id = p_tournament_id
       AND employee_id = p_loser_id
-      AND status != 'withdrawn';
+      AND status IN ('registered', 'active', 'semi_finalist', 'finalist', 'eliminated');
   END IF;
 END;
 $$;

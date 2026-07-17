@@ -56,7 +56,7 @@ const LoginPage = ({ onLogin }) => {
     setLoginError('');
 
     if (!validateEmpId(empId)) {
-      setLoginError('Invalid Employee ID format (e.g., ABCD1234)');
+      setLoginError('Invalid Employee ID format)');
       return;
     }
 
@@ -125,7 +125,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     if (!validateEmpId(empId)) {
-      showToast('Employee ID Format is wrong:', 'error');
+      showToast('Employee ID must be valid', 'error');
       return;
     }
 
@@ -205,7 +205,7 @@ const LoginPage = ({ onLogin }) => {
     const trimmedId = forgotEmpId.trim().toUpperCase();
 
     if (!validateEmpId(trimmedId)) {
-      showToast('Please enter a valid Employee ID (e.g., ABCD1234)', 'error');
+      showToast('Please enter a valid Employee ID (3-5 letters + 3-4 digits)', 'error');
       return;
     }
 
@@ -357,8 +357,8 @@ const LoginPage = ({ onLogin }) => {
                     type="text"
                     value={forgotEmpId}
                     onChange={(e) => setForgotEmpId(formatEmpId(e.target.value))}
-                    placeholder="e.g., ABCD1234"
-                    maxLength="8"
+                    // placeholder="e.g., ABC1234"
+                    maxLength="9"
                     style={{
                       padding: '12px 18px',
                       textTransform: 'uppercase',
@@ -517,8 +517,8 @@ const LoginPage = ({ onLogin }) => {
               type="text"
               value={empId}
               onChange={handleEmpIdChange}
-              // placeholder="e.g., ABCD1234 (4 letters + 4 digits)"
-              maxLength="8"
+              // placeholder="e.g., ABC1234"
+              maxLength="9"
               style={{
                 padding: '12px 18px',
                 textTransform: 'uppercase',
@@ -536,23 +536,23 @@ const LoginPage = ({ onLogin }) => {
               alignItems: 'center',
               flexWrap: 'wrap',
             }}>
-              <span>Format: <strong>4 letters</strong> + <strong>4 digits</strong></span>
+         
               {empId.length > 0 && (
                 <span style={{
                   display: 'inline-block',
                   padding: '1px 10px',
                   borderRadius: '12px',
-                  background: empId.length === 8 && validateEmpId(empId) ? 'rgba(56,142,60,0.1)' : 'rgba(229,57,53,0.1)',
-                  color: empId.length === 8 && validateEmpId(empId) ? '#2e7d32' : '#c62828',
+                  background: validateEmpId(empId) ? 'rgba(56,142,60,0.1)' : 'rgba(229,57,53,0.1)',
+                  color: validateEmpId(empId) ? '#2e7d32' : '#c62828',
                   fontSize: '0.55rem',
                   fontWeight: 600,
                 }}>
-                  {empId.length === 8 && validateEmpId(empId) ? '✅ Valid' : '⚠️ Invalid'}
+                  {validateEmpId(empId) ? '✅ Valid' : '⚠️ Invalid'}
                 </span>
               )}
             </div>
             <div style={{ fontSize: '0.55rem', color: '#999', marginTop: '2px' }}>
-              Example: <strong>ABCD1234</strong> or <strong>XYZW5678</strong>
+             
             </div>
           </div>
 

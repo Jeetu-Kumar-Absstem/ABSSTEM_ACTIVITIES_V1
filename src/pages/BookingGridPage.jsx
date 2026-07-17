@@ -49,11 +49,11 @@ const BookingGridPage = () => {
     setShowBookModal(true);
   };
 
-  const handleAddBooking = async (playerName) => {
-    const currentEmpId = currentUser?.user_metadata?.emp_id || '';
+  const handleAddBooking = async () => {
+    const currentEmpId = (currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || '').toUpperCase();
     const gameRecord = games.find(game => String(game.id) === String(selectedGame) || String(game.name).toLowerCase() === String(selectedGame).toLowerCase());
-    if (isBanned({ name: playerName, employee_id: currentEmpId }, gameRecord?.name || selectedGame, bans)) {
-      showToast(`${playerName} is banned from ${selectedGame}!`, 'error');
+    if (isBanned({ name: currentEmpId, employee_id: currentEmpId }, gameRecord?.name || selectedGame, bans)) {
+      showToast(`${currentEmpId} is banned from ${selectedGame}!`, 'error');
       return false;
     }
 
@@ -72,11 +72,11 @@ const BookingGridPage = () => {
       return false;
     }
 
-    const result = await addBooking(selectedDay, selectedSlotId, playerName);
+    const result = await addBooking(selectedDay, selectedSlotId);
     if (result.success) {
       // Reload bookings to refresh all components
       await loadBookings();
-      showToast(`${playerName} booked for ${selectedDay} Slot ${selectedSlotId}`);
+      showToast(`Booked my slot for ${selectedDay} Slot ${selectedSlotId}`);
       return true;
     } else {
       showToast(result.error || 'Booking failed!', 'error');
