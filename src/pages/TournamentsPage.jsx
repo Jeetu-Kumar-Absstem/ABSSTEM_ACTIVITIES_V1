@@ -163,6 +163,7 @@ const TournamentsPage = () => {
   const {
     tournaments,
     tournamentParticipants,
+    tournamentRegistrationRequests,
     tournamentMatches,
     finalResults,
     employees,
@@ -249,13 +250,13 @@ const TournamentsPage = () => {
   }, [tournamentParticipants]);
   const pendingByTournament = useMemo(() => {
     const map = {};
-    for (const p of tournamentParticipants) {
-      if (String(p.status || '').toLowerCase() !== 'pending') continue;
-      if (!map[p.tournament_id]) map[p.tournament_id] = [];
-      map[p.tournament_id].push(p);
+    for (const request of tournamentRegistrationRequests) {
+      if (String(request.status || '').toLowerCase() !== 'pending') continue;
+      if (!map[request.tournament_id]) map[request.tournament_id] = [];
+      map[request.tournament_id].push(request);
     }
     return map;
-  }, [tournamentParticipants]);
+  }, [tournamentRegistrationRequests]);
   const matchesForActive = useMemo(
     () => activeTournament ? getMatchesByTournament(activeTournament) : [],
     [activeTournament, tournamentMatches, getMatchesByTournament]

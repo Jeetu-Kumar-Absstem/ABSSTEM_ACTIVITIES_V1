@@ -34,6 +34,7 @@ export const AppProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [tournamentParticipants, setTournamentParticipants] = useState([]);
+  const [tournamentRegistrationRequests, setTournamentRegistrationRequests] = useState([]);
   const [tournamentMatches, setTournamentMatches] = useState([]);
   const [finalResults, setFinalResults] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
@@ -342,6 +343,20 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadTournamentRegistrationRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tournament_registration_requests')
+        .select('*')
+        .order('requested_at', { ascending: true });
+      if (error) throw error;
+      setTournamentRegistrationRequests(data || []);
+    } catch (err) {
+      console.error('Error loading tournament registration requests:', err);
+      setTournamentRegistrationRequests([]);
+    }
+  };
+
   const loadTournamentMatches = async () => {
     try {
       const { data, error } = await supabase
@@ -428,6 +443,7 @@ export const AppProvider = ({ children }) => {
     loadEvents();
     loadTournaments();
     loadTournamentParticipants();
+    loadTournamentRegistrationRequests();
     loadTournamentMatches();
     loadFinalResults();
     loadLeaderboard();
@@ -904,12 +920,6 @@ export const AppProvider = ({ children }) => {
       }
       const userIsAdmin = isAdmin();
       const approvedParticipants = getTournamentApprovedParticipants(tournamentId);
-      const pendingParticipant = tournamentParticipants.find(
-        p =>
-          p.tournament_id === tournamentId &&
-          p.employee_id?.toUpperCase() === normalizedEmpId &&
-          String(p.status || '').toLowerCase() === 'pending'
-      );
       const registeredParticipant = tournamentParticipants.find(
         p =>
           p.tournament_id === tournamentId &&
@@ -922,113 +932,161 @@ export const AppProvider = ({ children }) => {
           p.employee_id?.toUpperCase() === normalizedEmpId &&
           String(p.status || '').toLowerCase() === 'withdrawn'
       );
+      const existingRequest = tournamentRegistrationRequests.find(
+        (request) =>
+          request.tournament_id === tournamentId &&
+          request.employee_id?.toUpperCase() === normalizedEmpId &&
+          String(request.status || '').toLowerCase() === 'pending'
+      );
 
       if (userIsAdmin) {
         if (approvedParticipants.length >= (tournament.max_participants || 8)) {
           return { success: false, error: 'Tournament is full' };
         }
-      }
+        const nextSeed = approvedParticipants.length + 1;
+        const existingApproved = registeredParticipant;
+        let data;
 
-      const nextSeed = approvedParticipants.length + 1;
+        if (existingApproved) {
+          return { success: false, error: 'You are already registered for this tournament' };
+        }
 
-      // If the player previously unregistered, a withdrawn row still exists.
-      // UPDATE it back to the latest request state to avoid unique conflicts.
-      const existingWithdrawn = withdrawnParticipant;
-
-      let data;
-      if (existingWithdrawn) {
-        const { data: updated, error: updateErr } = await supabase
-          .from('tournament_participants')
-          .update({
-            status: userIsAdmin ? 'registered' : 'pending',
-            seed: userIsAdmin ? nextSeed : null,
-          })
-          .match({ id: existingWithdrawn.id })
-          .select();
-        if (updateErr) throw updateErr;
-        data = updated;
-      } else if (pendingParticipant) {
-        if (userIsAdmin) {
+        if (withdrawnParticipant) {
           const { data: updated, error: updateErr } = await supabase
             .from('tournament_participants')
             .update({ status: 'registered', seed: nextSeed })
-            .match({ id: pendingParticipant.id })
+            .match({ id: withdrawnParticipant.id })
             .select();
           if (updateErr) throw updateErr;
           data = updated;
         } else {
-          return { success: true, pending: true, data: pendingParticipant };
+          const { data: inserted, error: insertErr } = await supabase
+            .from('tournament_participants')
+            .insert([{
+              tournament_id: tournamentId,
+              employee_id: normalizedEmpId,
+              seed: nextSeed,
+              status: 'registered',
+            }])
+            .select();
+          if (insertErr) throw insertErr;
+          data = inserted;
         }
-      } else if (registeredParticipant) {
-        return {
-          success: false,
-          error: registeredParticipant.status === 'pending'
-            ? 'Your registration is already pending approval'
-            : 'You are already registered for this tournament',
-        };
-      } else {
-        const { data: inserted, error: insertErr } = await supabase
-          .from('tournament_participants')
-          .insert([{
-            tournament_id: tournamentId,
-            employee_id: normalizedEmpId,
-            seed: nextSeed,
-            status: userIsAdmin ? 'registered' : 'pending',
-          }])
-          .select();
-        if (insertErr) throw insertErr;
-        data = inserted;
-      }
 
-      await loadTournamentParticipants();
+        if (existingRequest) {
+          await supabase
+            .from('tournament_registration_requests')
+            .delete()
+            .match({ id: existingRequest.id });
+        }
 
-      if (userIsAdmin) {
-        // Refresh the leaderboard so the UI stays in sync with any other
-        // tournament-related score changes. Participation itself no longer
-        // awards points.
+        await loadTournamentParticipants();
+        await loadTournamentRegistrationRequests();
         await loadLeaderboard();
         return { success: true, data: data?.[0] || null };
       }
 
+      if (registeredParticipant) {
+        return { success: false, error: 'You are already registered for this tournament' };
+      }
+
+      if (existingRequest) {
+        return { success: true, pending: true, data: existingRequest };
+      }
+
+      const { data, error } = await supabase
+        .from('tournament_registration_requests')
+        .insert([{
+          tournament_id: tournamentId,
+          employee_id: normalizedEmpId,
+          status: 'pending',
+        }])
+        .select();
+      if (error) throw error;
+
+      await loadTournamentRegistrationRequests();
       return { success: true, pending: true, data: data?.[0] || null };
     } catch (err) {
       return { success: false, error: err.message };
     }
   };
 
-  const approveTournamentRegistration = async (participantId) => {
+  const approveTournamentRegistration = async (requestId) => {
     if (!isAdmin()) {
       return { success: false, error: 'Only admins can approve tournament registrations' };
     }
 
     try {
-      const participant = tournamentParticipants.find((p) => p.id === participantId);
-      if (!participant) {
+      const request = tournamentRegistrationRequests.find((row) => row.id === requestId);
+      if (!request) {
         return { success: false, error: 'Registration request not found' };
       }
-      if (String(participant.status || '').toLowerCase() !== 'pending') {
-        return { success: false, error: 'Only pending requests can be approved' };
-      }
 
-      const tournament = tournaments.find((t) => t.id === participant.tournament_id);
+      const tournament = tournaments.find((t) => t.id === request.tournament_id);
       if (!tournament) {
         return { success: false, error: 'Tournament not found' };
       }
 
-      const approvedParticipants = getTournamentApprovedParticipants(participant.tournament_id);
+      const approvedParticipants = getTournamentApprovedParticipants(request.tournament_id);
       if (approvedParticipants.length >= (tournament.max_participants || 8)) {
         return { success: false, error: 'Tournament is full' };
       }
 
       const nextSeed = approvedParticipants.length + 1;
-      const { data, error } = await supabase
-        .from('tournament_participants')
-        .update({ status: 'registered', seed: nextSeed })
-        .match({ id: participantId })
-        .select();
-      if (error) throw error;
+
+      const existingApproved = tournamentParticipants.find(
+        (p) =>
+          p.tournament_id === request.tournament_id &&
+          p.employee_id?.toUpperCase() === request.employee_id?.toUpperCase() &&
+          APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase())
+      );
+      if (existingApproved) {
+        await supabase
+          .from('tournament_registration_requests')
+          .delete()
+          .match({ id: requestId });
+        await loadTournamentRegistrationRequests();
+        return { success: true, data: existingApproved, alreadyRegistered: true };
+      }
+
+      const withdrawnParticipant = tournamentParticipants.find(
+        (p) =>
+          p.tournament_id === request.tournament_id &&
+          p.employee_id?.toUpperCase() === request.employee_id?.toUpperCase() &&
+          String(p.status || '').toLowerCase() === 'withdrawn'
+      );
+
+      let data;
+      if (withdrawnParticipant) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('tournament_participants')
+          .update({ status: 'registered', seed: nextSeed })
+          .match({ id: withdrawnParticipant.id })
+          .select();
+        if (updateErr) throw updateErr;
+        data = updated;
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('tournament_participants')
+          .insert([{
+            tournament_id: request.tournament_id,
+            employee_id: request.employee_id,
+            seed: nextSeed,
+            status: 'registered',
+          }])
+          .select();
+        if (insertErr) throw insertErr;
+        data = inserted;
+      }
+
+      const { error: deleteErr } = await supabase
+        .from('tournament_registration_requests')
+        .delete()
+        .match({ id: requestId });
+      if (deleteErr) throw deleteErr;
 
       await loadTournamentParticipants();
+      await loadTournamentRegistrationRequests();
       await loadLeaderboard();
       return { success: true, data: data?.[0] || null };
     } catch (err) {
@@ -1648,12 +1706,14 @@ export const AppProvider = ({ children }) => {
     events,
     tournaments,
     tournamentParticipants,
+    tournamentRegistrationRequests,
     tournamentMatches,
     finalResults,
     leaderboard,
     loadEvents,
     loadTournaments,
     loadTournamentParticipants,
+    loadTournamentRegistrationRequests,
     loadTournamentMatches,
     loadFinalResults,
     loadLeaderboard,

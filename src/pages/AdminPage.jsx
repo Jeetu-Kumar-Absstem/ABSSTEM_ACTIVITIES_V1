@@ -9,7 +9,7 @@ const ADMIN_TABS = [
 const AdminPage = () => {
   const {
     tournaments,
-    tournamentParticipants,
+    tournamentRegistrationRequests,
     approveTournamentRegistration,
     getEmployeeName,
   } = useApp();
@@ -18,7 +18,7 @@ const AdminPage = () => {
   const [approvingId, setApprovingId] = useState(null);
 
   const pendingRequests = useMemo(() => {
-    return tournamentParticipants
+    return tournamentRegistrationRequests
       .filter((row) => String(row.status || '').toLowerCase() === 'pending')
       .map((row) => {
         const tournament = tournaments.find((t) => t.id === row.tournament_id);
@@ -28,14 +28,19 @@ const AdminPage = () => {
         };
       })
       .sort((a, b) => String(a.registered_at || '').localeCompare(String(b.registered_at || '')));
-  }, [tournamentParticipants, tournaments]);
+  }, [tournamentRegistrationRequests, tournaments]);
 
   const handleApprove = async (row) => {
     setApprovingId(row.id);
     try {
       const result = await approveTournamentRegistration(row.id);
       if (result.success) {
-        showToast(`Approved ${row.employee_id} for ${row.tournament?.name || 'tournament'}`, 'success');
+        showToast(
+          result.alreadyRegistered
+            ? `${row.employee_id} was already registered for ${row.tournament?.name || 'tournament'}`
+            : `Approved ${row.employee_id} for ${row.tournament?.name || 'tournament'}`,
+          'success'
+        );
       } else {
         showToast(result.error || 'Failed to approve request', 'error');
       }
@@ -56,10 +61,10 @@ const AdminPage = () => {
         }}
       >
         <div style={{ fontSize: '0.78rem', opacity: 0.8 }}>Admin</div>
-        <h1 style={{ margin: '6px 0 0 0', fontSize: '1.8rem', fontWeight: 800 }}>Registration Approval</h1>
+        {/* <h1 style={{ margin: '6px 0 0 0', fontSize: '1.8rem', fontWeight: 800 }}>Registration Approval</h1>
         <div style={{ marginTop: '8px', fontSize: '0.85rem', opacity: 0.9 }}>
           Review pending tournament requests and approve them when space is available.
-        </div>
+        </div> */}
       </div>
 
       <div className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
