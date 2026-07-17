@@ -1,5 +1,5 @@
 // src/components/modals/BookSlotModal.jsx
-import React, { useState } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import { SLOTS } from '../../utils/constants';
 import { useApp } from '../../context/AppContext';
@@ -7,13 +7,13 @@ import useViewport from '../../hooks/useViewport';
 import BottomSheet from '../common/BottomSheet';
 
 const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBookings, maxPlayers, game }) => {
-  const [playerName, setPlayerName] = useState('');
   const { currentUser } = useApp();
   const { isMobile } = useViewport();
 
   if (!isOpen) return null;
 
   const slot = SLOTS.find(s => s.id === slotId);
+  const employeeId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.user_metadata?.empId || '';
   // Filter bookings for the selected game
   const gameBookings = currentBookings.filter(b =>
     String(b.game) === String(game) ||
@@ -22,10 +22,11 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
 
   const isFull = gameBookings.length >= maxPlayers;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (isFull) { alert('This slot is full!'); return; }
-    if (!playerName.trim()) { alert('Please enter your name!'); return; }
-    onConfirm(playerName) && onClose();
+    if (!employeeId) { alert('Your profile is missing an Employee ID'); return; }
+    const result = await onConfirm();
+    if (result) onClose();
   };
 
   // Single-source body content
@@ -39,16 +40,14 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div>
-          <label style={{ fontSize: '0.7rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-            Player Name <span style={{ color: '#e53935' }}>*</span>
-          </label>
-          <input
-            className="clay-input"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Enter your full name"
-          />
+        <div className="clay-soft" style={{ padding: '12px 16px', borderRadius: '16px', fontSize: '0.75rem', color: '#444466' }}>
+          <div style={{ fontWeight: 600, color: '#1a3c6e', marginBottom: '4px' }}>Auto-filled Employee ID</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.04em', color: '#1e1e2f' }}>
+            {employeeId || 'N/A'}
+          </div>
+          <div style={{ fontSize: '0.68rem', marginTop: '4px' }}>
+            This slot will be booked under your logged-in employee ID.
+          </div>
         </div>
 
         <div className="clay-soft" style={{ padding: '12px 16px', borderRadius: '16px', fontSize: '0.75rem', color: '#444466' }}>

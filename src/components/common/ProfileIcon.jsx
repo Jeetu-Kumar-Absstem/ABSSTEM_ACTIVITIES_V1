@@ -10,7 +10,7 @@ const ProfileIcon = ({ user, onLogout }) => {
   const [userName, setUserName] = useState('');
   const dropdownRef = useRef(null);
   const { showToast } = useToast();
-  const { setActiveTab } = useApp();
+  const { setActiveTab, isAdmin } = useApp();
 
   useEffect(() => {
     if (user) {
@@ -103,6 +103,28 @@ const ProfileIcon = ({ user, onLogout }) => {
           </div>
 
           <div style={{ padding: '4px 0' }}>
+            {isAdmin() && (
+              <div
+                onClick={() => {
+                  setShowDropdown(false);
+                  setActiveTab('admin');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '0.8rem',
+                  color: '#444466',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(26,60,110,0.05)'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                🛡️ Admin
+              </div>
+            )}
             <div
               onClick={() => {
                 setShowDropdown(false);

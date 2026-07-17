@@ -10,6 +10,7 @@ import RulesPage from './RulesPage';
 import BanManagementPage from './BanManagementPage';
 import ReportsPage from './ReportsPage';
 import ProfilePage from './ProfilePage';
+import AdminPage from './AdminPage';
 import EventsCalendarPage from './EventsCalendarPage';
 import TournamentsPage from './TournamentsPage';
 import LeaderboardPage from './LeaderboardPage';
@@ -27,6 +28,7 @@ const ActivityPlanner = ({ user, onLogout }) => {
       case 'bans': return <BanManagementPage />;
       case 'reports': return <ReportsPage />;
       case 'profile': return <ProfilePage />;
+      case 'admin': return <AdminPage />;
       case 'eventsCalendar': return <EventsCalendarPage />;
       case 'tournaments': return <TournamentsPage />;
       case 'leaderboard': return <LeaderboardPage />;

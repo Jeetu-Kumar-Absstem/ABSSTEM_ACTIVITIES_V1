@@ -4,6 +4,16 @@ import { supabase } from '../utils/supabase';
 import { GAMES, SLOTS, DAYS } from '../utils/constants';
 import { isAdminId } from '../utils/admin';
 import {
+  buildKnockoutFixturePlan,
+  buildRoundRobinFixturePlan,
+  buildSwissRoundPlan,
+  compareTournamentRounds,
+  getMatchTeams,
+  getRoundLabel,
+  groupMatchesByRound,
+  normalizeTournamentFormat,
+} from '../utils/tournamentFixtures';
+import {
   getDayName,
   getPlayerStatsFromResults,
   getWeekRange,
@@ -11,6 +21,14 @@ import {
 } from '../utils/helpers';
 
 const AppContext = createContext();
+const APPROVED_TOURNAMENT_STATUSES = new Set([
+  'registered',
+  'active',
+  'semi_finalist',
+  'finalist',
+  'eliminated',
+]);
+const FINISHING_MATCH_STATUSES = new Set(['completed', 'walkover', 'no_show', 'bye']);
 
 export const useApp = () => useContext(AppContext);
 
@@ -27,6 +45,7 @@ export const AppProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [tournamentParticipants, setTournamentParticipants] = useState([]);
+  const [tournamentRegistrationRequests, setTournamentRegistrationRequests] = useState([]);
   const [tournamentMatches, setTournamentMatches] = useState([]);
   const [finalResults, setFinalResults] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
@@ -45,6 +64,88 @@ export const AppProvider = ({ children }) => {
       currentUser?.user_metadata?.empId ||
       '';
     return isAdminId(empId);
+  };
+
+  const getCurrentEmpId = () =>
+    String(
+      currentUser?.user_metadata?.emp_id ||
+      currentUser?.user_metadata?.employee_code ||
+      currentUser?.user_metadata?.empId ||
+    ''
+    ).trim().toUpperCase();
+
+  const getMatchPlayerIds = (match) => {
+    const teamA = [
+      match?.player_a_employee_id,
+      ...(match?.team_a_players || []).map((p) => p.employee_id),
+    ].filter(Boolean);
+    const teamB = [
+      match?.player_b_employee_id,
+      ...(match?.team_b_players || []).map((p) => p.employee_id),
+    ].filter(Boolean);
+    return {
+      teamA: [...new Set(teamA)],
+      teamB: [...new Set(teamB)],
+    };
+  };
+
+  const getMatchResultLabel = (status) => {
+    const value = String(status || '').toLowerCase();
+    if (value === 'completed') return 'Completed';
+    if (value === 'draw') return 'Draw';
+    if (value === 'walkover') return 'Walkover';
+    if (value === 'rescheduled') return 'Rescheduled';
+    if (value === 'cancelled') return 'Cancelled';
+    if (value === 'disputed') return 'Disputed';
+    if (value === 'no_show') return 'No Show';
+    if (value === 'bye') return 'Bye';
+    if (value === 'in_progress') return 'In Progress';
+    if (value === 'scheduled') return 'Scheduled';
+    return value || 'Scheduled';
+  };
+
+  const getMatchStatus = (match) => String(match?.status || 'scheduled').toLowerCase();
+
+  const advanceWinnerToNextMatch = async (sourceMatch, winnerEmployeeId) => {
+    if (!sourceMatch?.next_match_winner_id || !winnerEmployeeId) return { success: true };
+    const nextMatch = tournamentMatches.find((m) => m.id === sourceMatch.next_match_winner_id);
+    if (!nextMatch) return { success: true };
+
+    if (String(nextMatch.player_a_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
+      return { success: true };
+    }
+    if (String(nextMatch.player_b_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
+      return { success: true };
+    }
+
+    const payload = {};
+    if (!nextMatch.player_a_employee_id) {
+      payload.player_a_employee_id = winnerEmployeeId;
+    } else if (!nextMatch.player_b_employee_id) {
+      payload.player_b_employee_id = winnerEmployeeId;
+    } else {
+      return { success: false, error: 'Next match already has two players' };
+    }
+
+    const { error } = await supabase
+      .from('tournament_matches')
+      .update(payload)
+      .match({ id: nextMatch.id });
+    if (error) throw error;
+
+    return { success: true };
+  };
+
+  const getSwissNextRoundNumber = (matches = []) => {
+    let maxRound = 0;
+    for (const match of matches) {
+      const round = String(match.round || '').toUpperCase();
+      const swissMatch = round.match(/^SW(\d+)$/);
+      if (swissMatch) {
+        maxRound = Math.max(maxRound, Number(swissMatch[1]));
+      }
+    }
+    return maxRound + 1;
   };
 
   const mapGameRow = (game) => ({
@@ -327,6 +428,20 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const loadTournamentRegistrationRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tournament_registration_requests')
+        .select('*')
+        .order('requested_at', { ascending: true });
+      if (error) throw error;
+      setTournamentRegistrationRequests(data || []);
+    } catch (err) {
+      console.error('Error loading tournament registration requests:', err);
+      setTournamentRegistrationRequests([]);
+    }
+  };
+
   const loadTournamentMatches = async () => {
     try {
       const { data, error } = await supabase
@@ -413,6 +528,7 @@ export const AppProvider = ({ children }) => {
     loadEvents();
     loadTournaments();
     loadTournamentParticipants();
+    loadTournamentRegistrationRequests();
     loadTournamentMatches();
     loadFinalResults();
     loadLeaderboard();
@@ -431,12 +547,13 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // Add booking function
-  const addBooking = async (day, slotId, playerName) => {
+  const addBooking = async (day, slotId) => {
     try {
       await cleanupOldBookings();
       const user = await supabase.auth.getUser();
       const userId = user.data.user?.id;
       const empId = user.data.user?.user_metadata?.emp_id || user.data.user?.user_metadata?.employee_code || currentUser?.user_metadata?.emp_id || '';
+      const normalizedEmpId = String(empId || '').trim().toUpperCase();
 
       const gameRecord = games.find(g => String(g.id) === String(selectedGame) || g.name === selectedGame);
       if (gameRecord && gameRecord.active === false) {
@@ -454,7 +571,7 @@ export const AppProvider = ({ children }) => {
       }
 
       const bannedForGame = bans.some(b => 
-        (b.employee_id === empId || b.employee === playerName) &&
+        (String(b.employee_id || '').toUpperCase() === normalizedEmpId || b.employee === normalizedEmpId) &&
         b.active !== false &&
         new Date(b.until_date) > new Date() &&
         (String(b.game) === String(selectedGame) || b.game === gameRecord?.name || b.game === 'All Games')
@@ -469,9 +586,9 @@ export const AppProvider = ({ children }) => {
         .insert([{ 
           day, 
           slot_id: slotId, 
-          player_name: playerName,
+          player_name: normalizedEmpId,
           user_id: userId,
-          employee_id: empId,
+          employee_id: normalizedEmpId,
           game: String(selectedGame),
           booked_at: new Date().toISOString()
         }])
@@ -483,9 +600,9 @@ export const AppProvider = ({ children }) => {
       if (!newBookings[day]) newBookings[day] = {};
       if (!newBookings[day][slotId]) newBookings[day][slotId] = [];
       newBookings[day][slotId].push({
-        name: playerName,
+        name: normalizedEmpId,
         user_id: userId,
-        employee_id: empId,
+        employee_id: normalizedEmpId,
         booking_id: data[0]?.id,
         game: String(data[0]?.game ?? selectedGame),
         booked_at: data[0]?.booked_at,
@@ -861,7 +978,186 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // ── Tournament participation (any auth user can self-register) ──────────
+  const generateTournamentFixtures = async (tournamentId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can generate fixtures' };
+    }
+    try {
+      const tournament = tournaments.find((t) => t.id === tournamentId);
+      if (!tournament) {
+        return { success: false, error: 'Tournament not found' };
+      }
+
+      const format = normalizeTournamentFormat(tournament.format);
+      const participants = getTournamentApprovedParticipants(tournamentId);
+      if (participants.length < 2) {
+        return { success: false, error: 'At least 2 registered participants are required' };
+      }
+
+      const startDatePassed = tournament.start_date && new Date(tournament.start_date) <= new Date();
+      if (!startDatePassed) {
+        return { success: false, error: 'Fixtures can only be generated once the start date has arrived' };
+      }
+      if (tournament.registration_open !== false) {
+        return { success: false, error: 'Close registration before generating fixtures' };
+      }
+
+      const existingMatches = tournamentMatches.filter((m) => m.tournament_id === tournamentId);
+      const existingSwissRounds = existingMatches.filter((m) => String(m.round || '').toUpperCase().startsWith('SW'));
+      const latestSwissRound = existingSwissRounds.reduce((max, match) => {
+        const roundNumber = Number(String(match.round || '').replace(/^SW/i, '')) || 0;
+        return Math.max(max, roundNumber);
+      }, 0);
+      const latestSwissRoundMatches = latestSwissRound
+        ? existingSwissRounds.filter((match) => Number(String(match.round || '').replace(/^SW/i, '')) === latestSwissRound)
+        : [];
+      const latestSwissRoundPending = latestSwissRoundMatches.some((match) =>
+        !FINISHING_MATCH_STATUSES.has(String(match.status || '').toLowerCase())
+      );
+
+      if (format !== 'swiss' && existingMatches.length > 0) {
+        return { success: false, error: 'Fixtures have already been generated for this tournament' };
+      }
+      if (format === 'swiss' && latestSwissRoundPending) {
+        return { success: false, error: 'Finish the current Swiss round before generating the next one' };
+      }
+
+      const payloads = [];
+      let roundPlan = null;
+      if (format === 'knockout') {
+        roundPlan = buildKnockoutFixturePlan(participants);
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            payloads.push({
+              tournament_id: tournamentId,
+              match_code: match.match_code,
+              round: match.round,
+              match_number: match.match_number,
+              player_a_employee_id: match.player_a_employee_id,
+              player_b_employee_id: match.player_b_employee_id,
+              score_a: match.score_a,
+              score_b: match.score_b,
+              winner_employee_id: match.winner_employee_id,
+              status: match.status,
+              played_at: match.status === 'bye' ? new Date().toISOString() : null,
+            });
+          }
+        }
+      } else if (format === 'round_robin') {
+        roundPlan = buildRoundRobinFixturePlan(participants);
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            payloads.push({
+              tournament_id: tournamentId,
+              match_code: match.match_code,
+              round: match.round,
+              match_number: match.match_number,
+              player_a_employee_id: match.player_a_employee_id,
+              player_b_employee_id: match.player_b_employee_id,
+              status: match.status,
+            });
+          }
+        }
+      } else if (format === 'swiss') {
+        const nextRoundNumber = latestSwissRound ? latestSwissRound + 1 : 1;
+        roundPlan = buildSwissRoundPlan(participants, existingMatches, nextRoundNumber);
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            payloads.push({
+              tournament_id: tournamentId,
+              match_code: match.match_code,
+              round: match.round,
+              match_number: match.match_number,
+              player_a_employee_id: match.player_a_employee_id,
+              player_b_employee_id: match.player_b_employee_id,
+              score_a: match.score_a,
+              score_b: match.score_b,
+              winner_employee_id: match.winner_employee_id,
+              status: match.status,
+              played_at: match.status === 'bye' ? new Date().toISOString() : null,
+            });
+          }
+        }
+      } else {
+        return { success: false, error: `Unsupported tournament format: ${format}` };
+      }
+
+      if (payloads.length === 0) {
+        return { success: false, error: 'No fixtures were generated' };
+      }
+
+      await supabase
+        .from('tournaments')
+        .update({
+          status: 'live',
+          registration_open: false,
+        })
+        .match({ id: tournamentId });
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from('tournament_matches')
+        .insert(payloads)
+        .select();
+      if (insertErr) throw insertErr;
+
+      if (format === 'knockout' && roundPlan?.rounds?.length > 1) {
+        const byCode = new Map((inserted || []).map((row) => [row.match_code, row]));
+        const pointerUpdates = [];
+        for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
+          const currentRound = roundPlan.rounds[roundIndex];
+          const nextRound = roundPlan.rounds[roundIndex + 1];
+          currentRound.matches.forEach((match, matchIndex) => {
+            const currentRow = byCode.get(match.match_code);
+            const nextRow = byCode.get(nextRound.matches[Math.floor(matchIndex / 2)]?.match_code);
+            if (!currentRow || !nextRow) return;
+            pointerUpdates.push(
+              supabase
+                .from('tournament_matches')
+                .update({ next_match_winner_id: nextRow.id })
+                .match({ id: currentRow.id })
+            );
+          });
+        }
+        await Promise.all(pointerUpdates);
+
+        const firstRound = roundPlan.rounds[0];
+        const secondRound = roundPlan.rounds[1];
+        if (firstRound && secondRound) {
+          for (let i = 0; i < firstRound.matches.length; i += 1) {
+            const match = firstRound.matches[i];
+            if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
+            const sourceRow = byCode.get(match.match_code);
+            const targetRow = byCode.get(secondRound.matches[Math.floor(i / 2)]?.match_code);
+            if (!sourceRow || !targetRow) continue;
+            const update = {};
+            if (!targetRow.player_a_employee_id) update.player_a_employee_id = match.winner_employee_id;
+            else if (!targetRow.player_b_employee_id) update.player_b_employee_id = match.winner_employee_id;
+            if (Object.keys(update).length > 0) {
+              await supabase
+                .from('tournament_matches')
+                .update(update)
+                .match({ id: targetRow.id });
+            }
+          }
+        }
+      }
+
+      await loadTournaments();
+      await loadTournamentMatches();
+      return { success: true, data: inserted || [] };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const getTournamentApprovedParticipants = (tournamentId) =>
+    tournamentParticipants.filter(
+      (p) =>
+        p.tournament_id === tournamentId &&
+        APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase())
+    );
+
+  // ── Tournament participation (admin approves non-admin requests) ─────────
   const registerForTournament = async (tournamentId, employeeId) => {
     try {
       const tournament = tournaments.find(t => t.id === tournamentId);
@@ -875,30 +1171,154 @@ export const AppProvider = ({ children }) => {
       if (tournament.start_date && new Date(tournament.start_date) <= new Date()) {
         return { success: false, error: 'Registration is closed — tournament has already started' };
       }
-      const registeredCount = tournamentParticipants.filter(
-        p => p.tournament_id === tournamentId && p.status !== 'withdrawn'
-      ).length;
-      if (registeredCount >= (tournament.max_participants || 8)) {
+      const normalizedEmpId = String(employeeId || getCurrentEmpId()).trim().toUpperCase();
+      if (!normalizedEmpId) {
+        return { success: false, error: 'Your profile is missing an employee ID' };
+      }
+      const userIsAdmin = isAdmin();
+      const approvedParticipants = getTournamentApprovedParticipants(tournamentId);
+      const registeredParticipant = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === normalizedEmpId &&
+          APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase())
+      );
+      const withdrawnParticipant = tournamentParticipants.find(
+        p =>
+          p.tournament_id === tournamentId &&
+          p.employee_id?.toUpperCase() === normalizedEmpId &&
+          String(p.status || '').toLowerCase() === 'withdrawn'
+      );
+      const existingRequest = tournamentRegistrationRequests.find(
+        (request) =>
+          request.tournament_id === tournamentId &&
+          request.employee_id?.toUpperCase() === normalizedEmpId &&
+          String(request.status || '').toLowerCase() === 'pending'
+      );
+
+      if (userIsAdmin) {
+        if (approvedParticipants.length >= (tournament.max_participants || 8)) {
+          return { success: false, error: 'Tournament is full' };
+        }
+        const nextSeed = approvedParticipants.length + 1;
+        const existingApproved = registeredParticipant;
+        let data;
+
+        if (existingApproved) {
+          return { success: false, error: 'You are already registered for this tournament' };
+        }
+
+        if (withdrawnParticipant) {
+          const { data: updated, error: updateErr } = await supabase
+            .from('tournament_participants')
+            .update({ status: 'registered', seed: nextSeed })
+            .match({ id: withdrawnParticipant.id })
+            .select();
+          if (updateErr) throw updateErr;
+          data = updated;
+        } else {
+          const { data: inserted, error: insertErr } = await supabase
+            .from('tournament_participants')
+            .insert([{
+              tournament_id: tournamentId,
+              employee_id: normalizedEmpId,
+              seed: nextSeed,
+              status: 'registered',
+            }])
+            .select();
+          if (insertErr) throw insertErr;
+          data = inserted;
+        }
+
+        if (existingRequest) {
+          await supabase
+            .from('tournament_registration_requests')
+            .delete()
+            .match({ id: existingRequest.id });
+        }
+
+        await loadTournamentParticipants();
+        await loadTournamentRegistrationRequests();
+        await loadLeaderboard();
+        return { success: true, data: data?.[0] || null };
+      }
+
+      if (registeredParticipant) {
+        return { success: false, error: 'You are already registered for this tournament' };
+      }
+
+      if (existingRequest) {
+        return { success: true, pending: true, data: existingRequest };
+      }
+
+      const { data, error } = await supabase
+        .from('tournament_registration_requests')
+        .insert([{
+          tournament_id: tournamentId,
+          employee_id: normalizedEmpId,
+          status: 'pending',
+        }])
+        .select();
+      if (error) throw error;
+
+      await loadTournamentRegistrationRequests();
+      return { success: true, pending: true, data: data?.[0] || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const approveTournamentRegistration = async (requestId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can approve tournament registrations' };
+    }
+
+    try {
+      const request = tournamentRegistrationRequests.find((row) => row.id === requestId);
+      if (!request) {
+        return { success: false, error: 'Registration request not found' };
+      }
+
+      const tournament = tournaments.find((t) => t.id === request.tournament_id);
+      if (!tournament) {
+        return { success: false, error: 'Tournament not found' };
+      }
+
+      const approvedParticipants = getTournamentApprovedParticipants(request.tournament_id);
+      if (approvedParticipants.length >= (tournament.max_participants || 8)) {
         return { success: false, error: 'Tournament is full' };
       }
 
-      const nextSeed = (tournamentParticipants.filter(p => p.tournament_id === tournamentId).length || 0) + 1;
+      const nextSeed = approvedParticipants.length + 1;
 
-      // If the player previously unregistered, a withdrawn row still exists.
-      // UPDATE it back to 'registered' to avoid the unique(tournament_id, employee_id) conflict.
-      const existingWithdrawn = tournamentParticipants.find(
-        p =>
-          p.tournament_id === tournamentId &&
-          p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
-          p.status === 'withdrawn'
+      const existingApproved = tournamentParticipants.find(
+        (p) =>
+          p.tournament_id === request.tournament_id &&
+          p.employee_id?.toUpperCase() === request.employee_id?.toUpperCase() &&
+          APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase())
+      );
+      if (existingApproved) {
+        await supabase
+          .from('tournament_registration_requests')
+          .delete()
+          .match({ id: requestId });
+        await loadTournamentRegistrationRequests();
+        return { success: true, data: existingApproved, alreadyRegistered: true };
+      }
+
+      const withdrawnParticipant = tournamentParticipants.find(
+        (p) =>
+          p.tournament_id === request.tournament_id &&
+          p.employee_id?.toUpperCase() === request.employee_id?.toUpperCase() &&
+          String(p.status || '').toLowerCase() === 'withdrawn'
       );
 
       let data;
-      if (existingWithdrawn) {
+      if (withdrawnParticipant) {
         const { data: updated, error: updateErr } = await supabase
           .from('tournament_participants')
           .update({ status: 'registered', seed: nextSeed })
-          .match({ id: existingWithdrawn.id })
+          .match({ id: withdrawnParticipant.id })
           .select();
         if (updateErr) throw updateErr;
         data = updated;
@@ -906,8 +1326,8 @@ export const AppProvider = ({ children }) => {
         const { data: inserted, error: insertErr } = await supabase
           .from('tournament_participants')
           .insert([{
-            tournament_id: tournamentId,
-            employee_id: employeeId,
+            tournament_id: request.tournament_id,
+            employee_id: request.employee_id,
             seed: nextSeed,
             status: 'registered',
           }])
@@ -916,14 +1336,15 @@ export const AppProvider = ({ children }) => {
         data = inserted;
       }
 
+      const { error: deleteErr } = await supabase
+        .from('tournament_registration_requests')
+        .delete()
+        .match({ id: requestId });
+      if (deleteErr) throw deleteErr;
+
       await loadTournamentParticipants();
-
-      // Refresh the leaderboard so the UI shows the new participation row.
-      // The DB trigger trg_leaderboard_participant (model 16) is the primary
-      // path for awarding the +1 participation. We do NOT call
-      // leaderboard_apply here in JS — that previously caused doubling.
+      await loadTournamentRegistrationRequests();
       await loadLeaderboard();
-
       return { success: true, data: data?.[0] || null };
     } catch (err) {
       return { success: false, error: err.message };
@@ -963,11 +1384,8 @@ export const AppProvider = ({ children }) => {
       const result = await withdrawFromTournament(participant.id);
       if (!result.success) return result;
 
-      // The DB trigger trg_leaderboard_participant handles the participation-point
-      // deduction when status flips to 'withdrawn' — exactly the same pattern as
-      // registration (where the trigger awards the point and JS does NOT call
-      // leaderboard_apply to avoid doubling). Just reload the leaderboard so the
-      // UI reflects the updated score.
+      // Participation no longer affects points, so just reload the leaderboard
+      // to keep the UI consistent after status changes.
       await loadLeaderboard();
 
       return { success: true };
@@ -1119,82 +1537,121 @@ export const AppProvider = ({ children }) => {
         }
       }
 
+      const resultType = String(
+        resultData.result_type ||
+        resultData.status ||
+        'completed'
+      ).trim().toLowerCase();
+      const normalizedType = resultType === 'in progress' ? 'in_progress' : resultType;
+      const isFirstEntry = !new Set(['completed', 'draw', 'walkover', 'no_show', 'rescheduled', 'cancelled', 'disputed', 'bye']).has(getMatchStatus(match));
+      const { teamA, teamB } = getMatchPlayerIds(match);
+      const winner = (
+        normalizedType === 'draw' ||
+        normalizedType === 'rescheduled' ||
+        normalizedType === 'cancelled' ||
+        normalizedType === 'disputed'
+      ) ? null : (
+        normalizedType === 'no_show' && resultData.absent_participant_employee_id
+          ? String(resultData.absent_participant_employee_id).toUpperCase() === String(match.player_a_employee_id || '').toUpperCase()
+            ? match.player_b_employee_id
+            : match.player_a_employee_id
+          : (resultData.winner_employee_id || null)
+      );
+
+      const status = (
+        normalizedType === 'no_show' ? 'no_show' :
+        normalizedType === 'walkover' ? 'walkover' :
+        normalizedType === 'draw' ? 'draw' :
+        normalizedType === 'rescheduled' ? 'rescheduled' :
+        normalizedType === 'cancelled' ? 'cancelled' :
+        normalizedType === 'disputed' ? 'disputed' :
+        normalizedType === 'bye' ? 'bye' :
+        'completed'
+      );
+
+      const payload = {
+        score_a: resultData.score_a ?? null,
+        score_b: resultData.score_b ?? null,
+        winner_employee_id: winner,
+        status,
+        played_at: status === 'completed' || status === 'walkover' || status === 'no_show' || status === 'bye'
+          ? new Date().toISOString()
+          : null,
+        duration_seconds: resultData.duration_seconds || null,
+        scheduled_at: status === 'rescheduled' && resultData.scheduled_at
+          ? resultData.scheduled_at
+          : match.scheduled_at || null,
+        notes: resultData.notes || resultData.reason || null,
+        recorded_by_employee_id: recordedBy,
+      };
+
       const { error } = await supabase
         .from('tournament_matches')
-        .update({
-          score_a: resultData.score_a,
-          score_b: resultData.score_b,
-          winner_employee_id: resultData.winner_employee_id,
-          status: 'completed',
-          played_at: new Date().toISOString(),
-          duration_seconds: resultData.duration_seconds || null,
-          recorded_by_employee_id: recordedBy,
-        })
+        .update(payload)
         .match({ id: matchId });
       if (error) throw error;
-      await loadTournamentMatches();
 
-      // ── Update tournament_participants match stats ──────────────────────
-      // Determine winner / loser from the saved result.
-      const winner = resultData.winner_employee_id;
-      const loser =
-        match.player_a_employee_id === winner
+      if (status === 'draw') {
+        const participantIds = [...new Set([...teamA, ...teamB])];
+        for (const empId of participantIds) {
+          const row = tournamentParticipants.find(
+            (p) => p.tournament_id === match.tournament_id && p.employee_id?.toUpperCase() === String(empId).toUpperCase()
+          );
+          if (!row) continue;
+          await supabase
+            .from('tournament_participants')
+            .update({
+              matches_played: (row.matches_played || 0) + 1,
+            })
+            .match({ id: row.id });
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: empId,
+            p_game: 'all',
+            p_delta: { draws: 1 },
+          });
+        }
+      } else if (winner && FINISHING_MATCH_STATUSES.has(status)) {
+        const loser = String(match.player_a_employee_id || '').toUpperCase() === String(winner).toUpperCase()
           ? match.player_b_employee_id
           : match.player_a_employee_id;
 
-      // Only increment matches_played when recording for the first time.
-      // If the match was already 'completed' this is an edit — skip the
-      // played counter so we don't double-count.
-      const isFirstEntry = match.status !== 'completed';
+        try {
+          await supabase.rpc('participant_record_match', {
+            p_tournament_id: match.tournament_id,
+            p_winner_id: winner || '',
+            p_loser_id: loser || '',
+            p_increment_played: isFirstEntry,
+          });
+        } catch (statsErr) {
+          console.warn('participant_record_match failed:', statsErr);
+        }
 
-      try {
-        await supabase.rpc('participant_record_match', {
-          p_tournament_id:   match.tournament_id,
-          p_winner_id:       winner  || '',
-          p_loser_id:        loser   || '',
-          p_increment_played: isFirstEntry,
-        });
-      } catch (statsErr) {
-        // Non-fatal: log but don't block the result from being saved.
-        console.warn('participant_record_match failed:', statsErr);
+        if (isFirstEntry) {
+          const teamAWon = String(winner || '').toUpperCase() === String(match.player_a_employee_id || '').toUpperCase();
+          for (const empId of teamA) {
+            await supabase.rpc('leaderboard_apply', {
+              p_employee_id: empId,
+              p_game: 'all',
+              p_delta: teamAWon ? { match_wins: 1 } : { match_losses: 1 },
+            });
+          }
+          for (const empId of teamB) {
+            await supabase.rpc('leaderboard_apply', {
+              p_employee_id: empId,
+              p_game: 'all',
+              p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
+            });
+          }
+        }
+
+        const tournament = tournaments.find((t) => t.id === match.tournament_id);
+        if (winner && normalizeTournamentFormat(tournament?.format) === 'knockout') {
+          await advanceWinnerToNextMatch(match, winner);
+        }
       }
+
+      await loadTournamentMatches();
       await loadTournamentParticipants();
-
-      // ── Update leaderboard win/loss counters ───────────────────────────
-      // IMPORTANT: only award points on the FIRST entry of a result.
-      // If match.status was already 'completed', this is a score correction/edit.
-      // Calling leaderboard_apply again would double-count points — that is
-      // exactly what caused the "extra points on edit" bug.
-      if (isFirstEntry) {
-        // Collect all players on each side: captain + any extra from junction table.
-        const teamAIds = [
-          match.player_a_employee_id,
-          ...(match.team_a_players || []).map(p => p.employee_id),
-        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
-
-        const teamBIds = [
-          match.player_b_employee_id,
-          ...(match.team_b_players || []).map(p => p.employee_id),
-        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
-
-        // Determine which team won based on the captain FK matching winner_employee_id.
-        const teamAWon = resultData.winner_employee_id === match.player_a_employee_id;
-
-        for (const empId of teamAIds) {
-          await supabase.rpc('leaderboard_apply', {
-            p_employee_id: empId,
-            p_game: 'all',
-            p_delta: teamAWon ? { match_wins: 1 } : { match_losses: 1 },
-          });
-        }
-        for (const empId of teamBIds) {
-          await supabase.rpc('leaderboard_apply', {
-            p_employee_id: empId,
-            p_game: 'all',
-            p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
-          });
-        }
-      }
       await loadLeaderboard();
       return { success: true };
     } catch (err) {
@@ -1395,16 +1852,14 @@ export const AppProvider = ({ children }) => {
     tournamentMatches
       .filter(m => m.tournament_id === tournamentId)
       .sort((a, b) => {
-        const roundOrder = { QF: 1, SF: 2, F: 3, '3RD': 4, RR: 5, GROUP: 6, QUAL: 7 };
-        const ra = roundOrder[a.round] || 99;
-        const rb = roundOrder[b.round] || 99;
-        if (ra !== rb) return ra - rb;
+        const ra = compareTournamentRounds(a.round, b.round);
+        if (ra !== 0) return ra;
         return (a.match_number || 0) - (b.match_number || 0);
       });
 
   const getParticipantsByTournament = (tournamentId) =>
     tournamentParticipants
-      .filter(p => p.tournament_id === tournamentId && p.status !== 'withdrawn')
+      .filter((p) => p.tournament_id === tournamentId && APPROVED_TOURNAMENT_STATUSES.has(String(p.status || '').toLowerCase()))
       .sort((a, b) => (a.seed || 0) - (b.seed || 0));
 
   const getResultsByTournament = (tournamentId) =>
@@ -1545,12 +2000,14 @@ export const AppProvider = ({ children }) => {
     events,
     tournaments,
     tournamentParticipants,
+    tournamentRegistrationRequests,
     tournamentMatches,
     finalResults,
     leaderboard,
     loadEvents,
     loadTournaments,
     loadTournamentParticipants,
+    loadTournamentRegistrationRequests,
     loadTournamentMatches,
     loadFinalResults,
     loadLeaderboard,
@@ -1560,7 +2017,9 @@ export const AppProvider = ({ children }) => {
     addTournament,
     updateTournament,
     deleteTournament,
+    generateTournamentFixtures,
     registerForTournament,
+    approveTournamentRegistration,
     withdrawFromTournament,
     unregisterFromTournament,
     addTournamentMatch,

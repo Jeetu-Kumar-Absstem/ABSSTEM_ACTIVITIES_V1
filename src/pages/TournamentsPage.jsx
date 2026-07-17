@@ -6,6 +6,10 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
 import { useCertificate } from '../hooks/useCertificate';
+import {
+  groupMatchesByRound,
+  normalizeTournamentFormat,
+} from '../utils/tournamentFixtures';
 
 // Confirm-delete modal (admin action on a tournament).
 const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
@@ -32,7 +36,7 @@ const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
 );
 
 // Batch-register modal: pick one or more active tournaments in a single click.
-const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCancel, onSubmit }) => {
+const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pendingByTournament, isAdminUser, onCancel, onSubmit }) => {
   // Open, accepting-registration, not-full, not-already-registered.
   const eligible = tournaments.filter(t => {
     if (t.status === 'completed' || t.status === 'cancelled') return false;
@@ -41,8 +45,11 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
     if (t.start_date && new Date(t.start_date) <= new Date()) return false;
     const parts = partsByTournament[t.id] || [];
     if (parts.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase())) return false;
+    const pending = pendingByTournament[t.id] || [];
+    if (pending.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase())) return false;
     const cap = t.max_participants || 8;
-    return parts.length < cap;
+    if (isAdminUser && parts.length >= cap) return false;
+    return true;
   });
   const [selected, setSelected] = useState(() => new Set(eligible.map(t => t.id)));
 
@@ -108,7 +115,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
           <span style={{ flex: 1, fontSize: '0.7rem', color: '#666' }}>
             {selected.size} selected
           </span>
-          <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
+            <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
           <button
             onClick={() => onSubmit([...selected])}
             disabled={selected.size === 0 || !currentEmpId}
@@ -117,7 +124,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, onCa
               opacity: selected.size === 0 || !currentEmpId ? 0.5 : 1,
               cursor: selected.size === 0 || !currentEmpId ? 'not-allowed' : 'pointer',
             }}
-          >Register</button>
+          >{isAdminUser ? 'Register' : 'Request'}</button>
         </div>
       </div>
     </div>
@@ -160,6 +167,7 @@ const TournamentsPage = () => {
   const {
     tournaments,
     tournamentParticipants,
+    tournamentRegistrationRequests,
     tournamentMatches,
     finalResults,
     employees,
@@ -167,6 +175,7 @@ const TournamentsPage = () => {
     isAdmin,
     addTournament,
     deleteTournament,
+    generateTournamentFixtures,
     registerForTournament,
     addTournamentMatch,
     recordMatchResult,
@@ -178,6 +187,7 @@ const TournamentsPage = () => {
     getParticipantsByTournament,
     getResultsByTournament,
     getEmployeeName,
+    updateTournament,
   } = useApp();
   const { showToast } = useToast();
   const { generateCertificate } = useCertificate();
@@ -200,7 +210,17 @@ const TournamentsPage = () => {
     team_b: ['', '', ''],
   });
   const [resultMatchId, setResultMatchId] = useState(null);
-  const [rForm, setRForm] = useState({ score_a: '', score_b: '', winner: '', duration: '' });
+  const [rForm, setRForm] = useState({
+    result_type: 'completed',
+    score_a: '',
+    score_b: '',
+    winner: '',
+    duration: '',
+    absent_participant_employee_id: '',
+    reason: '',
+    notes: '',
+    scheduled_at: '',
+  });
   const [finalForm, setFinalForm] = useState([]);
   const [tournamentToDelete, setTournamentToDelete] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -209,6 +229,9 @@ const TournamentsPage = () => {
   const [eForm, setEForm] = useState({ match_code: '', round: 'QF', match_number: 1, scheduled_at: '', team_a: [''], team_b: [''] });
   // matchToDelete: match pending admin delete confirmation
   const [matchToDelete, setMatchToDelete] = useState(null);
+  // editTournamentId: tournament being edited by admin (status / registration / date)
+  const [editTournamentId, setEditTournamentId] = useState(null);
+  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '' });
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -238,16 +261,30 @@ const TournamentsPage = () => {
   const partsByTournament = useMemo(() => {
     const map = {};
     for (const p of tournamentParticipants) {
-      if (p.status === 'withdrawn') continue;
+      if (p.status !== 'registered' && p.status !== 'active' && p.status !== 'semi_finalist' && p.status !== 'finalist' && p.status !== 'eliminated') continue;
       if (!map[p.tournament_id]) map[p.tournament_id] = [];
       map[p.tournament_id].push(p);
     }
     return map;
   }, [tournamentParticipants]);
+  const pendingByTournament = useMemo(() => {
+    const map = {};
+    for (const request of tournamentRegistrationRequests) {
+      if (String(request.status || '').toLowerCase() !== 'pending') continue;
+      if (!map[request.tournament_id]) map[request.tournament_id] = [];
+      map[request.tournament_id].push(request);
+    }
+    return map;
+  }, [tournamentRegistrationRequests]);
   const matchesForActive = useMemo(
     () => activeTournament ? getMatchesByTournament(activeTournament) : [],
     [activeTournament, tournamentMatches, getMatchesByTournament]
   );
+  const roundGroups = useMemo(
+    () => groupMatchesByRound(matchesForActive),
+    [matchesForActive]
+  );
+  const activeTournamentFormat = normalizeTournamentFormat(activeTournamentRecord?.format);
   const resultsForActive = useMemo(
     () => activeTournament ? getResultsByTournament(activeTournament) : [],
     [activeTournament, finalResults, getResultsByTournament]
@@ -320,18 +357,22 @@ const TournamentsPage = () => {
                 const alreadyRegistered = (partsByTournament[t.id] || []).some(
                   p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
                 );
-                // Per-row "Register" button: shown when registration is open,
-                // start date hasn't passed, tournament is not done, and the user hasn't joined yet.
-                const canRegister = !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !isFull && !!currentEmpId;
+                const hasPendingRequest = (pendingByTournament[t.id] || []).some(
+                  p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
+                );
+                const canRequest = !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !hasPendingRequest && !!currentEmpId;
+                const canRegister = isAdmin() ? canRequest && !isFull : canRequest;
                 const regLabel = alreadyRegistered
                   ? '✓ Registered'
-                  : isFull
-                    ? '🔒 Full'
+                  : hasPendingRequest
+                    ? '⏳ Waiting'
                     : isCompleted
                       ? '—'
                       : startDatePassed
                         ? 'Started'
-                        : regOpen ? '🏆 Register' : 'Closed';
+                        : isAdmin()
+                          ? (isFull ? '🔒 Full' : '🏆 Register')
+                          : '📝 Request';
                 return (
                   <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={styles.td}><strong>{t.code}</strong></td>
@@ -348,16 +389,17 @@ const TournamentsPage = () => {
                         disabled={!canRegister}
                         style={{
                           ...styles.tinyEnterBtn,
-                          background: alreadyRegistered ? '#388e3c' : isFull || isCompleted || startDatePassed ? '#9e9e9e' : '#1a3c6e',
-                          opacity: canRegister || alreadyRegistered ? 1 : 0.6,
-                          cursor: canRegister || alreadyRegistered ? 'pointer' : 'not-allowed',
+                          background: alreadyRegistered ? '#388e3c' : hasPendingRequest ? '#f9a825' : isCompleted || startDatePassed || (isAdmin() && isFull) ? '#9e9e9e' : '#1a3c6e',
+                          opacity: canRegister || alreadyRegistered || hasPendingRequest ? 1 : 0.6,
+                          cursor: canRegister || alreadyRegistered || hasPendingRequest ? 'pointer' : 'not-allowed',
                         }}
                         title={
                           alreadyRegistered ? 'You are already registered'
-                          : isFull ? 'Tournament is full'
+                          : hasPendingRequest ? 'Your request is waiting for admin approval'
+                          : isAdmin() && isFull ? 'Tournament is full'
                           : isCompleted ? 'Tournament is closed'
                           : startDatePassed ? 'Registration closed — tournament has started'
-                          : regOpen ? 'Click to register'
+                          : regOpen ? (isAdmin() ? 'Click to register' : 'Click to request approval')
                           : 'Registration closed'
                         }
                       >{regLabel}</button>
@@ -389,6 +431,20 @@ const TournamentsPage = () => {
                       >{activeTournament === t.id ? '✓' : '→'}</button>
                       {isAdmin() && (
                         <button
+                          onClick={() => {
+                            setTEditForm({
+                              status: t.status || 'registration_open',
+                              registration_open: t.registration_open !== false,
+                              start_date: t.start_date || '',
+                            });
+                            setEditTournamentId(t.id);
+                          }}
+                          style={{ ...styles.tinyIconBtn, color: '#5c6bc0', borderColor: '#c5cae9' }}
+                          title="Edit status / registration / date"
+                        >⚙️</button>
+                      )}
+                      {isAdmin() && (
+                        <button
                           onClick={() => setTournamentToDelete(t)}
                           style={{ ...styles.tinyIconBtn, color: '#000000', borderColor: '#ffcdd2' }}
                           title="Delete tournament"
@@ -403,7 +459,7 @@ const TournamentsPage = () => {
         </div>
         <div style={{ marginTop: '0.7rem', textAlign: 'right' }}>
             <button onClick={() => setShowRegisterModal(true)} style={styles.navyBtn}>
-              🏆 Register for Multiple Tournaments
+              {isAdmin() ? '🏆 Register for Multiple Tournaments' : '📝 Request Multiple Tournaments'}
             </button>
           </div>
       </div>
@@ -425,11 +481,6 @@ const TournamentsPage = () => {
         </div>
       );
     }
-    const qf = matchesForActive.filter(m => m.round === 'QF');
-    const sf = matchesForActive.filter(m => m.round === 'SF');
-    const f  = matchesForActive.filter(m => m.round === 'F');
-    const tp = matchesForActive.filter(m => m.round === '3RD');
-
     // Derive match stats from completed matches including all team members.
     const participantStats = {};
     for (const m of matchesForActive) {
@@ -460,11 +511,27 @@ const TournamentsPage = () => {
       return ordered.map(id => getEmployeeName(id)).join(' & ');
     };
 
+    const latestRound = roundGroups[roundGroups.length - 1];
+    const latestRoundOpen = latestRound
+      ? latestRound.matches.some((match) => !['completed', 'walkover', 'no_show', 'bye', 'draw', 'cancelled', 'rescheduled', 'disputed'].includes(String(match.status || '').toLowerCase()))
+      : false;
+    const canGenerateFixtures = isAdmin()
+      && activeTournamentRecord?.status !== 'completed'
+      && activeTournamentRecord?.registration_open === false
+      && (
+        activeTournamentFormat !== 'swiss'
+          ? matchesForActive.length === 0
+          : !latestRoundOpen
+      );
+    const generateLabel = activeTournamentFormat === 'swiss' && matchesForActive.length > 0
+      ? 'Generate Next Swiss Round'
+      : 'Generate Fixtures';
+
     const renderMatch = (m) => {
       const a = teamLabel(m.player_a_employee_id, m.team_a_players);
       const b = teamLabel(m.player_b_employee_id, m.team_b_players);
       const hasScore = m.score_a !== null && m.score_b !== null;
-      const isFinal = m.round === 'F';
+      const isFinal = String(m.round || '').toUpperCase() === 'F';
       return (
         <div key={m.id} style={{
           ...styles.matchCard,
@@ -488,7 +555,7 @@ const TournamentsPage = () => {
             <span style={{ fontSize: '0.7rem' }}>{b}</span><span>{m.score_b ?? '—'}</span>
           </div>
           <div style={styles.matchMeta}>
-            {m.status === 'completed' ? '✓ Final' : m.status === 'live' ? '● Live' : '⏳ Pending'}
+            {m.status === 'completed' ? '✓ Final' : m.status === 'bye' ? '↷ Bye' : m.status === 'walkover' ? '↷ Walkover' : m.status === 'live' ? '● Live' : '⏳ Pending'}
           </div>
           {canEditMatch(m) && (
             <button onClick={() => openResultModal(m)} style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}>
@@ -528,7 +595,7 @@ const TournamentsPage = () => {
                   <option key={t.id} value={t.id}>
                     {t.name} · {t.game} · {STATUS_BADGE[t.status]?.label || t.status}
                   </option>
-                ))}
+              ))}
               </select>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -536,6 +603,27 @@ const TournamentsPage = () => {
                 <span style={{ fontSize: '0.7rem', color: '#888' }}>
                   {activeTournamentRecord.format.replace('_', ' ').toUpperCase()}
                 </span>
+              )}
+              {isAdmin() && activeTournamentRecord && (
+                <button
+                  onClick={async () => {
+                    const result = await generateTournamentFixtures(activeTournamentRecord.id);
+                    if (result.success) {
+                      showToast(activeTournamentFormat === 'swiss' && matchesForActive.length > 0 ? 'Swiss round generated' : 'Fixtures generated');
+                    } else {
+                      showToast(result.error || 'Failed to generate fixtures', 'error');
+                    }
+                  }}
+                  disabled={!canGenerateFixtures}
+                  style={{
+                    ...styles.navyBtn,
+                    background: canGenerateFixtures ? '#1a3c6e' : '#9e9e9e',
+                    opacity: canGenerateFixtures ? 1 : 0.55,
+                    cursor: canGenerateFixtures ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {generateLabel}
+                </button>
               )}
               {isAdmin() && (
                 <button onClick={() => openNewMatchModal('QF')} style={styles.navyBtn}>+ Add Match</button>
@@ -556,34 +644,29 @@ const TournamentsPage = () => {
             </div>
           </div>
 
-          <div style={styles.bracketGrid}>
-            {/* Quarter finals */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#c81c1c' }}>QUARTER FINAL</div>
-              <div style={styles.bracketColBody}>
-                {qf.length === 0 ? <div style={styles.emptyCol}>No QF matches yet</div> : qf.map(renderMatch)}
-              </div>
-            </div>
-            {/* Semi finals */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#618ff4' }}>SEMI FINAL</div>
-              <div style={styles.bracketColBody}>
-                {sf.length === 0 ? <div style={styles.emptyCol}>No SF matches yet</div> : sf.map(renderMatch)}
-              </div>
-            </div>
-            {/* Final */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#fbdd65' }}>🏆 FINAL</div>
-              <div style={styles.bracketColBody}>
-                {f.length === 0 ? <div style={styles.emptyCol}>No final yet</div> : f.map(renderMatch)}
-              </div>
-            </div>
-            {/* 3rd place */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#59f0a5' }}>3RD PLACE</div>
-              <div style={styles.bracketColBody}>
-                {tp.length === 0 ? <div style={styles.emptyCol}>No 3rd-place match yet</div> : tp.map(renderMatch)}
-              </div>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ ...styles.bracketGrid, minWidth: Math.max(4, roundGroups.length) * 240 }}>
+              {roundGroups.length === 0 ? (
+                <div style={{ ...styles.bracketColBody, gridColumn: '1 / -1' }}>
+                  <div style={styles.emptyCol}>
+                    No fixtures yet. {isAdmin() ? 'Use Generate Fixtures to create the bracket.' : 'Waiting for admin to generate fixtures.'}
+                  </div>
+                </div>
+              ) : (
+                roundGroups.map((group, index) => (
+                  <div key={group.round} style={styles.bracketCol}>
+                    <div style={{
+                      ...styles.bracketColHeader,
+                      background: ['#c81c1c', '#618ff4', '#fbdd65', '#59f0a5', '#8e24aa', '#26a69a'][index % 6],
+                    }}>{group.label}</div>
+                    <div style={styles.bracketColBody}>
+                      {group.matches.length === 0
+                        ? <div style={styles.emptyCol}>No matches yet</div>
+                        : group.matches.map(renderMatch)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -997,7 +1080,11 @@ const TournamentsPage = () => {
     const result = await registerForTournament(tournamentId, currentEmpId);
     if (result.success) {
       const t = tournaments.find(x => x.id === tournamentId);
-      showToast(`Registered for "${t?.name || 'tournament'}"!`);
+      showToast(
+        result.pending
+          ? `Request sent for "${t?.name || 'tournament'}". Waiting for approval.`
+          : `Registered for "${t?.name || 'tournament'}"!`
+      );
     } else {
       showToast(result.error || 'Failed to register', 'error');
     }
@@ -1035,11 +1122,18 @@ const TournamentsPage = () => {
     }
 
     if (successCount > 0 && failures.length === 0) {
-      showToast(`Registered for ${successCount} tournament${successCount > 1 ? 's' : ''}!`);
+      showToast(
+        isAdmin()
+          ? `Registered for ${successCount} tournament${successCount > 1 ? 's' : ''}!`
+          : `Request sent for ${successCount} tournament${successCount > 1 ? 's' : ''}!`
+      );
       setShowRegisterModal(false);
     } else if (successCount > 0 && failures.length > 0) {
       const t = tournaments.find(x => x.id === failures[0].id);
-      showToast(`Registered for ${successCount}. "${t?.name}" failed: ${failures[0].error}`, 'warning');
+      showToast(
+        `${isAdmin() ? 'Registered' : 'Requested'} for ${successCount}. "${t?.name}" failed: ${failures[0].error}`,
+        'warning'
+      );
       setShowRegisterModal(false);
     } else {
       const t = tournaments.find(x => x.id === failures[0].id);
@@ -1233,23 +1327,45 @@ const TournamentsPage = () => {
   const openResultModal = (match) => {
     setResultMatchId(match.id);
     setRForm({
+      result_type: String(match.status || '').toLowerCase() === 'draw'
+        ? 'draw'
+        : String(match.status || '').toLowerCase() === 'walkover'
+          ? 'walkover'
+          : String(match.status || '').toLowerCase() === 'rescheduled'
+            ? 'rescheduled'
+            : String(match.status || '').toLowerCase() === 'cancelled'
+              ? 'cancelled'
+              : String(match.status || '').toLowerCase() === 'disputed'
+                ? 'disputed'
+                : String(match.status || '').toLowerCase() === 'no_show'
+                  ? 'no_show'
+                  : 'completed',
       score_a: match.score_a ?? '',
       score_b: match.score_b ?? '',
       winner: match.winner_employee_id || '',
       duration: match.duration_seconds || '',
+      absent_participant_employee_id: '',
+      reason: '',
+      notes: '',
+      scheduled_at: match.scheduled_at ? match.scheduled_at.slice(0, 16) : '',
     });
   };
 
   const handleSaveResult = async () => {
-    if (!rForm.winner) {
+    if (rForm.result_type === 'completed' && !rForm.winner) {
       showToast('Pick a winner', 'error');
       return;
     }
     const result = await recordMatchResult(resultMatchId, {
+      result_type: rForm.result_type,
       score_a: parseInt(rForm.score_a, 10) || 0,
       score_b: parseInt(rForm.score_b, 10) || 0,
       winner_employee_id: rForm.winner,
       duration_seconds: parseInt(rForm.duration, 10) || null,
+      absent_participant_employee_id: rForm.absent_participant_employee_id,
+      reason: rForm.reason,
+      notes: rForm.notes,
+      scheduled_at: rForm.scheduled_at ? new Date(rForm.scheduled_at + ':00+05:30').toISOString() : null,
     });
     if (result.success) {
       showToast('Result saved');
@@ -1287,6 +1403,24 @@ const TournamentsPage = () => {
     }
   };
 
+  // ── Edit tournament meta (admin) ─────────────────────────────────────────
+  const handleUpdateTournamentMeta = async () => {
+    const base = tournaments.find(t => t.id === editTournamentId);
+    if (!base) return;
+    const result = await updateTournament(editTournamentId, {
+      ...base,
+      status: tEditForm.status,
+      registration_open: tEditForm.registration_open,
+      start_date: tEditForm.start_date,
+    });
+    if (result.success) {
+      showToast('Tournament updated');
+      setEditTournamentId(null);
+    } else {
+      showToast(result.error || 'Failed to update tournament', 'error');
+    }
+  };
+
   return (
     <div style={{ fontFamily: "'Roboto', Arial, sans-serif", fontSize: 13, color: '#212121' }}>
       <EventsTopBar active="tournaments" />
@@ -1317,6 +1451,74 @@ const TournamentsPage = () => {
       {sub === 'results' && renderResults()}
       {sub === 'stopwatch' && renderStopwatch()}
       {sub === 'final' && renderFinalResults()}
+
+      {/* Admin: Edit Tournament Status / Registration Modal */}
+      {editTournamentId && isAdmin() && (() => {
+        const t = tournaments.find(x => x.id === editTournamentId);
+        return (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setEditTournamentId(null); }}
+            style={styles.modalBackdrop}
+          >
+            <div style={{ ...styles.modalCard, maxWidth: 420 }}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+                  ⚙️ Edit Tournament — {t?.name}
+                </h3>
+                <button onClick={() => setEditTournamentId(null)} style={styles.modalClose}>✕</button>
+              </div>
+              <div style={{ padding: '1rem', display: 'grid', gap: '0.85rem' }}>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Status</label>
+                  <select
+                    style={styles.formInput}
+                    value={tEditForm.status}
+                    onChange={(e) => setTEditForm(f => ({ ...f, status: e.target.value }))}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="registration_open">Registration Open</option>
+                    <option value="live">Live</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Registration Open</label>
+                  <select
+                    style={styles.formInput}
+                    value={tEditForm.registration_open ? 'true' : 'false'}
+                    onChange={(e) => setTEditForm(f => ({ ...f, registration_open: e.target.value === 'true' }))}
+                  >
+                    <option value="true">Yes — open for registration</option>
+                    <option value="false">No — registration closed</option>
+                  </select>
+                </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Start Date</label>
+                  <input
+                    type="date"
+                    style={styles.formInput}
+                    value={tEditForm.start_date}
+                    onChange={(e) => setTEditForm(f => ({ ...f, start_date: e.target.value }))}
+                  />
+                </div>
+                <div style={{
+                  fontSize: '0.68rem', color: '#7b5800',
+                  background: '#fff8e1', borderRadius: 4,
+                  padding: '0.55rem 0.7rem', border: '1px solid #ffe082',
+                  lineHeight: 1.5,
+                }}>
+                  💡 <strong>To unlock Generate Fixtures:</strong> set Status → <em>Registration Open</em>, Registration → <em>Closed</em>, Start Date → <em>today or earlier</em>.
+                </div>
+              </div>
+              <div style={styles.modalFooter}>
+                <button onClick={() => setEditTournamentId(null)} style={styles.outlineBtn}>Cancel</button>
+                <button onClick={handleUpdateTournamentMeta} style={styles.navyBtn}>Save Changes</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* New Tournament Modal */}
       {showNewTournamentModal && (
@@ -1436,10 +1638,12 @@ const TournamentsPage = () => {
                   <div style={styles.formGrid}>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Round</label>
-                      <select style={styles.formInput} value={mForm.round}
-                              onChange={(e) => setMForm(f => ({ ...f, round: e.target.value }))}>
-                        <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
-                      </select>
+                      <input
+                        style={styles.formInput}
+                        value={mForm.round}
+                        onChange={(e) => setMForm(f => ({ ...f, round: e.target.value.toUpperCase() }))}
+                        placeholder="QF, SF, F, R16, SW1"
+                      />
                     </div>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Match Code</label>
@@ -1558,10 +1762,12 @@ const TournamentsPage = () => {
                   <div style={styles.formGrid}>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Round</label>
-                      <select style={styles.formInput} value={eForm.round}
-                              onChange={(e) => setEForm(f => ({ ...f, round: e.target.value }))}>
-                        <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
-                      </select>
+                      <input
+                        style={styles.formInput}
+                        value={eForm.round}
+                        onChange={(e) => setEForm(f => ({ ...f, round: e.target.value.toUpperCase() }))}
+                        placeholder="QF, SF, F, R16, SW1"
+                      />
                     </div>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Match Code</label>
@@ -1656,42 +1862,133 @@ const TournamentsPage = () => {
               {(() => {
                 const m = matchesForActive.find(x => x.id === resultMatchId);
                 if (!m) return null;
+                const teamAIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)].filter(Boolean);
+                const teamBIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)].filter(Boolean);
+                const teamAOption = teamAIds.length > 0 ? teamAIds[0] : '';
+                const teamBOption = teamBIds.length > 0 ? teamBIds[0] : '';
+                const showScoreFields = ['completed', 'draw', 'walkover', 'no_show'].includes(rForm.result_type);
+                const showWinnerField = ['completed', 'walkover', 'no_show'].includes(rForm.result_type);
+                const showReasonField = ['walkover', 'rescheduled', 'cancelled', 'disputed', 'no_show'].includes(rForm.result_type);
+                const showScheduleField = rForm.result_type === 'rescheduled';
                 return (
                   <div style={styles.formGrid}>
-                    <div style={styles.formRow}>
-                      <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)}</label>
-                      <input style={styles.formInput} type="number" min="0" value={rForm.score_a}
-                             onChange={(e) => setRForm(f => ({ ...f, score_a: e.target.value }))} />
-                    </div>
-                    <div style={styles.formRow}>
-                      <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)}</label>
-                      <input style={styles.formInput} type="number" min="0" value={rForm.score_b}
-                             onChange={(e) => setRForm(f => ({ ...f, score_b: e.target.value }))} />
-                    </div>
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                      <label style={styles.formLabel}>Winner</label>
-                      <select style={styles.formInput} value={rForm.winner}
-                              onChange={(e) => setRForm(f => ({ ...f, winner: e.target.value }))}>
-                        <option value="">— select —</option>
-                        {/* Winner value = captain ID (FK-safe); label shows full team */}
-                        <option value={m.player_a_employee_id}>
-                          {(() => {
-                            const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
-                            return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team A';
-                          })()}
-                        </option>
-                        <option value={m.player_b_employee_id}>
-                          {(() => {
-                            const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
-                            return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team B';
-                          })()}
-                        </option>
+                      <label style={styles.formLabel}>Result Type</label>
+                      <select
+                        style={styles.formInput}
+                        value={rForm.result_type}
+                        onChange={(e) => setRForm(f => ({
+                          ...f,
+                          result_type: e.target.value,
+                          winner: e.target.value === 'draw' ? '' : f.winner,
+                        }))}
+                      >
+                        <option value="completed">Completed</option>
+                        <option value="draw">Draw</option>
+                        <option value="walkover">Walkover</option>
+                        <option value="rescheduled">Rescheduled</option>
+                        <option value="no_show">No Show</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="disputed">Disputed</option>
                       </select>
                     </div>
-                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+
+                    {showScoreFields && (
+                      <>
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)}</label>
+                          <input style={styles.formInput} type="number" min="0" value={rForm.score_a}
+                                 onChange={(e) => setRForm(f => ({ ...f, score_a: e.target.value }))} />
+                        </div>
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)}</label>
+                          <input style={styles.formInput} type="number" min="0" value={rForm.score_b}
+                                 onChange={(e) => setRForm(f => ({ ...f, score_b: e.target.value }))} />
+                        </div>
+                      </>
+                    )}
+
+                    {showWinnerField && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>Winner</label>
+                        <select style={styles.formInput} value={rForm.winner}
+                                onChange={(e) => setRForm(f => ({ ...f, winner: e.target.value }))}>
+                          <option value="">— select —</option>
+                          <option value={teamAOption}>
+                            {(() => {
+                              const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
+                              return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team A';
+                            })()}
+                          </option>
+                          <option value={teamBOption}>
+                            {(() => {
+                              const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
+                              return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team B';
+                            })()}
+                          </option>
+                        </select>
+                      </div>
+                    )}
+
+                    {rForm.result_type === 'no_show' && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>Absent Participant</label>
+                        <select
+                          style={styles.formInput}
+                          value={rForm.absent_participant_employee_id}
+                          onChange={(e) => {
+                            const absent = e.target.value;
+                            setRForm(f => ({
+                              ...f,
+                              absent_participant_employee_id: absent,
+                              winner: absent && absent === m.player_a_employee_id ? teamBOption : absent && absent === m.player_b_employee_id ? teamAOption : f.winner,
+                            }));
+                          }}
+                        >
+                          <option value="">— select —</option>
+                          <option value={m.player_a_employee_id}>{getEmployeeName(m.player_a_employee_id)}</option>
+                          <option value={m.player_b_employee_id}>{getEmployeeName(m.player_b_employee_id)}</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {showReasonField && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>
+                          {rForm.result_type === 'rescheduled' ? 'Reason' : rForm.result_type === 'no_show' ? 'Remarks' : 'Reason'}
+                        </label>
+                        <input
+                          style={styles.formInput}
+                          value={rForm.reason}
+                          onChange={(e) => setRForm(f => ({ ...f, reason: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    {showScheduleField && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>New Date & Time</label>
+                        <input
+                          style={styles.formInput}
+                          type="datetime-local"
+                          value={rForm.scheduled_at}
+                          onChange={(e) => setRForm(f => ({ ...f, scheduled_at: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    <div style={styles.formRow}>
                       <label style={styles.formLabel}>Duration (seconds)</label>
                       <input style={styles.formInput} type="number" min="0" value={rForm.duration}
                              onChange={(e) => setRForm(f => ({ ...f, duration: e.target.value }))} />
+                    </div>
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <label style={styles.formLabel}>Notes</label>
+                      <textarea
+                        style={{ ...styles.formInput, minHeight: 64, resize: 'vertical' }}
+                        value={rForm.notes}
+                        onChange={(e) => setRForm(f => ({ ...f, notes: e.target.value }))}
+                      />
                     </div>
                   </div>
                 );
@@ -1930,10 +2227,12 @@ const TournamentsPage = () => {
 
       {/* Batch register modal — pick one or more active tournaments */}
       {showRegisterModal && (
-        <BatchRegisterModal
+      <BatchRegisterModal
           tournaments={tournaments}
           currentEmpId={currentEmpId}
           partsByTournament={partsByTournament}
+          pendingByTournament={pendingByTournament}
+          isAdminUser={isAdmin()}
           onCancel={() => setShowRegisterModal(false)}
           onSubmit={handleBatchRegister}
         />

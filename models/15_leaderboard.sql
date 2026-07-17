@@ -5,7 +5,7 @@
 --   tournament_runner_up  = 15
 --   tournament_3rd        = 10
 --   match_win             = 5
---   participation         = 2
+--   participation         = 0
 --   rule_violation        = -5
 --   no_show               = -3
 --
@@ -112,7 +112,7 @@ declare
     + v_ts * 15
     + v_tt * 10
     + v_mw * 5
-    + v_pa * 2
+    + v_pa * 0
     - v_rv * 5
     - v_ns * 3;
 begin

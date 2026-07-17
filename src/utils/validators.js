@@ -1,69 +1,37 @@
 // src/utils/validators.js
 
 /**
- * Validate Employee ID format (8 chars total):
- *   - 4 letters + 4 digits  (e.g. ABCD1234)
- *   - 5 letters + 3 digits  (e.g. ABCDE123)
+ * Validate Employee ID format:
+ * - 3 to 5 letters followed by 3 to 4 digits
+ * Examples: ABC123, ABC1234, ABCD1234, ABCDE123
  */
 export const validateEmpId = (id) => {
-  if (!id || id.length !== 8) return false;
-  const firstFour = id.slice(0, 4);
-  const lastFour = id.slice(4, 8);
-
-  const isFirstFourLetters = /^[a-zA-Z]{4}$/.test(firstFour);
-  const isLastFourDigits = /^[0-9]{4}$/.test(lastFour);
-  //
-
-
-
-  // we have to add this validation for 5 letters 3 numbers 
-
-  const firstFive = id.slice(0, 5);
-  const lastThree = id.slice(5, 8);
-
-  const isFirstFiveLetters = /^[a-zA-Z]{5}$/.test(firstFive);
-  const isLastThreeDigits = /^[0-9]{3}$/.test(lastThree);
-
-
-  if (isFirstFiveLetters && isLastThreeDigits) {
-    return true;
-  }
-  return isFirstFourLetters && isLastFourDigits;
+  if (!id) return false;
+  return /^[A-Za-z]{3,5}[0-9]{3,4}$/.test(String(id).trim());
 };
 
 /**
  * Format Employee ID as user types.
- * Supports two formats (both 8 chars):
- *   - 4 letters + 4 digits  (e.g. ABCD1234)
- *   - 5 letters + 3 digits  (e.g. ABCDE123)
- *
- * Strategy: collect letters first, then digits.
- * The split point (4 or 5) is determined once the user starts typing digits.
- * Until a digit is entered, up to 5 letters are accepted.
- * Once a digit is entered, no more letters are allowed.
+ * Keeps the alphabetic prefix first, then up to 4 trailing digits.
  */
 export const formatEmpId = (value) => {
-  // Strip anything that isn't a letter or digit
-  const cleaned = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-
+  const cleaned = String(value || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
   let letters = '';
   let digits = '';
-  let digitStarted = false;
 
   for (const char of cleaned) {
-    if (!digitStarted && /[A-Z]/.test(char)) {
-      // Accept letters until we hit a digit, max 5
-      if (letters.length < 5) letters += char;
+    if (/[A-Z]/.test(char)) {
+      if (letters.length < 5 && digits.length === 0) {
+        letters += char;
+      }
     } else if (/[0-9]/.test(char)) {
-      digitStarted = true;
-      // Total length must stay at 8: digits fill the remaining slots
-      const maxDigits = 8 - letters.length;
-      if (digits.length < maxDigits) digits += char;
+      if (letters.length >= 3 && digits.length < 4) {
+        digits += char;
+      }
     }
-    // Letters after digits have started are silently dropped
   }
 
-  return letters + digits;
+  return `${letters}${digits}`;
 };
 
 /**

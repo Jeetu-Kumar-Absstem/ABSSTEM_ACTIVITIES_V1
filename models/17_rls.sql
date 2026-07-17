@@ -3,7 +3,7 @@
 -- Fixes two issues:
 --   1. Statement timeout caused by `auth.role()` being evaluated
 --      per-row. Wrapping it in (select auth.role()) makes it
---      evaluate once per query — dramatically faster.
+--      evaluate once per query - dramatically faster.
 --   2. Drops the now-redundant app_is_admin / app_current_emp_id
 --      dependency from SELECT policies (they only need auth check).
 -- ============================================================
@@ -72,6 +72,35 @@ create policy tournament_participants_admin_write
   using (app_is_admin())
   with check (app_is_admin());
 
+-- ── tournament_registration_requests ─────────────────────────
+drop policy if exists tournament_registration_requests_select_authenticated on public.tournament_registration_requests;
+create policy tournament_registration_requests_select_authenticated
+  on public.tournament_registration_requests
+  for select
+  using ((select auth.role()) = 'authenticated');
+
+drop policy if exists tournament_registration_requests_self_insert on public.tournament_registration_requests;
+create policy tournament_registration_requests_self_insert
+  on public.tournament_registration_requests
+  for insert
+  with check (
+    auth.uid() is not null
+    and upper(employee_id) = app_current_emp_id()
+  );
+
+drop policy if exists tournament_registration_requests_self_delete on public.tournament_registration_requests;
+create policy tournament_registration_requests_self_delete
+  on public.tournament_registration_requests
+  for delete
+  using (upper(employee_id) = app_current_emp_id() or app_is_admin());
+
+drop policy if exists tournament_registration_requests_admin_write on public.tournament_registration_requests;
+create policy tournament_registration_requests_admin_write
+  on public.tournament_registration_requests
+  for all
+  using (app_is_admin())
+  with check (app_is_admin());
+
 -- ── tournament_matches ────────────────────────────────────────
 drop policy if exists tournament_matches_select_authenticated on public.tournament_matches;
 create policy tournament_matches_select_authenticated
@@ -128,7 +157,7 @@ create policy final_results_admin_write
   using (app_is_admin())
   with check (app_is_admin());
 
--- ── leaderboard ───────────────────────────────────────────────
+-- ── leaderboard ──────────────────────────────────────────────
 drop policy if exists leaderboard_select_authenticated on public.leaderboard;
 create policy leaderboard_select_authenticated
   on public.leaderboard
@@ -145,7 +174,7 @@ create policy leaderboard_admin_write
 
 -- ============================================================
 -- Also create app_is_admin() and app_current_emp_id() if they
--- don't exist yet — the write policies depend on them.
+-- don't exist yet - the write policies depend on them.
 -- Safe to re-run: uses CREATE OR REPLACE.
 -- ============================================================
 
