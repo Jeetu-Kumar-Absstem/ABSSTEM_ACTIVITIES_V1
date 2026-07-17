@@ -187,6 +187,7 @@ const TournamentsPage = () => {
     getParticipantsByTournament,
     getResultsByTournament,
     getEmployeeName,
+    updateTournament,
   } = useApp();
   const { showToast } = useToast();
   const { generateCertificate } = useCertificate();
@@ -228,6 +229,9 @@ const TournamentsPage = () => {
   const [eForm, setEForm] = useState({ match_code: '', round: 'QF', match_number: 1, scheduled_at: '', team_a: [''], team_b: [''] });
   // matchToDelete: match pending admin delete confirmation
   const [matchToDelete, setMatchToDelete] = useState(null);
+  // editTournamentId: tournament being edited by admin (status / registration / date)
+  const [editTournamentId, setEditTournamentId] = useState(null);
+  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '' });
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -425,6 +429,20 @@ const TournamentsPage = () => {
                         style={{ ...styles.tinyIconBtn, background: activeTournament === t.id ? '#fff3e0' : undefined }}
                         title="Select"
                       >{activeTournament === t.id ? '✓' : '→'}</button>
+                      {isAdmin() && (
+                        <button
+                          onClick={() => {
+                            setTEditForm({
+                              status: t.status || 'registration_open',
+                              registration_open: t.registration_open !== false,
+                              start_date: t.start_date || '',
+                            });
+                            setEditTournamentId(t.id);
+                          }}
+                          style={{ ...styles.tinyIconBtn, color: '#5c6bc0', borderColor: '#c5cae9' }}
+                          title="Edit status / registration / date"
+                        >⚙️</button>
+                      )}
                       {isAdmin() && (
                         <button
                           onClick={() => setTournamentToDelete(t)}
@@ -1385,6 +1403,24 @@ const TournamentsPage = () => {
     }
   };
 
+  // ── Edit tournament meta (admin) ─────────────────────────────────────────
+  const handleUpdateTournamentMeta = async () => {
+    const base = tournaments.find(t => t.id === editTournamentId);
+    if (!base) return;
+    const result = await updateTournament(editTournamentId, {
+      ...base,
+      status: tEditForm.status,
+      registration_open: tEditForm.registration_open,
+      start_date: tEditForm.start_date,
+    });
+    if (result.success) {
+      showToast('Tournament updated');
+      setEditTournamentId(null);
+    } else {
+      showToast(result.error || 'Failed to update tournament', 'error');
+    }
+  };
+
   return (
     <div style={{ fontFamily: "'Roboto', Arial, sans-serif", fontSize: 13, color: '#212121' }}>
       <EventsTopBar active="tournaments" />
@@ -1415,6 +1451,74 @@ const TournamentsPage = () => {
       {sub === 'results' && renderResults()}
       {sub === 'stopwatch' && renderStopwatch()}
       {sub === 'final' && renderFinalResults()}
+
+      {/* Admin: Edit Tournament Status / Registration Modal */}
+      {editTournamentId && isAdmin() && (() => {
+        const t = tournaments.find(x => x.id === editTournamentId);
+        return (
+          <div
+            onClick={(e) => { if (e.target === e.currentTarget) setEditTournamentId(null); }}
+            style={styles.modalBackdrop}
+          >
+            <div style={{ ...styles.modalCard, maxWidth: 420 }}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+                  ⚙️ Edit Tournament — {t?.name}
+                </h3>
+                <button onClick={() => setEditTournamentId(null)} style={styles.modalClose}>✕</button>
+              </div>
+              <div style={{ padding: '1rem', display: 'grid', gap: '0.85rem' }}>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Status</label>
+                  <select
+                    style={styles.formInput}
+                    value={tEditForm.status}
+                    onChange={(e) => setTEditForm(f => ({ ...f, status: e.target.value }))}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="registration_open">Registration Open</option>
+                    <option value="live">Live</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Registration Open</label>
+                  <select
+                    style={styles.formInput}
+                    value={tEditForm.registration_open ? 'true' : 'false'}
+                    onChange={(e) => setTEditForm(f => ({ ...f, registration_open: e.target.value === 'true' }))}
+                  >
+                    <option value="true">Yes — open for registration</option>
+                    <option value="false">No — registration closed</option>
+                  </select>
+                </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Start Date</label>
+                  <input
+                    type="date"
+                    style={styles.formInput}
+                    value={tEditForm.start_date}
+                    onChange={(e) => setTEditForm(f => ({ ...f, start_date: e.target.value }))}
+                  />
+                </div>
+                <div style={{
+                  fontSize: '0.68rem', color: '#7b5800',
+                  background: '#fff8e1', borderRadius: 4,
+                  padding: '0.55rem 0.7rem', border: '1px solid #ffe082',
+                  lineHeight: 1.5,
+                }}>
+                  💡 <strong>To unlock Generate Fixtures:</strong> set Status → <em>Registration Open</em>, Registration → <em>Closed</em>, Start Date → <em>today or earlier</em>.
+                </div>
+              </div>
+              <div style={styles.modalFooter}>
+                <button onClick={() => setEditTournamentId(null)} style={styles.outlineBtn}>Cancel</button>
+                <button onClick={handleUpdateTournamentMeta} style={styles.navyBtn}>Save Changes</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* New Tournament Modal */}
       {showNewTournamentModal && (
