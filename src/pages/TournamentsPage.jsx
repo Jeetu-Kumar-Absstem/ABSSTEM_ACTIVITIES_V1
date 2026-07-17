@@ -6,6 +6,10 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
 import { useCertificate } from '../hooks/useCertificate';
+import {
+  groupMatchesByRound,
+  normalizeTournamentFormat,
+} from '../utils/tournamentFixtures';
 
 // Confirm-delete modal (admin action on a tournament).
 const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
@@ -171,6 +175,7 @@ const TournamentsPage = () => {
     isAdmin,
     addTournament,
     deleteTournament,
+    generateTournamentFixtures,
     registerForTournament,
     addTournamentMatch,
     recordMatchResult,
@@ -204,7 +209,17 @@ const TournamentsPage = () => {
     team_b: ['', '', ''],
   });
   const [resultMatchId, setResultMatchId] = useState(null);
-  const [rForm, setRForm] = useState({ score_a: '', score_b: '', winner: '', duration: '' });
+  const [rForm, setRForm] = useState({
+    result_type: 'completed',
+    score_a: '',
+    score_b: '',
+    winner: '',
+    duration: '',
+    absent_participant_employee_id: '',
+    reason: '',
+    notes: '',
+    scheduled_at: '',
+  });
   const [finalForm, setFinalForm] = useState([]);
   const [tournamentToDelete, setTournamentToDelete] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -261,6 +276,11 @@ const TournamentsPage = () => {
     () => activeTournament ? getMatchesByTournament(activeTournament) : [],
     [activeTournament, tournamentMatches, getMatchesByTournament]
   );
+  const roundGroups = useMemo(
+    () => groupMatchesByRound(matchesForActive),
+    [matchesForActive]
+  );
+  const activeTournamentFormat = normalizeTournamentFormat(activeTournamentRecord?.format);
   const resultsForActive = useMemo(
     () => activeTournament ? getResultsByTournament(activeTournament) : [],
     [activeTournament, finalResults, getResultsByTournament]
@@ -443,11 +463,6 @@ const TournamentsPage = () => {
         </div>
       );
     }
-    const qf = matchesForActive.filter(m => m.round === 'QF');
-    const sf = matchesForActive.filter(m => m.round === 'SF');
-    const f  = matchesForActive.filter(m => m.round === 'F');
-    const tp = matchesForActive.filter(m => m.round === '3RD');
-
     // Derive match stats from completed matches including all team members.
     const participantStats = {};
     for (const m of matchesForActive) {
@@ -478,11 +493,27 @@ const TournamentsPage = () => {
       return ordered.map(id => getEmployeeName(id)).join(' & ');
     };
 
+    const latestRound = roundGroups[roundGroups.length - 1];
+    const latestRoundOpen = latestRound
+      ? latestRound.matches.some((match) => !['completed', 'walkover', 'no_show', 'bye', 'draw', 'cancelled', 'rescheduled', 'disputed'].includes(String(match.status || '').toLowerCase()))
+      : false;
+    const canGenerateFixtures = isAdmin()
+      && activeTournamentRecord?.status !== 'completed'
+      && activeTournamentRecord?.registration_open === false
+      && (
+        activeTournamentFormat !== 'swiss'
+          ? matchesForActive.length === 0
+          : !latestRoundOpen
+      );
+    const generateLabel = activeTournamentFormat === 'swiss' && matchesForActive.length > 0
+      ? 'Generate Next Swiss Round'
+      : 'Generate Fixtures';
+
     const renderMatch = (m) => {
       const a = teamLabel(m.player_a_employee_id, m.team_a_players);
       const b = teamLabel(m.player_b_employee_id, m.team_b_players);
       const hasScore = m.score_a !== null && m.score_b !== null;
-      const isFinal = m.round === 'F';
+      const isFinal = String(m.round || '').toUpperCase() === 'F';
       return (
         <div key={m.id} style={{
           ...styles.matchCard,
@@ -506,7 +537,7 @@ const TournamentsPage = () => {
             <span style={{ fontSize: '0.7rem' }}>{b}</span><span>{m.score_b ?? '—'}</span>
           </div>
           <div style={styles.matchMeta}>
-            {m.status === 'completed' ? '✓ Final' : m.status === 'live' ? '● Live' : '⏳ Pending'}
+            {m.status === 'completed' ? '✓ Final' : m.status === 'bye' ? '↷ Bye' : m.status === 'walkover' ? '↷ Walkover' : m.status === 'live' ? '● Live' : '⏳ Pending'}
           </div>
           {canEditMatch(m) && (
             <button onClick={() => openResultModal(m)} style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}>
@@ -546,7 +577,7 @@ const TournamentsPage = () => {
                   <option key={t.id} value={t.id}>
                     {t.name} · {t.game} · {STATUS_BADGE[t.status]?.label || t.status}
                   </option>
-                ))}
+              ))}
               </select>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -554,6 +585,27 @@ const TournamentsPage = () => {
                 <span style={{ fontSize: '0.7rem', color: '#888' }}>
                   {activeTournamentRecord.format.replace('_', ' ').toUpperCase()}
                 </span>
+              )}
+              {isAdmin() && activeTournamentRecord && (
+                <button
+                  onClick={async () => {
+                    const result = await generateTournamentFixtures(activeTournamentRecord.id);
+                    if (result.success) {
+                      showToast(activeTournamentFormat === 'swiss' && matchesForActive.length > 0 ? 'Swiss round generated' : 'Fixtures generated');
+                    } else {
+                      showToast(result.error || 'Failed to generate fixtures', 'error');
+                    }
+                  }}
+                  disabled={!canGenerateFixtures}
+                  style={{
+                    ...styles.navyBtn,
+                    background: canGenerateFixtures ? '#1a3c6e' : '#9e9e9e',
+                    opacity: canGenerateFixtures ? 1 : 0.55,
+                    cursor: canGenerateFixtures ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {generateLabel}
+                </button>
               )}
               {isAdmin() && (
                 <button onClick={() => openNewMatchModal('QF')} style={styles.navyBtn}>+ Add Match</button>
@@ -574,34 +626,29 @@ const TournamentsPage = () => {
             </div>
           </div>
 
-          <div style={styles.bracketGrid}>
-            {/* Quarter finals */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#c81c1c' }}>QUARTER FINAL</div>
-              <div style={styles.bracketColBody}>
-                {qf.length === 0 ? <div style={styles.emptyCol}>No QF matches yet</div> : qf.map(renderMatch)}
-              </div>
-            </div>
-            {/* Semi finals */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#618ff4' }}>SEMI FINAL</div>
-              <div style={styles.bracketColBody}>
-                {sf.length === 0 ? <div style={styles.emptyCol}>No SF matches yet</div> : sf.map(renderMatch)}
-              </div>
-            </div>
-            {/* Final */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#fbdd65' }}>🏆 FINAL</div>
-              <div style={styles.bracketColBody}>
-                {f.length === 0 ? <div style={styles.emptyCol}>No final yet</div> : f.map(renderMatch)}
-              </div>
-            </div>
-            {/* 3rd place */}
-            <div style={styles.bracketCol}>
-              <div style={{ ...styles.bracketColHeader, background: '#59f0a5' }}>3RD PLACE</div>
-              <div style={styles.bracketColBody}>
-                {tp.length === 0 ? <div style={styles.emptyCol}>No 3rd-place match yet</div> : tp.map(renderMatch)}
-              </div>
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ ...styles.bracketGrid, minWidth: Math.max(4, roundGroups.length) * 240 }}>
+              {roundGroups.length === 0 ? (
+                <div style={{ ...styles.bracketColBody, gridColumn: '1 / -1' }}>
+                  <div style={styles.emptyCol}>
+                    No fixtures yet. {isAdmin() ? 'Use Generate Fixtures to create the bracket.' : 'Waiting for admin to generate fixtures.'}
+                  </div>
+                </div>
+              ) : (
+                roundGroups.map((group, index) => (
+                  <div key={group.round} style={styles.bracketCol}>
+                    <div style={{
+                      ...styles.bracketColHeader,
+                      background: ['#c81c1c', '#618ff4', '#fbdd65', '#59f0a5', '#8e24aa', '#26a69a'][index % 6],
+                    }}>{group.label}</div>
+                    <div style={styles.bracketColBody}>
+                      {group.matches.length === 0
+                        ? <div style={styles.emptyCol}>No matches yet</div>
+                        : group.matches.map(renderMatch)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1262,23 +1309,45 @@ const TournamentsPage = () => {
   const openResultModal = (match) => {
     setResultMatchId(match.id);
     setRForm({
+      result_type: String(match.status || '').toLowerCase() === 'draw'
+        ? 'draw'
+        : String(match.status || '').toLowerCase() === 'walkover'
+          ? 'walkover'
+          : String(match.status || '').toLowerCase() === 'rescheduled'
+            ? 'rescheduled'
+            : String(match.status || '').toLowerCase() === 'cancelled'
+              ? 'cancelled'
+              : String(match.status || '').toLowerCase() === 'disputed'
+                ? 'disputed'
+                : String(match.status || '').toLowerCase() === 'no_show'
+                  ? 'no_show'
+                  : 'completed',
       score_a: match.score_a ?? '',
       score_b: match.score_b ?? '',
       winner: match.winner_employee_id || '',
       duration: match.duration_seconds || '',
+      absent_participant_employee_id: '',
+      reason: '',
+      notes: '',
+      scheduled_at: match.scheduled_at ? match.scheduled_at.slice(0, 16) : '',
     });
   };
 
   const handleSaveResult = async () => {
-    if (!rForm.winner) {
+    if (rForm.result_type === 'completed' && !rForm.winner) {
       showToast('Pick a winner', 'error');
       return;
     }
     const result = await recordMatchResult(resultMatchId, {
+      result_type: rForm.result_type,
       score_a: parseInt(rForm.score_a, 10) || 0,
       score_b: parseInt(rForm.score_b, 10) || 0,
       winner_employee_id: rForm.winner,
       duration_seconds: parseInt(rForm.duration, 10) || null,
+      absent_participant_employee_id: rForm.absent_participant_employee_id,
+      reason: rForm.reason,
+      notes: rForm.notes,
+      scheduled_at: rForm.scheduled_at ? new Date(rForm.scheduled_at + ':00+05:30').toISOString() : null,
     });
     if (result.success) {
       showToast('Result saved');
@@ -1465,10 +1534,12 @@ const TournamentsPage = () => {
                   <div style={styles.formGrid}>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Round</label>
-                      <select style={styles.formInput} value={mForm.round}
-                              onChange={(e) => setMForm(f => ({ ...f, round: e.target.value }))}>
-                        <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
-                      </select>
+                      <input
+                        style={styles.formInput}
+                        value={mForm.round}
+                        onChange={(e) => setMForm(f => ({ ...f, round: e.target.value.toUpperCase() }))}
+                        placeholder="QF, SF, F, R16, SW1"
+                      />
                     </div>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Match Code</label>
@@ -1587,10 +1658,12 @@ const TournamentsPage = () => {
                   <div style={styles.formGrid}>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Round</label>
-                      <select style={styles.formInput} value={eForm.round}
-                              onChange={(e) => setEForm(f => ({ ...f, round: e.target.value }))}>
-                        <option>QF</option><option>SF</option><option>F</option><option>3RD</option>
-                      </select>
+                      <input
+                        style={styles.formInput}
+                        value={eForm.round}
+                        onChange={(e) => setEForm(f => ({ ...f, round: e.target.value.toUpperCase() }))}
+                        placeholder="QF, SF, F, R16, SW1"
+                      />
                     </div>
                     <div style={styles.formRow}>
                       <label style={styles.formLabel}>Match Code</label>
@@ -1685,42 +1758,133 @@ const TournamentsPage = () => {
               {(() => {
                 const m = matchesForActive.find(x => x.id === resultMatchId);
                 if (!m) return null;
+                const teamAIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)].filter(Boolean);
+                const teamBIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)].filter(Boolean);
+                const teamAOption = teamAIds.length > 0 ? teamAIds[0] : '';
+                const teamBOption = teamBIds.length > 0 ? teamBIds[0] : '';
+                const showScoreFields = ['completed', 'draw', 'walkover', 'no_show'].includes(rForm.result_type);
+                const showWinnerField = ['completed', 'walkover', 'no_show'].includes(rForm.result_type);
+                const showReasonField = ['walkover', 'rescheduled', 'cancelled', 'disputed', 'no_show'].includes(rForm.result_type);
+                const showScheduleField = rForm.result_type === 'rescheduled';
                 return (
                   <div style={styles.formGrid}>
-                    <div style={styles.formRow}>
-                      <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)}</label>
-                      <input style={styles.formInput} type="number" min="0" value={rForm.score_a}
-                             onChange={(e) => setRForm(f => ({ ...f, score_a: e.target.value }))} />
-                    </div>
-                    <div style={styles.formRow}>
-                      <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)}</label>
-                      <input style={styles.formInput} type="number" min="0" value={rForm.score_b}
-                             onChange={(e) => setRForm(f => ({ ...f, score_b: e.target.value }))} />
-                    </div>
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                      <label style={styles.formLabel}>Winner</label>
-                      <select style={styles.formInput} value={rForm.winner}
-                              onChange={(e) => setRForm(f => ({ ...f, winner: e.target.value }))}>
-                        <option value="">— select —</option>
-                        {/* Winner value = captain ID (FK-safe); label shows full team */}
-                        <option value={m.player_a_employee_id}>
-                          {(() => {
-                            const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
-                            return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team A';
-                          })()}
-                        </option>
-                        <option value={m.player_b_employee_id}>
-                          {(() => {
-                            const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
-                            return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team B';
-                          })()}
-                        </option>
+                      <label style={styles.formLabel}>Result Type</label>
+                      <select
+                        style={styles.formInput}
+                        value={rForm.result_type}
+                        onChange={(e) => setRForm(f => ({
+                          ...f,
+                          result_type: e.target.value,
+                          winner: e.target.value === 'draw' ? '' : f.winner,
+                        }))}
+                      >
+                        <option value="completed">Completed</option>
+                        <option value="draw">Draw</option>
+                        <option value="walkover">Walkover</option>
+                        <option value="rescheduled">Rescheduled</option>
+                        <option value="no_show">No Show</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="disputed">Disputed</option>
                       </select>
                     </div>
-                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+
+                    {showScoreFields && (
+                      <>
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)}</label>
+                          <input style={styles.formInput} type="number" min="0" value={rForm.score_a}
+                                 onChange={(e) => setRForm(f => ({ ...f, score_a: e.target.value }))} />
+                        </div>
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)}</label>
+                          <input style={styles.formInput} type="number" min="0" value={rForm.score_b}
+                                 onChange={(e) => setRForm(f => ({ ...f, score_b: e.target.value }))} />
+                        </div>
+                      </>
+                    )}
+
+                    {showWinnerField && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>Winner</label>
+                        <select style={styles.formInput} value={rForm.winner}
+                                onChange={(e) => setRForm(f => ({ ...f, winner: e.target.value }))}>
+                          <option value="">— select —</option>
+                          <option value={teamAOption}>
+                            {(() => {
+                              const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
+                              return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team A';
+                            })()}
+                          </option>
+                          <option value={teamBOption}>
+                            {(() => {
+                              const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
+                              return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team B';
+                            })()}
+                          </option>
+                        </select>
+                      </div>
+                    )}
+
+                    {rForm.result_type === 'no_show' && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>Absent Participant</label>
+                        <select
+                          style={styles.formInput}
+                          value={rForm.absent_participant_employee_id}
+                          onChange={(e) => {
+                            const absent = e.target.value;
+                            setRForm(f => ({
+                              ...f,
+                              absent_participant_employee_id: absent,
+                              winner: absent && absent === m.player_a_employee_id ? teamBOption : absent && absent === m.player_b_employee_id ? teamAOption : f.winner,
+                            }));
+                          }}
+                        >
+                          <option value="">— select —</option>
+                          <option value={m.player_a_employee_id}>{getEmployeeName(m.player_a_employee_id)}</option>
+                          <option value={m.player_b_employee_id}>{getEmployeeName(m.player_b_employee_id)}</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {showReasonField && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>
+                          {rForm.result_type === 'rescheduled' ? 'Reason' : rForm.result_type === 'no_show' ? 'Remarks' : 'Reason'}
+                        </label>
+                        <input
+                          style={styles.formInput}
+                          value={rForm.reason}
+                          onChange={(e) => setRForm(f => ({ ...f, reason: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    {showScheduleField && (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>New Date & Time</label>
+                        <input
+                          style={styles.formInput}
+                          type="datetime-local"
+                          value={rForm.scheduled_at}
+                          onChange={(e) => setRForm(f => ({ ...f, scheduled_at: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    <div style={styles.formRow}>
                       <label style={styles.formLabel}>Duration (seconds)</label>
                       <input style={styles.formInput} type="number" min="0" value={rForm.duration}
                              onChange={(e) => setRForm(f => ({ ...f, duration: e.target.value }))} />
+                    </div>
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <label style={styles.formLabel}>Notes</label>
+                      <textarea
+                        style={{ ...styles.formInput, minHeight: 64, resize: 'vertical' }}
+                        value={rForm.notes}
+                        onChange={(e) => setRForm(f => ({ ...f, notes: e.target.value }))}
+                      />
                     </div>
                   </div>
                 );

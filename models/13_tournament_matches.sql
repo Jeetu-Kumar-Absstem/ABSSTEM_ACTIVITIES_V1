@@ -16,7 +16,7 @@ create table if not exists public.tournament_matches (
   score_a integer,
   score_b integer,
   winner_employee_id text references public.employees(employee_code) on update cascade on delete set null,
-  status text not null default 'pending',
+  status text not null default 'scheduled',
   scheduled_at timestamptz,
   played_at timestamptz,
   duration_seconds integer,
@@ -27,8 +27,8 @@ create table if not exists public.tournament_matches (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tournament_id, match_code),
-  check (round in ('QF', 'SF', 'F', '3RD', 'RR', 'GROUP', 'QUAL')),
-  check (status in ('pending', 'live', 'completed', 'walkover', 'cancelled'))
+  check (btrim(round) <> ''),
+  check (status in ('scheduled', 'in_progress', 'completed', 'draw', 'walkover', 'rescheduled', 'cancelled', 'disputed', 'no_show', 'bye', 'overdue', 'pending', 'live'))
 );
 
 create index if not exists tournament_matches_tournament_idx on public.tournament_matches (tournament_id);

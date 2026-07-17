@@ -4,6 +4,16 @@ import { supabase } from '../utils/supabase';
 import { GAMES, SLOTS, DAYS } from '../utils/constants';
 import { isAdminId } from '../utils/admin';
 import {
+  buildKnockoutFixturePlan,
+  buildRoundRobinFixturePlan,
+  buildSwissRoundPlan,
+  compareTournamentRounds,
+  getMatchTeams,
+  getRoundLabel,
+  groupMatchesByRound,
+  normalizeTournamentFormat,
+} from '../utils/tournamentFixtures';
+import {
   getDayName,
   getPlayerStatsFromResults,
   getWeekRange,
@@ -18,6 +28,7 @@ const APPROVED_TOURNAMENT_STATUSES = new Set([
   'finalist',
   'eliminated',
 ]);
+const FINISHING_MATCH_STATUSES = new Set(['completed', 'walkover', 'no_show', 'bye']);
 
 export const useApp = () => useContext(AppContext);
 
@@ -60,8 +71,82 @@ export const AppProvider = ({ children }) => {
       currentUser?.user_metadata?.emp_id ||
       currentUser?.user_metadata?.employee_code ||
       currentUser?.user_metadata?.empId ||
-      ''
+    ''
     ).trim().toUpperCase();
+
+  const getMatchPlayerIds = (match) => {
+    const teamA = [
+      match?.player_a_employee_id,
+      ...(match?.team_a_players || []).map((p) => p.employee_id),
+    ].filter(Boolean);
+    const teamB = [
+      match?.player_b_employee_id,
+      ...(match?.team_b_players || []).map((p) => p.employee_id),
+    ].filter(Boolean);
+    return {
+      teamA: [...new Set(teamA)],
+      teamB: [...new Set(teamB)],
+    };
+  };
+
+  const getMatchResultLabel = (status) => {
+    const value = String(status || '').toLowerCase();
+    if (value === 'completed') return 'Completed';
+    if (value === 'draw') return 'Draw';
+    if (value === 'walkover') return 'Walkover';
+    if (value === 'rescheduled') return 'Rescheduled';
+    if (value === 'cancelled') return 'Cancelled';
+    if (value === 'disputed') return 'Disputed';
+    if (value === 'no_show') return 'No Show';
+    if (value === 'bye') return 'Bye';
+    if (value === 'in_progress') return 'In Progress';
+    if (value === 'scheduled') return 'Scheduled';
+    return value || 'Scheduled';
+  };
+
+  const getMatchStatus = (match) => String(match?.status || 'scheduled').toLowerCase();
+
+  const advanceWinnerToNextMatch = async (sourceMatch, winnerEmployeeId) => {
+    if (!sourceMatch?.next_match_winner_id || !winnerEmployeeId) return { success: true };
+    const nextMatch = tournamentMatches.find((m) => m.id === sourceMatch.next_match_winner_id);
+    if (!nextMatch) return { success: true };
+
+    if (String(nextMatch.player_a_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
+      return { success: true };
+    }
+    if (String(nextMatch.player_b_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
+      return { success: true };
+    }
+
+    const payload = {};
+    if (!nextMatch.player_a_employee_id) {
+      payload.player_a_employee_id = winnerEmployeeId;
+    } else if (!nextMatch.player_b_employee_id) {
+      payload.player_b_employee_id = winnerEmployeeId;
+    } else {
+      return { success: false, error: 'Next match already has two players' };
+    }
+
+    const { error } = await supabase
+      .from('tournament_matches')
+      .update(payload)
+      .match({ id: nextMatch.id });
+    if (error) throw error;
+
+    return { success: true };
+  };
+
+  const getSwissNextRoundNumber = (matches = []) => {
+    let maxRound = 0;
+    for (const match of matches) {
+      const round = String(match.round || '').toUpperCase();
+      const swissMatch = round.match(/^SW(\d+)$/);
+      if (swissMatch) {
+        maxRound = Math.max(maxRound, Number(swissMatch[1]));
+      }
+    }
+    return maxRound + 1;
+  };
 
   const mapGameRow = (game) => ({
     id: String(game.id),
@@ -893,6 +978,178 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const generateTournamentFixtures = async (tournamentId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can generate fixtures' };
+    }
+    try {
+      const tournament = tournaments.find((t) => t.id === tournamentId);
+      if (!tournament) {
+        return { success: false, error: 'Tournament not found' };
+      }
+
+      const format = normalizeTournamentFormat(tournament.format);
+      const participants = getTournamentApprovedParticipants(tournamentId);
+      if (participants.length < 2) {
+        return { success: false, error: 'At least 2 registered participants are required' };
+      }
+
+      const startDatePassed = tournament.start_date && new Date(tournament.start_date) <= new Date();
+      if (!startDatePassed) {
+        return { success: false, error: 'Fixtures can only be generated once the start date has arrived' };
+      }
+      if (tournament.registration_open !== false) {
+        return { success: false, error: 'Close registration before generating fixtures' };
+      }
+
+      const existingMatches = tournamentMatches.filter((m) => m.tournament_id === tournamentId);
+      const existingSwissRounds = existingMatches.filter((m) => String(m.round || '').toUpperCase().startsWith('SW'));
+      const latestSwissRound = existingSwissRounds.reduce((max, match) => {
+        const roundNumber = Number(String(match.round || '').replace(/^SW/i, '')) || 0;
+        return Math.max(max, roundNumber);
+      }, 0);
+      const latestSwissRoundMatches = latestSwissRound
+        ? existingSwissRounds.filter((match) => Number(String(match.round || '').replace(/^SW/i, '')) === latestSwissRound)
+        : [];
+      const latestSwissRoundPending = latestSwissRoundMatches.some((match) =>
+        !FINISHING_MATCH_STATUSES.has(String(match.status || '').toLowerCase())
+      );
+
+      if (format !== 'swiss' && existingMatches.length > 0) {
+        return { success: false, error: 'Fixtures have already been generated for this tournament' };
+      }
+      if (format === 'swiss' && latestSwissRoundPending) {
+        return { success: false, error: 'Finish the current Swiss round before generating the next one' };
+      }
+
+      const payloads = [];
+      let roundPlan = null;
+      if (format === 'knockout') {
+        roundPlan = buildKnockoutFixturePlan(participants);
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            payloads.push({
+              tournament_id: tournamentId,
+              match_code: match.match_code,
+              round: match.round,
+              match_number: match.match_number,
+              player_a_employee_id: match.player_a_employee_id,
+              player_b_employee_id: match.player_b_employee_id,
+              score_a: match.score_a,
+              score_b: match.score_b,
+              winner_employee_id: match.winner_employee_id,
+              status: match.status,
+              played_at: match.status === 'bye' ? new Date().toISOString() : null,
+            });
+          }
+        }
+      } else if (format === 'round_robin') {
+        roundPlan = buildRoundRobinFixturePlan(participants);
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            payloads.push({
+              tournament_id: tournamentId,
+              match_code: match.match_code,
+              round: match.round,
+              match_number: match.match_number,
+              player_a_employee_id: match.player_a_employee_id,
+              player_b_employee_id: match.player_b_employee_id,
+              status: match.status,
+            });
+          }
+        }
+      } else if (format === 'swiss') {
+        const nextRoundNumber = latestSwissRound ? latestSwissRound + 1 : 1;
+        roundPlan = buildSwissRoundPlan(participants, existingMatches, nextRoundNumber);
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            payloads.push({
+              tournament_id: tournamentId,
+              match_code: match.match_code,
+              round: match.round,
+              match_number: match.match_number,
+              player_a_employee_id: match.player_a_employee_id,
+              player_b_employee_id: match.player_b_employee_id,
+              score_a: match.score_a,
+              score_b: match.score_b,
+              winner_employee_id: match.winner_employee_id,
+              status: match.status,
+              played_at: match.status === 'bye' ? new Date().toISOString() : null,
+            });
+          }
+        }
+      } else {
+        return { success: false, error: `Unsupported tournament format: ${format}` };
+      }
+
+      if (payloads.length === 0) {
+        return { success: false, error: 'No fixtures were generated' };
+      }
+
+      await supabase
+        .from('tournaments')
+        .update({
+          status: 'live',
+          registration_open: false,
+        })
+        .match({ id: tournamentId });
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from('tournament_matches')
+        .insert(payloads)
+        .select();
+      if (insertErr) throw insertErr;
+
+      if (format === 'knockout' && roundPlan?.rounds?.length > 1) {
+        const byCode = new Map((inserted || []).map((row) => [row.match_code, row]));
+        const pointerUpdates = [];
+        for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
+          const currentRound = roundPlan.rounds[roundIndex];
+          const nextRound = roundPlan.rounds[roundIndex + 1];
+          currentRound.matches.forEach((match, matchIndex) => {
+            const currentRow = byCode.get(match.match_code);
+            const nextRow = byCode.get(nextRound.matches[Math.floor(matchIndex / 2)]?.match_code);
+            if (!currentRow || !nextRow) return;
+            pointerUpdates.push(
+              supabase
+                .from('tournament_matches')
+                .update({ next_match_winner_id: nextRow.id })
+                .match({ id: currentRow.id })
+            );
+          });
+        }
+        await Promise.all(pointerUpdates);
+
+        const firstRound = roundPlan.rounds[0];
+        const secondRound = roundPlan.rounds[1];
+        if (firstRound && secondRound) {
+          for (let i = 0; i < firstRound.matches.length; i += 1) {
+            const match = firstRound.matches[i];
+            if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
+            const sourceRow = byCode.get(match.match_code);
+            const targetRow = byCode.get(secondRound.matches[Math.floor(i / 2)]?.match_code);
+            if (!sourceRow || !targetRow) continue;
+            const update = {};
+            if (!targetRow.player_a_employee_id) update.player_a_employee_id = match.winner_employee_id;
+            else if (!targetRow.player_b_employee_id) update.player_b_employee_id = match.winner_employee_id;
+            if (Object.keys(update).length > 0) {
+              await supabase
+                .from('tournament_matches')
+                .update(update)
+                .match({ id: targetRow.id });
+            }
+          }
+        }
+      }
+
+      await loadTournaments();
+      await loadTournamentMatches();
+      return { success: true, data: inserted || [] };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   const getTournamentApprovedParticipants = (tournamentId) =>
     tournamentParticipants.filter(
       (p) =>
@@ -1280,82 +1537,121 @@ export const AppProvider = ({ children }) => {
         }
       }
 
+      const resultType = String(
+        resultData.result_type ||
+        resultData.status ||
+        'completed'
+      ).trim().toLowerCase();
+      const normalizedType = resultType === 'in progress' ? 'in_progress' : resultType;
+      const isFirstEntry = !new Set(['completed', 'draw', 'walkover', 'no_show', 'rescheduled', 'cancelled', 'disputed', 'bye']).has(getMatchStatus(match));
+      const { teamA, teamB } = getMatchPlayerIds(match);
+      const winner = (
+        normalizedType === 'draw' ||
+        normalizedType === 'rescheduled' ||
+        normalizedType === 'cancelled' ||
+        normalizedType === 'disputed'
+      ) ? null : (
+        normalizedType === 'no_show' && resultData.absent_participant_employee_id
+          ? String(resultData.absent_participant_employee_id).toUpperCase() === String(match.player_a_employee_id || '').toUpperCase()
+            ? match.player_b_employee_id
+            : match.player_a_employee_id
+          : (resultData.winner_employee_id || null)
+      );
+
+      const status = (
+        normalizedType === 'no_show' ? 'no_show' :
+        normalizedType === 'walkover' ? 'walkover' :
+        normalizedType === 'draw' ? 'draw' :
+        normalizedType === 'rescheduled' ? 'rescheduled' :
+        normalizedType === 'cancelled' ? 'cancelled' :
+        normalizedType === 'disputed' ? 'disputed' :
+        normalizedType === 'bye' ? 'bye' :
+        'completed'
+      );
+
+      const payload = {
+        score_a: resultData.score_a ?? null,
+        score_b: resultData.score_b ?? null,
+        winner_employee_id: winner,
+        status,
+        played_at: status === 'completed' || status === 'walkover' || status === 'no_show' || status === 'bye'
+          ? new Date().toISOString()
+          : null,
+        duration_seconds: resultData.duration_seconds || null,
+        scheduled_at: status === 'rescheduled' && resultData.scheduled_at
+          ? resultData.scheduled_at
+          : match.scheduled_at || null,
+        notes: resultData.notes || resultData.reason || null,
+        recorded_by_employee_id: recordedBy,
+      };
+
       const { error } = await supabase
         .from('tournament_matches')
-        .update({
-          score_a: resultData.score_a,
-          score_b: resultData.score_b,
-          winner_employee_id: resultData.winner_employee_id,
-          status: 'completed',
-          played_at: new Date().toISOString(),
-          duration_seconds: resultData.duration_seconds || null,
-          recorded_by_employee_id: recordedBy,
-        })
+        .update(payload)
         .match({ id: matchId });
       if (error) throw error;
-      await loadTournamentMatches();
 
-      // ── Update tournament_participants match stats ──────────────────────
-      // Determine winner / loser from the saved result.
-      const winner = resultData.winner_employee_id;
-      const loser =
-        match.player_a_employee_id === winner
+      if (status === 'draw') {
+        const participantIds = [...new Set([...teamA, ...teamB])];
+        for (const empId of participantIds) {
+          const row = tournamentParticipants.find(
+            (p) => p.tournament_id === match.tournament_id && p.employee_id?.toUpperCase() === String(empId).toUpperCase()
+          );
+          if (!row) continue;
+          await supabase
+            .from('tournament_participants')
+            .update({
+              matches_played: (row.matches_played || 0) + 1,
+            })
+            .match({ id: row.id });
+          await supabase.rpc('leaderboard_apply', {
+            p_employee_id: empId,
+            p_game: 'all',
+            p_delta: { draws: 1 },
+          });
+        }
+      } else if (winner && FINISHING_MATCH_STATUSES.has(status)) {
+        const loser = String(match.player_a_employee_id || '').toUpperCase() === String(winner).toUpperCase()
           ? match.player_b_employee_id
           : match.player_a_employee_id;
 
-      // Only increment matches_played when recording for the first time.
-      // If the match was already 'completed' this is an edit — skip the
-      // played counter so we don't double-count.
-      const isFirstEntry = match.status !== 'completed';
+        try {
+          await supabase.rpc('participant_record_match', {
+            p_tournament_id: match.tournament_id,
+            p_winner_id: winner || '',
+            p_loser_id: loser || '',
+            p_increment_played: isFirstEntry,
+          });
+        } catch (statsErr) {
+          console.warn('participant_record_match failed:', statsErr);
+        }
 
-      try {
-        await supabase.rpc('participant_record_match', {
-          p_tournament_id:   match.tournament_id,
-          p_winner_id:       winner  || '',
-          p_loser_id:        loser   || '',
-          p_increment_played: isFirstEntry,
-        });
-      } catch (statsErr) {
-        // Non-fatal: log but don't block the result from being saved.
-        console.warn('participant_record_match failed:', statsErr);
+        if (isFirstEntry) {
+          const teamAWon = String(winner || '').toUpperCase() === String(match.player_a_employee_id || '').toUpperCase();
+          for (const empId of teamA) {
+            await supabase.rpc('leaderboard_apply', {
+              p_employee_id: empId,
+              p_game: 'all',
+              p_delta: teamAWon ? { match_wins: 1 } : { match_losses: 1 },
+            });
+          }
+          for (const empId of teamB) {
+            await supabase.rpc('leaderboard_apply', {
+              p_employee_id: empId,
+              p_game: 'all',
+              p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
+            });
+          }
+        }
+
+        const tournament = tournaments.find((t) => t.id === match.tournament_id);
+        if (winner && normalizeTournamentFormat(tournament?.format) === 'knockout') {
+          await advanceWinnerToNextMatch(match, winner);
+        }
       }
+
+      await loadTournamentMatches();
       await loadTournamentParticipants();
-
-      // ── Update leaderboard win/loss counters ───────────────────────────
-      // IMPORTANT: only award points on the FIRST entry of a result.
-      // If match.status was already 'completed', this is a score correction/edit.
-      // Calling leaderboard_apply again would double-count points — that is
-      // exactly what caused the "extra points on edit" bug.
-      if (isFirstEntry) {
-        // Collect all players on each side: captain + any extra from junction table.
-        const teamAIds = [
-          match.player_a_employee_id,
-          ...(match.team_a_players || []).map(p => p.employee_id),
-        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
-
-        const teamBIds = [
-          match.player_b_employee_id,
-          ...(match.team_b_players || []).map(p => p.employee_id),
-        ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
-
-        // Determine which team won based on the captain FK matching winner_employee_id.
-        const teamAWon = resultData.winner_employee_id === match.player_a_employee_id;
-
-        for (const empId of teamAIds) {
-          await supabase.rpc('leaderboard_apply', {
-            p_employee_id: empId,
-            p_game: 'all',
-            p_delta: teamAWon ? { match_wins: 1 } : { match_losses: 1 },
-          });
-        }
-        for (const empId of teamBIds) {
-          await supabase.rpc('leaderboard_apply', {
-            p_employee_id: empId,
-            p_game: 'all',
-            p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
-          });
-        }
-      }
       await loadLeaderboard();
       return { success: true };
     } catch (err) {
@@ -1556,10 +1852,8 @@ export const AppProvider = ({ children }) => {
     tournamentMatches
       .filter(m => m.tournament_id === tournamentId)
       .sort((a, b) => {
-        const roundOrder = { QF: 1, SF: 2, F: 3, '3RD': 4, RR: 5, GROUP: 6, QUAL: 7 };
-        const ra = roundOrder[a.round] || 99;
-        const rb = roundOrder[b.round] || 99;
-        if (ra !== rb) return ra - rb;
+        const ra = compareTournamentRounds(a.round, b.round);
+        if (ra !== 0) return ra;
         return (a.match_number || 0) - (b.match_number || 0);
       });
 
@@ -1723,6 +2017,7 @@ export const AppProvider = ({ children }) => {
     addTournament,
     updateTournament,
     deleteTournament,
+    generateTournamentFixtures,
     registerForTournament,
     approveTournamentRegistration,
     withdrawFromTournament,
