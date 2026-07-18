@@ -273,6 +273,153 @@ export const computeSwissStandings = (participants = [], matches = []) => {
   });
 };
 
+// ── Round-Robin standings ────────────────────────────────────────────────────
+// Tallies wins / draws / losses from completed RR matches and returns a sorted
+// array of participant stat objects (best-to-worst).
+export const computeRoundRobinStandings = (matches = [], participants = []) => {
+  const stats = {};
+
+  for (const p of participants) {
+    const id = String(p.employee_id || '').toUpperCase();
+    if (!id) continue;
+    stats[id] = {
+      employee_id: p.employee_id,
+      seed: p.seed || 0,
+      played: 0,
+      won: 0,
+      lost: 0,
+      drawn: 0,
+      points: 0,
+      score_diff: 0,
+    };
+  }
+
+  for (const m of matches) {
+    // Only round-robin phase matches — skip KO phase matches (identified by
+    // match_code prefix "KO_", since their round values are QF/SF/F).
+    const round     = String(m.round      || '').toUpperCase();
+    const matchCode = String(m.match_code || '').toUpperCase();
+    if (!round.startsWith('RR') || matchCode.startsWith('KO_')) continue;
+
+    const status = String(m.status || '').toLowerCase();
+    if (!['completed', 'walkover', 'no_show', 'draw'].includes(status)) continue;
+
+    const a = String(m.player_a_employee_id || '').toUpperCase();
+    const b = String(m.player_b_employee_id || '').toUpperCase();
+    if (!a || !b) continue;
+
+    if (stats[a]) stats[a].played += 1;
+    if (stats[b]) stats[b].played += 1;
+
+    // Score differential (used as secondary tiebreaker)
+    const sa = Number(m.score_a ?? 0);
+    const sb = Number(m.score_b ?? 0);
+    if (stats[a]) stats[a].score_diff += sa - sb;
+    if (stats[b]) stats[b].score_diff += sb - sa;
+
+    if (status === 'draw') {
+      if (stats[a]) { stats[a].drawn += 1; stats[a].points += 1; }
+      if (stats[b]) { stats[b].drawn += 1; stats[b].points += 1; }
+      continue;
+    }
+
+    const winner = String(m.winner_employee_id || '').toUpperCase();
+    const loser  = winner === a ? b : a;
+    if (stats[winner]) { stats[winner].won += 1; stats[winner].points += 3; }
+    if (stats[loser])  { stats[loser].lost  += 1; }
+  }
+
+  return Object.values(stats).sort((a, b) => {
+    if (b.points      !== a.points)      return b.points      - a.points;
+    if (b.won         !== a.won)         return b.won         - a.won;
+    if (b.score_diff  !== a.score_diff)  return b.score_diff  - a.score_diff;
+    if (a.lost        !== b.lost)        return a.lost        - b.lost;
+    return (a.seed || 0) - (b.seed || 0);
+  });
+};
+
+// ── Round-Robin → Knockout phase ─────────────────────────────────────────────
+// Takes the standings from the RR phase and builds the knockout bracket:
+//   • Top 5 qualify
+//   • Seeds 1, 2, 3 → automatic BYE into Semifinals
+//   • Seed 4 vs Seed 5 → KO_QF (sole Quarterfinal)
+//   • KO_SF1: Seed 1  vs winner of KO_QF
+//   • KO_SF2: Seed 2  vs Seed 3
+//   • KO_F  : winner of KO_SF1 vs winner of KO_SF2
+//
+// Returns an array of match payload objects ready for Supabase insert
+// (tournament_id must be set by the caller).
+export const buildRoundRobinKnockoutPlan = (standings = []) => {
+  const top5 = standings.slice(0, 5);
+  if (top5.length < 2) return [];
+
+  const seed = (n) => top5[n - 1]?.employee_id || null;
+
+  // round values must satisfy the DB check constraint — use the standard
+  // round codes (QF / SF / F). The match_code prefix "KO_" is what we use
+  // in JS to identify these as the RR-knockout phase (not a pure knockout
+  // tournament bracket).
+  const matches = [
+    // Quarterfinal — Seed 4 vs Seed 5
+    {
+      round: 'QF',
+      match_number: 1,
+      match_code: 'KO_QF1',
+      player_a_employee_id: seed(4),
+      player_b_employee_id: seed(5),
+      status: seed(4) && seed(5) ? 'scheduled' : 'bye',
+      winner_employee_id: !(seed(4) && seed(5)) ? (seed(4) || seed(5)) : null,
+      score_a: null,
+      score_b: null,
+    },
+    // Semifinal 1 — Seed 1 vs winner of KO_QF
+    {
+      round: 'SF',
+      match_number: 1,
+      match_code: 'KO_SF1',
+      player_a_employee_id: seed(1),
+      player_b_employee_id: null,          // filled when KO_QF completes
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+    // Semifinal 2 — Seed 2 vs Seed 3
+    {
+      round: 'SF',
+      match_number: 2,
+      match_code: 'KO_SF2',
+      player_a_employee_id: seed(2),
+      player_b_employee_id: seed(3),
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+    // Final — winner SF1 vs winner SF2
+    {
+      round: 'F',
+      match_number: 1,
+      match_code: 'KO_F1',
+      player_a_employee_id: null,
+      player_b_employee_id: null,
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+  ];
+
+  // If only 4 players qualified, skip QF and put seed 4 straight into SF1
+  if (!seed(5) && seed(4)) {
+    matches[0].status = 'bye';
+    matches[0].winner_employee_id = seed(4);
+    matches[1].player_b_employee_id = seed(4);
+  }
+
+  return matches;
+};
+
 export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber = 1) => {
   const standings = computeSwissStandings(participants, matches);
   const opponentMap = buildOpponentMap(matches);
@@ -366,4 +513,3 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
     }],
   };
 };
-

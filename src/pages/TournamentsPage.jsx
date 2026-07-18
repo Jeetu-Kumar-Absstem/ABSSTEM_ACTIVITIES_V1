@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
 import { useCertificate } from '../hooks/useCertificate';
 import {
+  computeRoundRobinStandings,
   groupMatchesByRound,
   normalizeTournamentFormat,
 } from '../utils/tournamentFixtures';
@@ -188,6 +189,7 @@ const TournamentsPage = () => {
     getResultsByTournament,
     getEmployeeName,
     updateTournament,
+    generateRoundRobinKnockout,
   } = useApp();
   const { showToast } = useToast();
   const { generateCertificate } = useCertificate();
@@ -580,12 +582,169 @@ const TournamentsPage = () => {
       );
     };
 
+    // ── Round-Robin derived data ──────────────────────────────────────────
+    // KO phase matches are identified by match_code prefix ("KO_"), NOT by
+    // round value — because the DB constraint requires round ∈ {QF,SF,F,...}.
+    const isRoundRobin = activeTournamentFormat === 'round_robin';
+
+    const isKoMatch  = (m) => String(m.match_code || '').toUpperCase().startsWith('KO_');
+    const isRrMatch  = (m) => String(m.round      || '').toUpperCase().startsWith('RR');
+
+    const rrMatches = isRoundRobin ? matchesForActive.filter(isRrMatch)  : [];
+    const koMatches = isRoundRobin ? matchesForActive.filter(isKoMatch)  : [];
+
+    // For the RR fixture grid, exclude any KO phase matches (they share QF/SF/F round codes)
+    const rrMatchGroups = isRoundRobin
+      ? roundGroups.filter((g) => String(g.round).startsWith('RR'))
+      : roundGroups;
+
+    // Build KO bracket columns grouped by match_code prefix (KO_QF / KO_SF / KO_F)
+    const koColKeys   = ['KO_QF', 'KO_SF', 'KO_F'];
+    const koColLabels = { KO_QF: 'Quarter Final', KO_SF: 'Semi Finals', KO_F: 'Final' };
+    const koColColors = { KO_QF: '#8e24aa',        KO_SF: '#618ff4',     KO_F: '#c81c1c' };
+
+    const koMatchGroups = koColKeys.map((colKey) => ({
+      key: colKey,
+      label: koColLabels[colKey],
+      matches: koMatches
+        .filter((m) => String(m.match_code || '').toUpperCase().startsWith(colKey))
+        .sort((a, b) => (a.match_number || 0) - (b.match_number || 0)),
+    }));
+
+    const rrStandings = isRoundRobin
+      ? computeRoundRobinStandings(rrMatches, partsList)
+      : [];
+
+    const rrAllDone = rrMatches.length > 0 && rrMatches.every((m) =>
+      ['completed', 'walkover', 'no_show', 'draw', 'bye', 'cancelled'].includes(
+        String(m.status || '').toLowerCase()
+      )
+    );
+    const hasKoPhase    = koMatches.length > 0;
+    const canGenerateKo = isAdmin() && isRoundRobin && rrAllDone && !hasKoPhase;
+
     return (
       <div style={{ display: 'grid', gap: '1rem' }}>
+
+        {/* ── Round-Robin Standings Table ─────────────────────────────── */}
+        {isRoundRobin && rrMatches.length > 0 && (
+          <div className="clay-card" style={{ ...styles.card, background: '#e8f4fd' }}>
+            <div style={styles.cardHeader}>
+              <div style={styles.cardHeaderTitle}>📋 Round-Robin Standings</div>
+              {canGenerateKo && (
+                <button
+                  onClick={async () => {
+                    const result = await generateRoundRobinKnockout(activeTournamentRecord.id);
+                    if (result.success) {
+                      showToast('Knockout phase generated — Top 5 advance!');
+                    } else {
+                      showToast(result.error || 'Failed to generate knockout phase', 'error');
+                    }
+                  }}
+                  style={{ ...styles.navyBtn, background: '#1b5e20' }}
+                >
+                  🏆 Generate Knockout Phase
+                </button>
+              )}
+              {hasKoPhase && (
+                <span style={{ ...styles.tinyChip, background: '#e8f5e9', color: '#2e7d32', fontSize: '0.72rem' }}>
+                  ✓ Knockout phase active
+                </span>
+              )}
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={styles.table}>
+                <thead>
+                  <tr style={styles.theadRow}>
+                    {['Rank', 'Player', 'P', 'W', 'D', 'L', 'Pts', 'Qualify'].map((h) => (
+                      <th key={h} style={styles.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rrStandings.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>
+                        No results yet.
+                      </td>
+                    </tr>
+                  ) : rrStandings.map((row, i) => {
+                    const qualifies = i < 5;
+                    const isTop3    = i < 3;
+                    return (
+                      <tr
+                        key={row.employee_id}
+                        style={{
+                          borderBottom: '1px solid #d0d0d0',
+                          background: isTop3 ? '#f0fff4' : qualifies ? '#f5f5f5' : 'transparent',
+                          opacity: qualifies ? 1 : 0.55,
+                        }}
+                      >
+                        <td style={{ ...styles.td, fontWeight: 700, color: i === 0 ? '#f9a825' : i === 1 ? '#9e9e9e' : i === 2 ? '#d84315' : '#444' }}>
+                          {i + 1}
+                        </td>
+                        <td style={{ ...styles.td, fontWeight: 600 }}>{getEmployeeName(row.employee_id)}</td>
+                        <td style={styles.td}>{row.played}</td>
+                        <td style={{ ...styles.td, color: '#2e7d32', fontWeight: 600 }}>{row.won}</td>
+                        <td style={styles.td}>{row.drawn}</td>
+                        <td style={{ ...styles.td, color: '#c62828' }}>{row.lost}</td>
+                        <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{row.points}</td>
+                        <td style={styles.td}>
+                          {qualifies ? (
+                            <span style={{
+                              ...styles.tinyChip,
+                              background: isTop3 ? '#e8f5e9' : '#fff3e0',
+                              color: isTop3 ? '#1b5e20' : '#e65100',
+                            }}>
+                              {isTop3 ? `Seed ${i + 1} — BYE` : `Seed ${i + 1}`}
+                            </span>
+                          ) : (
+                            <span style={{ ...styles.tinyChip, background: '#ffebee', color: '#c62828' }}>Eliminated</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Knockout Bracket (round-robin → KO phase) ───────────────── */}
+        {isRoundRobin && hasKoPhase && (
+          <div className="clay-card" style={{ ...styles.card }}>
+            <div style={styles.cardHeader}>
+              <div style={styles.cardHeaderTitle}>🏆 Knockout Phase</div>
+              <span style={{ fontSize: '0.7rem', color: '#888' }}>Top 5 · QF → SF → Final</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ ...styles.bracketGrid, gridTemplateColumns: 'repeat(3, 1fr)', minWidth: 720 }}>
+                {koMatchGroups.map(({ key, label, matches: colMatches }) => (
+                  <div key={key} style={styles.bracketCol}>
+                    <div style={{
+                      ...styles.bracketColHeader,
+                      background: koColColors[key] || '#1a3c6e',
+                      color: 'white',
+                    }}>{label}</div>
+                    <div style={{ ...styles.bracketColBody, justifyContent: 'center' }}>
+                      {colMatches.length === 0 ? (
+                        <div style={styles.emptyCol}>Awaiting results</div>
+                      ) : (
+                        colMatches.map(renderMatch)
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="clay-card" style={styles.card}>
           <div style={styles.cardHeader}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <div style={styles.cardHeaderTitle}>📊 Bracket / Fixtures</div>
+              <div style={styles.cardHeaderTitle}>📊 {isRoundRobin ? 'Round-Robin Fixtures' : 'Bracket / Fixtures'}</div>
               <select
                 value={activeTournament || ''}
                 onChange={(e) => setActiveTournament(e.target.value)}
@@ -645,15 +804,16 @@ const TournamentsPage = () => {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <div style={{ ...styles.bracketGrid, minWidth: Math.max(4, roundGroups.length) * 240 }}>
-              {roundGroups.length === 0 ? (
+            {/* For RR tournaments, only show the RR fixture grid (KO shown above) */}
+            <div style={{ ...styles.bracketGrid, minWidth: Math.max(4, (isRoundRobin ? rrMatchGroups : roundGroups).length) * 240 }}>
+              {(isRoundRobin ? rrMatchGroups : roundGroups).length === 0 ? (
                 <div style={{ ...styles.bracketColBody, gridColumn: '1 / -1' }}>
                   <div style={styles.emptyCol}>
                     No fixtures yet. {isAdmin() ? 'Use Generate Fixtures to create the bracket.' : 'Waiting for admin to generate fixtures.'}
                   </div>
                 </div>
               ) : (
-                roundGroups.map((group, index) => (
+                (isRoundRobin ? rrMatchGroups : roundGroups).map((group, index) => (
                   <div key={group.round} style={styles.bracketCol}>
                     <div style={{
                       ...styles.bracketColHeader,

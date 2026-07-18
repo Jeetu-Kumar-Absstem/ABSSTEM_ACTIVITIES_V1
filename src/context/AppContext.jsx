@@ -6,8 +6,10 @@ import { isAdminId } from '../utils/admin';
 import {
   buildKnockoutFixturePlan,
   buildRoundRobinFixturePlan,
+  buildRoundRobinKnockoutPlan,
   buildSwissRoundPlan,
   compareTournamentRounds,
+  computeRoundRobinStandings,
   getMatchTeams,
   getRoundLabel,
   groupMatchesByRound,
@@ -1645,7 +1647,9 @@ export const AppProvider = ({ children }) => {
         }
 
         const tournament = tournaments.find((t) => t.id === match.tournament_id);
-        if (winner && normalizeTournamentFormat(tournament?.format) === 'knockout') {
+        const fmt = normalizeTournamentFormat(tournament?.format);
+        const isKoRound = String(match.match_code || '').toUpperCase().startsWith('KO_');
+        if (winner && (fmt === 'knockout' || isKoRound)) {
           await advanceWinnerToNextMatch(match, winner);
         }
       }
@@ -1654,6 +1658,120 @@ export const AppProvider = ({ children }) => {
       await loadTournamentParticipants();
       await loadLeaderboard();
       return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // ── Round-Robin → Knockout phase generation (admin) ─────────────────────
+  // Called once all RR matches are completed. Verifies completion, ranks the
+  // top 5 participants, then inserts KO_QF / KO_SF / KO_F matches with the
+  // correct next_match_winner_id pointer chain so that recordMatchResult can
+  // auto-advance winners.
+  const generateRoundRobinKnockout = async (tournamentId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can generate the knockout phase' };
+    }
+    try {
+      const tournament = tournaments.find((t) => t.id === tournamentId);
+      if (!tournament) return { success: false, error: 'Tournament not found' };
+
+      const format = normalizeTournamentFormat(tournament.format);
+      if (format !== 'round_robin') {
+        return { success: false, error: 'This action is only for Round-Robin tournaments' };
+      }
+
+      const existingMatches = tournamentMatches.filter((m) => m.tournament_id === tournamentId);
+
+      // Block if KO phase already exists
+      if (existingMatches.some((m) => String(m.match_code || '').toUpperCase().startsWith('KO_'))) {
+        return { success: false, error: 'Knockout phase has already been generated' };
+      }
+
+      const rrMatches = existingMatches.filter((m) => String(m.round || '').toUpperCase().startsWith('RR'));
+      if (rrMatches.length === 0) {
+        return { success: false, error: 'No Round-Robin matches found. Generate fixtures first.' };
+      }
+
+      const incomplete = rrMatches.filter(
+        (m) => !['completed', 'walkover', 'no_show', 'draw', 'bye', 'cancelled'].includes(
+          String(m.status || '').toLowerCase()
+        )
+      );
+      if (incomplete.length > 0) {
+        return {
+          success: false,
+          error: `${incomplete.length} Round-Robin match${incomplete.length > 1 ? 'es are' : ' is'} still pending. Complete all matches before generating the knockout phase.`,
+        };
+      }
+
+      const participants = getTournamentApprovedParticipants(tournamentId);
+      const standings = computeRoundRobinStandings(rrMatches, participants);
+      const matchPlans = buildRoundRobinKnockoutPlan(standings);
+
+      if (matchPlans.length === 0) {
+        return { success: false, error: 'Not enough qualified participants to build a knockout bracket (need at least 2)' };
+      }
+
+      const payloads = matchPlans.map((m) => ({
+        tournament_id: tournamentId,
+        match_code: m.match_code,
+        round: m.round,
+        match_number: m.match_number,
+        player_a_employee_id: m.player_a_employee_id,
+        player_b_employee_id: m.player_b_employee_id,
+        status: m.status,
+        winner_employee_id: m.winner_employee_id,
+        score_a: m.score_a,
+        score_b: m.score_b,
+        played_at: m.status === 'bye' ? new Date().toISOString() : null,
+      }));
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from('tournament_matches')
+        .insert(payloads)
+        .select();
+      if (insertErr) throw insertErr;
+
+      // Wire next_match_winner_id pointers:
+      //   KO_QF1  → KO_SF1 (player_b slot)
+      //   KO_SF1  → KO_F1  (player_a slot)
+      //   KO_SF2  → KO_F1  (player_b slot)
+      const byCode = new Map((inserted || []).map((r) => [r.match_code, r]));
+      const pointers = [];
+
+      const qf1  = byCode.get('KO_QF1');
+      const sf1  = byCode.get('KO_SF1');
+      const sf2  = byCode.get('KO_SF2');
+      const fin  = byCode.get('KO_F1');
+
+      if (qf1 && sf1) {
+        pointers.push(
+          supabase.from('tournament_matches').update({ next_match_winner_id: sf1.id }).match({ id: qf1.id })
+        );
+      }
+      if (sf1 && fin) {
+        pointers.push(
+          supabase.from('tournament_matches').update({ next_match_winner_id: fin.id }).match({ id: sf1.id })
+        );
+      }
+      if (sf2 && fin) {
+        pointers.push(
+          supabase.from('tournament_matches').update({ next_match_winner_id: fin.id }).match({ id: sf2.id })
+        );
+      }
+      await Promise.all(pointers);
+
+      // If QF was a bye, immediately slot the winner into SF1 player_b
+      if (qf1?.status === 'bye' && qf1?.winner_employee_id && sf1) {
+        await supabase
+          .from('tournament_matches')
+          .update({ player_b_employee_id: qf1.winner_employee_id })
+          .match({ id: sf1.id });
+      }
+
+      await loadTournamentMatches();
+      return { success: true, standings };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -2018,6 +2136,7 @@ export const AppProvider = ({ children }) => {
     updateTournament,
     deleteTournament,
     generateTournamentFixtures,
+    generateRoundRobinKnockout,
     registerForTournament,
     approveTournamentRegistration,
     withdrawFromTournament,
