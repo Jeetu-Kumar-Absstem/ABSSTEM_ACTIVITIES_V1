@@ -182,6 +182,8 @@ const TournamentsPage = () => {
     recordMatchResult,
     declareFinalResults,
     unregisterFromTournament,
+    approveWithdrawalRequest,
+    rejectWithdrawalRequest,
     updateTournamentMatch,
     deleteTournamentMatch,
     getMatchesByTournament,
@@ -190,6 +192,9 @@ const TournamentsPage = () => {
     getEmployeeName,
     updateTournament,
     generateRoundRobinKnockout,
+    approveTournamentRegistration,
+    refreshTournamentData,
+    refreshKnockoutFixtures,
   } = useApp();
   const { showToast } = useToast();
   const { generateCertificate } = useCertificate();
@@ -278,6 +283,19 @@ const TournamentsPage = () => {
     }
     return map;
   }, [tournamentRegistrationRequests]);
+
+  // Participants who have requested withdrawal while tournament is live
+  // keyed by tournament_id — used to show admin the approval panel
+  const withdrawalPendingByTournament = useMemo(() => {
+    const map = {};
+    for (const p of tournamentParticipants) {
+      if (String(p.status || '').toLowerCase() !== 'pending_withdrawal') continue;
+      if (!map[p.tournament_id]) map[p.tournament_id] = [];
+      map[p.tournament_id].push(p);
+    }
+    return map;
+  }, [tournamentParticipants]);
+
   const matchesForActive = useMemo(
     () => activeTournament ? getMatchesByTournament(activeTournament) : [],
     [activeTournament, tournamentMatches, getMatchesByTournament]
@@ -356,9 +374,12 @@ const TournamentsPage = () => {
                 const regOpen = t.registration_open !== false;
                 // Lock registration once the start date has passed.
                 const startDatePassed = t.start_date && new Date(t.start_date) <= new Date();
-                const alreadyRegistered = (partsByTournament[t.id] || []).some(
+                const myParticipantRow = (partsByTournament[t.id] || []).find(
                   p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
                 );
+                const alreadyRegistered = !!myParticipantRow;
+                const hasPendingWithdrawal = myParticipantRow &&
+                  String(myParticipantRow.status || '').toLowerCase() === 'pending_withdrawal';
                 const hasPendingRequest = (pendingByTournament[t.id] || []).some(
                   p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
                 );
@@ -407,15 +428,24 @@ const TournamentsPage = () => {
                       >{regLabel}</button>
                     </td>
                     <td style={styles.td}>
-                      {alreadyRegistered && !isCompleted ? (
+                      {alreadyRegistered && !isCompleted && !isAdmin() ? (
+                        hasPendingWithdrawal ? (
+                          <span style={{ ...styles.tinyChip, background: '#fff3e0', color: '#e65100', fontSize: '0.68rem' }}>
+                            ⏳ Withdrawal pending
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleUnregisterForOne(t.id)}
+                            style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                            title="Request to withdraw from this tournament"
+                          >✕ Unregister</button>
+                        )
+                      ) : alreadyRegistered && !isCompleted && isAdmin() ? (
                         <button
                           onClick={() => handleUnregisterForOne(t.id)}
-                          style={{
-                            ...styles.tinyEnterBtn,
-                            background: '#c62828',
-                          }}
-                          title="Unregister from this tournament"
-                        >✕ Unregister</button>
+                          style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                          title="Remove participant immediately (admin)"
+                        >✕ Remove</button>
                       ) : (
                         <span style={{ fontSize: '0.66rem', color: '#bbb' }}>—</span>
                       )}
@@ -464,6 +494,74 @@ const TournamentsPage = () => {
               {isAdmin() ? '🏆 Register for Multiple Tournaments' : '📝 Request Multiple Tournaments'}
             </button>
           </div>
+
+        {/* ── Admin: Pending Registration Requests ─────────────────────── */}
+        {isAdmin() && tournamentRegistrationRequests.filter(r => String(r.status||'').toLowerCase() === 'pending').length > 0 && (
+          <div style={{ ...styles.card, background: '#fff8e1', marginTop: '1rem', borderRadius: 8, padding: '0.8rem 1rem' }}>
+            <div style={{ ...styles.cardHeaderTitle, marginBottom: '0.6rem' }}>📋 Pending Registration Requests</div>
+            {tournamentRegistrationRequests
+              .filter(r => String(r.status || '').toLowerCase() === 'pending')
+              .map(r => {
+                const t = tournaments.find(x => x.id === r.tournament_id);
+                return (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #ffe082', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, minWidth: 120 }}>{getEmployeeName(r.employee_id)}</span>
+                    <span style={{ color: '#888', fontSize: '0.78rem' }}>→ {t?.name || `Tournament #${r.tournament_id}`}</span>
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        onClick={async () => {
+                          const res = await approveTournamentRegistration(r.id);
+                          res.success ? showToast(`Approved ${getEmployeeName(r.employee_id)}`) : showToast(res.error || 'Failed', 'error');
+                        }}
+                        style={{ ...styles.tinyEnterBtn, background: '#2e7d32' }}
+                      >✓ Approve</button>
+                      <button
+                        onClick={async () => {
+                          const { error } = await import('../utils/supabase').then(m => m.supabase.from('tournament_registration_requests').delete().match({ id: r.id }));
+                          if (!error) { showToast('Request rejected'); }
+                        }}
+                        style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                      >✕ Reject</button>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        )}
+
+        {/* ── Admin: Pending Withdrawal Requests ───────────────────────── */}
+        {isAdmin() && Object.values(withdrawalPendingByTournament).flat().length > 0 && (
+          <div style={{ ...styles.card, background: '#fce4ec', marginTop: '0.6rem', borderRadius: 8, padding: '0.8rem 1rem' }}>
+            <div style={{ ...styles.cardHeaderTitle, marginBottom: '0.6rem' }}>🚪 Pending Withdrawal Requests</div>
+            {Object.values(withdrawalPendingByTournament).flat().map(p => {
+              const t = tournaments.find(x => x.id === p.tournament_id);
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #f48fb1', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, minWidth: 120 }}>{getEmployeeName(p.employee_id)}</span>
+                  <span style={{ color: '#888', fontSize: '0.78rem' }}>wants to leave <strong>{t?.name || `Tournament #${p.tournament_id}`}</strong></span>
+                  <span style={{ ...styles.tinyChip, background: '#fff3e0', color: '#e65100', fontSize: '0.68rem' }}>⚠ Tournament is live</span>
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      onClick={async () => {
+                        const res = await approveWithdrawalRequest(p.id);
+                        res.success ? showToast(`${getEmployeeName(p.employee_id)} withdrawn from ${t?.name || 'tournament'}`, 'warning') : showToast(res.error || 'Failed', 'error');
+                      }}
+                      style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                    >✓ Approve Withdrawal</button>
+                    <button
+                      onClick={async () => {
+                        const res = await rejectWithdrawalRequest(p.id);
+                        res.success ? showToast(`Withdrawal rejected — ${getEmployeeName(p.employee_id)} stays enrolled`) : showToast(res.error || 'Failed', 'error');
+                      }}
+                      style={{ ...styles.tinyEnterBtn, background: '#5c6bc0' }}
+                    >✕ Keep in Tournament</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -530,41 +628,78 @@ const TournamentsPage = () => {
       : 'Generate Fixtures';
 
     const renderMatch = (m) => {
+      // Phantom guard: TBD vs TBD should never appear in the DB with the new
+      // engine, but skip rendering just in case.
+      if (!m.player_a_employee_id && !m.player_b_employee_id) return null;
+
       const a = teamLabel(m.player_a_employee_id, m.team_a_players);
       const b = teamLabel(m.player_b_employee_id, m.team_b_players);
       const hasScore = m.score_a !== null && m.score_b !== null;
-      const isFinal = String(m.round || '').toUpperCase() === 'F';
+      const isFinal  = String(m.round || '').toUpperCase() === 'F';
+
+      // A bye match has only one real player, or status is explicitly 'bye'.
+      const isBye =
+        String(m.status || '').toLowerCase() === 'bye' ||
+        (!m.player_a_employee_id && !!m.player_b_employee_id) ||
+        (!!m.player_a_employee_id && !m.player_b_employee_id);
+
       return (
         <div key={m.id} style={{
           ...styles.matchCard,
-          border: isFinal ? '2px solid #f9a825' : '1px solid #d0d0d0',
+          border: isFinal ? '2px solid #f9a825' : isBye ? '1px dashed #b0bec5' : '1px solid #d0d0d0',
+          opacity: isBye ? 0.82 : 1,
         }}>
           <div style={styles.matchLabel}>Match {m.match_code || m.match_number}</div>
+
+          {/* Player A */}
           <div style={{
             ...styles.matchPlayer,
             background: hasScore && m.score_a > m.score_b ? '#e8f5e9' : 'transparent',
-            color: hasScore && m.score_a > m.score_b ? '#1b5e20' : '#212121',
+            color:      hasScore && m.score_a > m.score_b ? '#1b5e20' : '#212121',
             fontWeight: hasScore && m.score_a > m.score_b ? 700 : 500,
           }}>
-            <span style={{ fontSize: '0.7rem' }}>{a}</span><span>{m.score_a ?? '—'}</span>
+            <span style={{ fontSize: '0.7rem' }}>{a}</span>
+            <span>{m.score_a ?? '—'}</span>
           </div>
+
+          {/* Player B — show "Bye" when slot is empty */}
           <div style={{
             ...styles.matchPlayer,
             background: hasScore && m.score_b > m.score_a ? '#e8f5e9' : 'transparent',
-            color: hasScore && m.score_b > m.score_a ? '#1b5e20' : '#212121',
+            color:      hasScore && m.score_b > m.score_a ? '#1b5e20'
+                          : (isBye && !m.player_b_employee_id) ? '#9e9e9e' : '#212121',
             fontWeight: hasScore && m.score_b > m.score_a ? 700 : 500,
+            fontStyle:  (isBye && !m.player_b_employee_id) ? 'italic' : 'normal',
           }}>
-            <span style={{ fontSize: '0.7rem' }}>{b}</span><span>{m.score_b ?? '—'}</span>
+            <span style={{ fontSize: '0.7rem' }}>{b}</span>
+            <span>{m.score_b ?? '—'}</span>
           </div>
+
+          {/* Status line */}
           <div style={styles.matchMeta}>
-            {m.status === 'completed' ? '✓ Final' : m.status === 'bye' ? '↷ Bye' : m.status === 'walkover' ? '↷ Walkover' : m.status === 'live' ? '● Live' : '⏳ Pending'}
+            {m.status === 'completed'
+              ? '✓ Final'
+              : isBye
+                ? '✓ Advanced by Bye'
+                : m.status === 'walkover'
+                  ? '↷ Walkover'
+                  : m.status === 'live'
+                    ? '● Live'
+                    : '⏳ Pending'}
           </div>
-          {canEditMatch(m) && (
-            <button onClick={() => openResultModal(m)} style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}>
+
+          {/* Enter/Edit result — hidden for bye matches */}
+          {!isBye && canEditMatch(m) && (
+            <button
+              onClick={() => openResultModal(m)}
+              style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}
+            >
               {m.status === 'completed' ? '✎ Edit Result' : '⏎ Enter Result'}
             </button>
           )}
-          {isAdmin() && (
+
+          {/* Admin edit/delete — also hidden for bye matches */}
+          {!isBye && isAdmin() && (
             <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
               <button
                 onClick={() => openEditMatchModal(m)}
@@ -786,6 +921,27 @@ const TournamentsPage = () => {
               )}
               {isAdmin() && (
                 <button onClick={() => openNewMatchModal('QF')} style={styles.navyBtn}>+ Add Match</button>
+              )}
+              {isAdmin() && matchesForActive.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (activeTournamentFormat === 'knockout') {
+                      // Smart refresh: keeps completed matches, rebuilds only pending rounds.
+                      const result = await refreshKnockoutFixtures(activeTournamentRecord.id);
+                      if (result.success) {
+                        showToast(result.message || 'Fixtures refreshed');
+                      } else {
+                        showToast(result.error || 'Refresh failed', 'error');
+                      }
+                    } else {
+                      // Round-robin / Swiss: simple data reload is sufficient.
+                      await refreshTournamentData();
+                      showToast('Fixtures refreshed');
+                    }
+                  }}
+                  style={{ ...styles.navyBtn, background: '#37474f' }}
+                  title="Reload fixtures and participants from the database"
+                >🔄 Refresh</button>
               )}
               {!isAdmin() && activeTournamentRecord?.status === 'registration_open' && (
                 <button

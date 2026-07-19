@@ -14,6 +14,8 @@ import {
   getRoundLabel,
   groupMatchesByRound,
   normalizeTournamentFormat,
+  isByeMatch,
+  refreshKnockoutPlan,
 } from '../utils/tournamentFixtures';
 import {
   getDayName,
@@ -29,6 +31,7 @@ const APPROVED_TOURNAMENT_STATUSES = new Set([
   'semi_finalist',
   'finalist',
   'eliminated',
+  'pending_withdrawal', // still active until admin approves the withdrawal
 ]);
 const FINISHING_MATCH_STATUSES = new Set(['completed', 'walkover', 'no_show', 'bye']);
 
@@ -409,7 +412,22 @@ export const AppProvider = ({ children }) => {
         .select('*')
         .order('start_date', { ascending: false });
       if (error) throw error;
-      setTournaments(data || []);
+
+      // Derive status: if end_date has passed and the tournament isn't already
+      // marked completed/cancelled, treat it as completed on the client side
+      // without writing back to the DB.
+      const now = new Date();
+      const enriched = (data || []).map((t) => {
+        const alreadyDone = ['completed', 'cancelled'].includes(
+          String(t.status || '').toLowerCase()
+        );
+        if (!alreadyDone && t.end_date && new Date(t.end_date) < now) {
+          return { ...t, status: 'completed' };
+        }
+        return t;
+      });
+
+      setTournaments(enriched);
     } catch (err) {
       console.error('Error loading tournaments:', err);
       setTournaments([]);
@@ -1030,18 +1048,24 @@ export const AppProvider = ({ children }) => {
         roundPlan = buildKnockoutFixturePlan(participants);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
+            // Guard: never insert phantom (TBD vs TBD) matches.
+            if (!match.player_a_employee_id && !match.player_b_employee_id &&
+                !match._preplace_a && !match._preplace_b) continue;
+
             payloads.push({
-              tournament_id: tournamentId,
-              match_code: match.match_code,
-              round: match.round,
-              match_number: match.match_number,
-              player_a_employee_id: match.player_a_employee_id,
-              player_b_employee_id: match.player_b_employee_id,
-              score_a: match.score_a,
-              score_b: match.score_b,
-              winner_employee_id: match.winner_employee_id,
-              status: match.status,
-              played_at: match.status === 'bye' ? new Date().toISOString() : null,
+              tournament_id:         tournamentId,
+              match_code:            match.match_code,
+              round:                 match.round,
+              match_number:          match.match_number,
+              // Use _preplace fields when a bye winner is already known for
+              // this slot — fills the next-round match at insert time.
+              player_a_employee_id:  match._preplace_a ?? match.player_a_employee_id,
+              player_b_employee_id:  match._preplace_b ?? match.player_b_employee_id,
+              score_a:               match.score_a,
+              score_b:               match.score_b,
+              winner_employee_id:    match.winner_employee_id,
+              status:                match.status,
+              played_at:             match.status === 'bye' ? new Date().toISOString() : null,
             });
           }
         }
@@ -1104,13 +1128,15 @@ export const AppProvider = ({ children }) => {
 
       if (format === 'knockout' && roundPlan?.rounds?.length > 1) {
         const byCode = new Map((inserted || []).map((row) => [row.match_code, row]));
+
+        // ── Step 1: wire next_match_winner_id pointers ─────────────────
         const pointerUpdates = [];
         for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
           const currentRound = roundPlan.rounds[roundIndex];
-          const nextRound = roundPlan.rounds[roundIndex + 1];
+          const nextRound    = roundPlan.rounds[roundIndex + 1];
           currentRound.matches.forEach((match, matchIndex) => {
             const currentRow = byCode.get(match.match_code);
-            const nextRow = byCode.get(nextRound.matches[Math.floor(matchIndex / 2)]?.match_code);
+            const nextRow    = byCode.get(nextRound.matches[Math.floor(matchIndex / 2)]?.match_code);
             if (!currentRow || !nextRow) return;
             pointerUpdates.push(
               supabase
@@ -1122,18 +1148,42 @@ export const AppProvider = ({ children }) => {
         }
         await Promise.all(pointerUpdates);
 
-        const firstRound = roundPlan.rounds[0];
-        const secondRound = roundPlan.rounds[1];
-        if (firstRound && secondRound) {
-          for (let i = 0; i < firstRound.matches.length; i += 1) {
-            const match = firstRound.matches[i];
+        // ── Step 2: auto-advance bye winners across ALL rounds ──────────
+        // The new engine pre-fills _preplace_a/_preplace_b in the payload
+        // for known bye winners, so many slots are already set. This pass
+        // catches any remaining cases where a bye winner still needs to be
+        // placed into the next-round match slot.
+        for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
+          const currentRound = roundPlan.rounds[roundIndex];
+          const nextRound    = roundPlan.rounds[roundIndex + 1];
+
+          for (let matchIndex = 0; matchIndex < currentRound.matches.length; matchIndex += 1) {
+            const match = currentRound.matches[matchIndex];
             if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
+
             const sourceRow = byCode.get(match.match_code);
-            const targetRow = byCode.get(secondRound.matches[Math.floor(i / 2)]?.match_code);
+            const nextMatchPlan = nextRound.matches[Math.floor(matchIndex / 2)];
+            if (!nextMatchPlan) continue;
+            const targetRow = byCode.get(nextMatchPlan.match_code);
             if (!sourceRow || !targetRow) continue;
+
+            // Re-read the target row fresh from DB so we see any _preplace
+            // values already written during insert.
+            const { data: freshTarget } = await supabase
+              .from('tournament_matches')
+              .select('player_a_employee_id, player_b_employee_id')
+              .eq('id', targetRow.id)
+              .single();
+
+            if (!freshTarget) continue;
             const update = {};
-            if (!targetRow.player_a_employee_id) update.player_a_employee_id = match.winner_employee_id;
-            else if (!targetRow.player_b_employee_id) update.player_b_employee_id = match.winner_employee_id;
+            if (!freshTarget.player_a_employee_id) {
+              update.player_a_employee_id = match.winner_employee_id;
+            } else if (!freshTarget.player_b_employee_id &&
+                       freshTarget.player_a_employee_id !== match.winner_employee_id) {
+              update.player_b_employee_id = match.winner_employee_id;
+            }
+
             if (Object.keys(update).length > 0) {
               await supabase
                 .from('tournament_matches')
@@ -1367,29 +1417,85 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Convenience wrapper: finds the active participant row by tournamentId +
-  // employeeId, then delegates to withdrawFromTournament.
-  // Also deducts the 2 participation points that were awarded on registration
-  // via the DB trigger trg_leaderboard_participant.
+  // Unregister flow:
+  //   • Tournament NOT yet started → withdraw immediately (existing behaviour)
+  //   • Tournament already live    → set participant status to 'pending_withdrawal'
+  //     so the admin sees a request card and can approve or reject it.
+  //     No new table or column needed — 'pending_withdrawal' is just another
+  //     status value on tournament_participants.
   const unregisterFromTournament = async (tournamentId, employeeId) => {
     try {
       const participant = tournamentParticipants.find(
-        p =>
+        (p) =>
           p.tournament_id === tournamentId &&
           p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
-          p.status !== 'withdrawn'
+          !['withdrawn', 'pending_withdrawal'].includes(String(p.status || '').toLowerCase())
       );
       if (!participant) {
+        // Already pending or withdrawn
+        const alreadyPending = tournamentParticipants.find(
+          (p) =>
+            p.tournament_id === tournamentId &&
+            p.employee_id?.toUpperCase() === employeeId?.toUpperCase() &&
+            String(p.status || '').toLowerCase() === 'pending_withdrawal'
+        );
+        if (alreadyPending) return { success: true, pending: true };
         return { success: false, error: 'You are not registered for this tournament' };
       }
 
+      const tournament = tournaments.find((t) => t.id === tournamentId);
+      const tournamentStarted = ['live', 'in_progress'].includes(
+        String(tournament?.status || '').toLowerCase()
+      );
+
+      if (tournamentStarted) {
+        // Queue for admin approval — mark as pending_withdrawal
+        const { error } = await supabase
+          .from('tournament_participants')
+          .update({ status: 'pending_withdrawal' })
+          .match({ id: participant.id });
+        if (error) throw error;
+        await loadTournamentParticipants();
+        return { success: true, pending: true };
+      }
+
+      // Tournament not started — withdraw immediately
       const result = await withdrawFromTournament(participant.id);
       if (!result.success) return result;
-
-      // Participation no longer affects points, so just reload the leaderboard
-      // to keep the UI consistent after status changes.
       await loadLeaderboard();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
 
+  // Admin approves a withdrawal request → finalise as withdrawn
+  const approveWithdrawalRequest = async (participantId) => {
+    if (!isAdmin()) return { success: false, error: 'Only admins can approve withdrawal requests' };
+    try {
+      const { error } = await supabase
+        .from('tournament_participants')
+        .update({ status: 'withdrawn' })
+        .match({ id: participantId });
+      if (error) throw error;
+      await loadTournamentParticipants();
+      await loadLeaderboard();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Admin rejects a withdrawal request → restore previous active status
+  const rejectWithdrawalRequest = async (participantId) => {
+    if (!isAdmin()) return { success: false, error: 'Only admins can reject withdrawal requests' };
+    try {
+      const { error } = await supabase
+        .from('tournament_participants')
+        .update({ status: 'registered' })
+        .match({ id: participantId });
+      if (error) throw error;
+      await loadTournamentParticipants();
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -1777,6 +1883,137 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // ── Smart knockout refresh (admin) ─────────────────────────────────────
+  // Reloads participants and matches from Supabase, keeps completed/bye
+  // matches intact, deletes only pending matches, and regenerates the
+  // remaining rounds with phantom prevention and bye auto-completion.
+  const refreshKnockoutFixtures = async (tournamentId) => {
+    if (!isAdmin()) return { success: false, error: 'Admins only' };
+    try {
+      // Fetch fresh data directly from Supabase (not stale React state)
+      const [{ data: freshParticipants }, { data: freshMatches }] = await Promise.all([
+        supabase.from('tournament_participants').select('*').eq('tournament_id', tournamentId),
+        supabase.from('tournament_matches').select('*').eq('tournament_id', tournamentId),
+      ]);
+
+      const APPROVED = new Set([
+        'registered', 'active', 'semi_finalist', 'finalist',
+        'eliminated', 'pending_withdrawal',
+      ]);
+      const approvedParticipants = (freshParticipants || []).filter(
+        (p) => APPROVED.has(String(p.status || '').toLowerCase())
+      );
+
+      const plan = refreshKnockoutPlan(freshMatches || [], approvedParticipants);
+
+      if (plan.status === 'up_to_date') {
+        await Promise.all([loadTournamentMatches(), loadTournamentParticipants()]);
+        return { success: true, message: plan.message };
+      }
+
+      // Delete pending matches
+      if (plan.matchesToDelete.length > 0) {
+        const { error: delErr } = await supabase
+          .from('tournament_matches')
+          .delete()
+          .in('id', plan.matchesToDelete);
+        if (delErr) throw delErr;
+      }
+
+      // Insert new rounds
+      const payloads = [];
+      for (const round of plan.newRounds) {
+        for (const match of round.matches) {
+          if (!match.player_a_employee_id && !match.player_b_employee_id &&
+              !match._preplace_a && !match._preplace_b) continue;
+          payloads.push({
+            tournament_id:         tournamentId,
+            match_code:            match.match_code,
+            round:                 match.round,
+            match_number:          match.match_number,
+            player_a_employee_id:  match._preplace_a ?? match.player_a_employee_id,
+            player_b_employee_id:  match._preplace_b ?? match.player_b_employee_id,
+            score_a:               match.score_a,
+            score_b:               match.score_b,
+            winner_employee_id:    match.winner_employee_id,
+            status:                match.status,
+            played_at:             match.status === 'bye' ? new Date().toISOString() : null,
+          });
+        }
+      }
+
+      if (payloads.length > 0) {
+        const { data: inserted, error: insErr } = await supabase
+          .from('tournament_matches')
+          .insert(payloads)
+          .select();
+        if (insErr) throw insErr;
+
+        // Re-wire next_match_winner_id pointers
+        const byCode = new Map((inserted || []).map((r) => [r.match_code, r]));
+        const ptrs   = [];
+        for (let ri = 0; ri < plan.newRounds.length - 1; ri++) {
+          const cur  = plan.newRounds[ri];
+          const next = plan.newRounds[ri + 1];
+          cur.matches.forEach((m, mi) => {
+            const curRow  = byCode.get(m.match_code);
+            const nextRow = byCode.get(next.matches[Math.floor(mi / 2)]?.match_code);
+            if (curRow && nextRow) {
+              ptrs.push(
+                supabase
+                  .from('tournament_matches')
+                  .update({ next_match_winner_id: nextRow.id })
+                  .match({ id: curRow.id })
+              );
+            }
+          });
+        }
+        await Promise.all(ptrs);
+
+        // Auto-advance bye winners into next-round slots
+        for (let ri = 0; ri < plan.newRounds.length - 1; ri++) {
+          const cur  = plan.newRounds[ri];
+          const next = plan.newRounds[ri + 1];
+          for (let mi = 0; mi < cur.matches.length; mi++) {
+            const match = cur.matches[mi];
+            if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
+            const sourceRow = byCode.get(match.match_code);
+            const nextMatch = next.matches[Math.floor(mi / 2)];
+            if (!nextMatch) continue;
+            const targetRow = byCode.get(nextMatch.match_code);
+            if (!sourceRow || !targetRow) continue;
+
+            const { data: freshTarget } = await supabase
+              .from('tournament_matches')
+              .select('player_a_employee_id, player_b_employee_id')
+              .eq('id', targetRow.id)
+              .single();
+            if (!freshTarget) continue;
+
+            const update = {};
+            if (!freshTarget.player_a_employee_id) {
+              update.player_a_employee_id = match.winner_employee_id;
+            } else if (!freshTarget.player_b_employee_id &&
+                       freshTarget.player_a_employee_id !== match.winner_employee_id) {
+              update.player_b_employee_id = match.winner_employee_id;
+            }
+            if (Object.keys(update).length > 0) {
+              await supabase
+                .from('tournament_matches')
+                .update(update)
+                .match({ id: targetRow.id });
+            }
+          }
+        }
+      }
+
+      await Promise.all([loadTournamentMatches(), loadTournamentParticipants()]);
+      return { success: true, message: plan.message };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   // ── Final results (admin) ───────────────────────────────────────────────
   const declareFinalResults = async (tournamentId, results) => {
     if (!isAdmin()) {
@@ -2141,6 +2378,12 @@ export const AppProvider = ({ children }) => {
     approveTournamentRegistration,
     withdrawFromTournament,
     unregisterFromTournament,
+    approveWithdrawalRequest,
+    rejectWithdrawalRequest,
+    refreshTournamentData: async () => {
+      await Promise.all([loadTournaments(), loadTournamentMatches(), loadTournamentParticipants()]);
+    },
+    refreshKnockoutFixtures,
     addTournamentMatch,
     updateTournamentMatch,
     deleteTournamentMatch,
