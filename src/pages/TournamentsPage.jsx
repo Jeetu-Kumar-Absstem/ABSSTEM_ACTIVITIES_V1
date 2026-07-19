@@ -238,7 +238,7 @@ const TournamentsPage = () => {
   const [matchToDelete, setMatchToDelete] = useState(null);
   // editTournamentId: tournament being edited by admin (status / registration / date)
   const [editTournamentId, setEditTournamentId] = useState(null);
-  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '' });
+  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '', end_date: '' });
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -468,6 +468,7 @@ const TournamentsPage = () => {
                               status: t.status || 'registration_open',
                               registration_open: t.registration_open !== false,
                               start_date: t.start_date || '',
+                              end_date: t.end_date || '',
                             });
                             setEditTournamentId(t.id);
                           }}
@@ -1488,8 +1489,8 @@ const TournamentsPage = () => {
   };
 
   const handleCreateTournament = async () => {
-    if (!tForm.name.trim() || !tForm.start_date) {
-      showToast('Name and start date are required', 'error');
+    if (!tForm.name.trim() || !tForm.start_date || !tForm.end_date) {
+      showToast('Name, start date and end date are required', 'error');
       return;
     }
     const result = await addTournament({
@@ -1723,11 +1724,16 @@ const TournamentsPage = () => {
   const handleUpdateTournamentMeta = async () => {
     const base = tournaments.find(t => t.id === editTournamentId);
     if (!base) return;
+    if (!tEditForm.end_date) {
+      showToast('End date is required', 'error');
+      return;
+    }
     const result = await updateTournament(editTournamentId, {
       ...base,
       status: tEditForm.status,
       registration_open: tEditForm.registration_open,
       start_date: tEditForm.start_date,
+      end_date: tEditForm.end_date,
     });
     if (result.success) {
       showToast('Tournament updated');
@@ -1818,6 +1824,18 @@ const TournamentsPage = () => {
                     onChange={(e) => setTEditForm(f => ({ ...f, start_date: e.target.value }))}
                   />
                 </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>End Date *</label>
+                  <input
+                    type="date"
+                    style={{
+                      ...styles.formInput,
+                      borderColor: !tEditForm.end_date ? '#e53935' : '#d0d0d0',
+                    }}
+                    value={tEditForm.end_date}
+                    onChange={(e) => setTEditForm(f => ({ ...f, end_date: e.target.value }))}
+                  />
+                </div>
                 <div style={{
                   fontSize: '0.68rem', color: '#7b5800',
                   background: '#fff8e1', borderRadius: 4,
@@ -1877,7 +1895,7 @@ const TournamentsPage = () => {
                          onChange={(e) => setTForm(f => ({ ...f, start_date: e.target.value }))} />
                 </div>
                 <div style={styles.formRow}>
-                  <label style={styles.formLabel}>End Date</label>
+                  <label style={styles.formLabel}>End Date *</label>
                   <input style={styles.formInput} type="date" value={tForm.end_date}
                          onChange={(e) => setTForm(f => ({ ...f, end_date: e.target.value }))} />
                 </div>
