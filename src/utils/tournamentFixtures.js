@@ -892,6 +892,178 @@ export const buildRoundRobinKnockoutPlan = (standings = [], opts = {}) => {
 };
 
 /**
+ * Build a complete League fixture plan:
+ *   • ALL round-robin matches (every participant plays each other once)
+ *   • Complete knockout bracket SHELLS (QF / SF / Final) with null players = TBD
+ *
+ * The KO shells are created immediately so the bracket is visible from day 1.
+ * As RR results come in, call `updateKnockoutShellsFromStandings` to fill in
+ * the actual player slots.
+ *
+ * KO structure (matches top-5 from standings):
+ *   Seed 1, 2, 3 → BYE into SF
+ *   KO_QF1: Seed 4 vs Seed 5
+ *   KO_SF1: Seed 1 vs winner(KO_QF1)
+ *   KO_SF2: Seed 2 vs Seed 3
+ *   KO_F1 : winner(KO_SF1) vs winner(KO_SF2)
+ *
+ * @param {object[]} participants
+ * @param {object}   opts
+ * @returns {{ rrRounds: Round[], koMatches: object[] }}
+ */
+export const buildLeagueFullFixturePlan = (participants = [], opts = {}) => {
+  const {
+    playersPerTeam      = 1,
+    tournamentStartDate = null,
+    startHour           = 10,
+    intervalMinutes     = 30,
+    timezone            = 'Asia/Kolkata',
+  } = opts;
+
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+
+  let teamMap = {};
+  let bracketParticipants = participants;
+
+  if (ppt > 1) {
+    const teams = groupIntoTeams(participants, ppt);
+    teamMap = Object.fromEntries(teams.map((t) => [t.captain.employee_id, t]));
+    bracketParticipants = teams.map((t) => t.captain);
+  }
+
+  // ── Round-Robin matches ─────────────────────────────────────────────────
+  const rrMatches = [];
+  let counter = 1;
+  for (let i = 0; i < bracketParticipants.length; i++) {
+    for (let j = i + 1; j < bracketParticipants.length; j++) {
+      rrMatches.push({
+        round: 'RR',
+        match_number: counter,
+        match_code: `RR${counter}`,
+        player_a_employee_id: bracketParticipants[i]?.employee_id || null,
+        player_b_employee_id: bracketParticipants[j]?.employee_id || null,
+        status: 'scheduled',
+        winner_employee_id: null,
+        score_a: null,
+        score_b: null,
+      });
+      counter++;
+    }
+  }
+
+  let rrRounds = [{ round: 'RR', label: 'Round Robin', matches: rrMatches }];
+  if (ppt > 1) rrRounds = injectTeamPlayers(rrRounds, teamMap);
+  if (tournamentStartDate) {
+    rrRounds = stampScheduledTimes(rrRounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
+  }
+
+  // ── KO Shell matches (all TBD) ──────────────────────────────────────────
+  // Shells are inserted with null players; they get filled as RR results come in.
+  const koMatches = [
+    // QF: Seed 4 vs Seed 5
+    {
+      round: 'QF',
+      match_number: 1,
+      match_code: 'KO_QF1',
+      player_a_employee_id: null,
+      player_b_employee_id: null,
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+    // SF1: Seed 1 vs winner(QF)
+    {
+      round: 'SF',
+      match_number: 1,
+      match_code: 'KO_SF1',
+      player_a_employee_id: null,
+      player_b_employee_id: null,
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+    // SF2: Seed 2 vs Seed 3
+    {
+      round: 'SF',
+      match_number: 2,
+      match_code: 'KO_SF2',
+      player_a_employee_id: null,
+      player_b_employee_id: null,
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+    // Final
+    {
+      round: 'F',
+      match_number: 1,
+      match_code: 'KO_F1',
+      player_a_employee_id: null,
+      player_b_employee_id: null,
+      status: 'scheduled',
+      winner_employee_id: null,
+      score_a: null,
+      score_b: null,
+    },
+  ];
+
+  return { rrRounds, koMatches };
+};
+
+/**
+ * Given current RR standings (sorted best→worst), return the set of Supabase
+ * updates needed to fill KO shell matches with the correct players.
+ *
+ * Only updates slots that can be determined and are not yet filled by a real
+ * match result. Returns an array of { matchCode, update } objects.
+ *
+ * Seeding:
+ *   Seed 1 → KO_SF1.player_a
+ *   Seed 2 → KO_SF2.player_a
+ *   Seed 3 → KO_SF2.player_b
+ *   Seed 4 → KO_QF1.player_a
+ *   Seed 5 → KO_QF1.player_b
+ *
+ * @param {object[]} standings   — computeRoundRobinStandings result (sorted)
+ * @param {object[]} koMatches   — existing KO match rows from Supabase
+ * @returns {Array<{ id: string, update: object }>}
+ */
+export const computeKnockoutShellUpdates = (standings = [], koMatches = []) => {
+  const byCode = new Map(koMatches.map((m) => [String(m.match_code || '').toUpperCase(), m]));
+
+  const seed = (n) => standings[n - 1]?.employee_id || null;
+
+  const updates = [];
+
+  const tryUpdate = (code, field, value) => {
+    if (!value) return; // no player determined yet
+    const match = byCode.get(code);
+    if (!match) return;
+    // Don't overwrite a slot that already has a real match result player
+    // (i.e. the match is completed/walkover) — only update TBD slots.
+    if (String(match.status || '').toLowerCase() === 'completed') return;
+    if (String(match[field] || '') === String(value)) return; // already correct
+    updates.push({ id: match.id, update: { [field]: value } });
+  };
+
+  // KO_QF1: Seed4 vs Seed5
+  tryUpdate('KO_QF1', 'player_a_employee_id', seed(4));
+  tryUpdate('KO_QF1', 'player_b_employee_id', seed(5));
+
+  // KO_SF1: Seed1 vs winner(QF) — only fill Seed1 here (QF winner filled by advanceWinner)
+  tryUpdate('KO_SF1', 'player_a_employee_id', seed(1));
+
+  // KO_SF2: Seed2 vs Seed3
+  tryUpdate('KO_SF2', 'player_a_employee_id', seed(2));
+  tryUpdate('KO_SF2', 'player_b_employee_id', seed(3));
+
+  return updates;
+};
+
+/**
  * @param {object[]} participants
  * @param {object[]} matches       — existing matches (for standing + opponent tracking)
  * @param {number}   roundNumber

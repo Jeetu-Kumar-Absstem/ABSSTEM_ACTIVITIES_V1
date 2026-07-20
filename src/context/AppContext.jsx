@@ -8,6 +8,8 @@ import {
   buildRoundRobinFixturePlan,
   buildRoundRobinKnockoutPlan,
   buildSwissRoundPlan,
+  buildLeagueFullFixturePlan,
+  computeKnockoutShellUpdates,
   compareTournamentRounds,
   computeRoundRobinStandings,
   getMatchTeams,
@@ -1125,8 +1127,13 @@ export const AppProvider = ({ children }) => {
           }
         }
       } else if (format === 'round_robin') {
-        roundPlan = buildRoundRobinFixturePlan(participants, fixtureOpts);
-        for (const round of roundPlan.rounds) {
+        // Generate ALL RR matches + KO bracket shells (TBD placeholders) at once.
+        // Shells are filled in progressively as RR results arrive via recordMatchResult.
+        const leaguePlan = buildLeagueFullFixturePlan(participants, fixtureOpts);
+        roundPlan = { rounds: leaguePlan.rrRounds };
+
+        // RR match payloads
+        for (const round of leaguePlan.rrRounds) {
           for (const match of round.matches) {
             payloads.push({
               tournament_id:         tournamentId,
@@ -1140,6 +1147,51 @@ export const AppProvider = ({ children }) => {
             });
           }
         }
+
+        // Insert RR matches first
+        const { data: rrInserted, error: rrErr } = await supabase
+          .from('tournament_matches')
+          .insert(payloads)
+          .select();
+        if (rrErr) throw rrErr;
+
+        // Insert KO shell matches (all TBD)
+        const koPayloads = leaguePlan.koMatches.map((m) => ({
+          tournament_id:         tournamentId,
+          match_code:            m.match_code,
+          round:                 m.round,
+          match_number:          m.match_number,
+          player_a_employee_id:  null,
+          player_b_employee_id:  null,
+          status:                'scheduled',
+          winner_employee_id:    null,
+          score_a:               null,
+          score_b:               null,
+          scheduled_at:          null,
+        }));
+        const { data: koInserted, error: koErr } = await supabase
+          .from('tournament_matches')
+          .insert(koPayloads)
+          .select();
+        if (koErr) throw koErr;
+
+        // Wire KO pointer chain: QF1→SF1, SF1→F1, SF2→F1
+        const byCode = new Map((koInserted || []).map((r) => [r.match_code, r]));
+        const qf1  = byCode.get('KO_QF1');
+        const sf1  = byCode.get('KO_SF1');
+        const sf2  = byCode.get('KO_SF2');
+        const fin  = byCode.get('KO_F1');
+        const ptrs = [];
+        if (qf1 && sf1) ptrs.push(supabase.from('tournament_matches').update({ next_match_winner_id: sf1.id }).match({ id: qf1.id }));
+        if (sf1 && fin) ptrs.push(supabase.from('tournament_matches').update({ next_match_winner_id: fin.id }).match({ id: sf1.id }));
+        if (sf2 && fin) ptrs.push(supabase.from('tournament_matches').update({ next_match_winner_id: fin.id }).match({ id: sf2.id }));
+        await Promise.all(ptrs);
+
+        await supabase.from('tournaments').update({ status: 'live', registration_open: false }).match({ id: tournamentId });
+        await loadTournaments();
+        await loadTournamentMatches();
+        return { success: true, data: [...(rrInserted || []), ...(koInserted || [])] };
+
       } else if (format === 'swiss') {
         const nextRoundNumber = latestSwissRound ? latestSwissRound + 1 : 1;
         roundPlan = buildSwissRoundPlan(participants, existingMatches, nextRoundNumber, fixtureOpts);
@@ -1806,6 +1858,45 @@ export const AppProvider = ({ children }) => {
         const isKoRound = String(match.match_code || '').toUpperCase().startsWith('KO_');
         if (winner && (fmt === 'knockout' || isKoRound)) {
           await advanceWinnerToNextMatch(match, winner);
+        }
+      }
+
+      // ── Auto-fill KO bracket shells when a League (round_robin) RR match completes ──
+      // After each RR result, recompute standings and push updated seeds into
+      // the KO_QF1, KO_SF1, KO_SF2 shell matches (F1 is filled by advanceWinner).
+      const isRrMatch = String(match.round || '').toUpperCase().startsWith('RR') &&
+                        !String(match.match_code || '').toUpperCase().startsWith('KO_');
+      const tournamentForRr = tournaments.find((t) => t.id === match.tournament_id);
+      const fmtForRr = normalizeTournamentFormat(tournamentForRr?.format);
+      if (isRrMatch && fmtForRr === 'round_robin') {
+        try {
+          // Fetch fresh match + participant data so standings are up to date
+          const [{ data: freshMatches }, { data: freshParticipants }] = await Promise.all([
+            supabase.from('tournament_matches').select('*').eq('tournament_id', match.tournament_id),
+            supabase.from('tournament_participants').select('*').eq('tournament_id', match.tournament_id),
+          ]);
+          const rrOnlyMatches = (freshMatches || []).filter(
+            (m) => String(m.round || '').toUpperCase().startsWith('RR') &&
+                   !String(m.match_code || '').toUpperCase().startsWith('KO_')
+          );
+          const approvedParts = (freshParticipants || []).filter((p) =>
+            ['registered','active','semi_finalist','finalist','eliminated','pending_withdrawal']
+              .includes(String(p.status || '').toLowerCase())
+          );
+          const standings = computeRoundRobinStandings(rrOnlyMatches, approvedParts);
+          const koShells = (freshMatches || []).filter(
+            (m) => String(m.match_code || '').toUpperCase().startsWith('KO_')
+          );
+          if (koShells.length > 0) {
+            const shellUpdates = computeKnockoutShellUpdates(standings, koShells);
+            await Promise.all(
+              shellUpdates.map(({ id, update }) =>
+                supabase.from('tournament_matches').update(update).match({ id })
+              )
+            );
+          }
+        } catch (shellErr) {
+          console.warn('KO shell update failed (non-critical):', shellErr);
         }
       }
 

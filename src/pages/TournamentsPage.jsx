@@ -615,13 +615,24 @@ const TournamentsPage = () => {
     const latestRoundOpen = latestRound
       ? latestRound.matches.some((match) => !['completed', 'walkover', 'no_show', 'bye', 'draw', 'cancelled', 'rescheduled', 'disputed'].includes(String(match.status || '').toLowerCase()))
       : false;
+    // For round_robin: fixtures not yet generated if no RR matches exist
+    // (KO shell matches don't count — they're created alongside, not before, RR).
+    const rrMatchesExist = activeTournamentFormat === 'round_robin'
+      ? matchesForActive.some((m) =>
+          String(m.round || '').toUpperCase().startsWith('RR') &&
+          !String(m.match_code || '').toUpperCase().startsWith('KO_')
+        )
+      : false;
+
     const canGenerateFixtures = isAdmin()
       && activeTournamentRecord?.status !== 'completed'
       && activeTournamentRecord?.registration_open === false
       && (
-        activeTournamentFormat !== 'swiss'
-          ? matchesForActive.length === 0
-          : !latestRoundOpen
+        activeTournamentFormat === 'swiss'
+          ? !latestRoundOpen
+          : activeTournamentFormat === 'round_robin'
+            ? !rrMatchesExist
+            : matchesForActive.length === 0
       );
     const generateLabel = activeTournamentFormat === 'swiss' && matchesForActive.length > 0
       ? 'Generate Next Swiss Round'
@@ -785,8 +796,8 @@ const TournamentsPage = () => {
         String(m.status || '').toLowerCase()
       )
     );
-    const hasKoPhase    = koMatches.length > 0;
-    const canGenerateKo = isAdmin() && isRoundRobin && rrAllDone && !hasKoPhase;
+    const hasKoPhase = koMatches.length > 0;
+    // KO is now auto-generated alongside RR fixtures — no manual "Generate KO" button needed.
 
     return (
       <div style={{ display: 'grid', gap: '1rem' }}>
@@ -796,24 +807,14 @@ const TournamentsPage = () => {
           <div className="clay-card" style={{ ...styles.card, background: '#e8f4fd' }}>
             <div style={styles.cardHeader}>
               <div style={styles.cardHeaderTitle}>📋 Round-Robin Standings</div>
-              {canGenerateKo && (
-                <button
-                  onClick={async () => {
-                    const result = await generateRoundRobinKnockout(activeTournamentRecord.id);
-                    if (result.success) {
-                      showToast('Knockout phase generated — Top 5 advance!');
-                    } else {
-                      showToast(result.error || 'Failed to generate knockout phase', 'error');
-                    }
-                  }}
-                  style={{ ...styles.navyBtn, background: '#1b5e20' }}
-                >
-                  🏆 Generate Knockout Phase
-                </button>
-              )}
-              {hasKoPhase && (
+              {rrAllDone && hasKoPhase && (
                 <span style={{ ...styles.tinyChip, background: '#e8f5e9', color: '#2e7d32', fontSize: '0.72rem' }}>
-                  ✓ Knockout phase active
+                  ✓ All RR matches done — Knockout phase active
+                </span>
+              )}
+              {!rrAllDone && hasKoPhase && (
+                <span style={{ ...styles.tinyChip, background: '#fff3e0', color: '#e65100', fontSize: '0.72rem' }}>
+                  🔄 Standings update live — KO bracket fills automatically
                 </span>
               )}
             </div>
@@ -881,7 +882,9 @@ const TournamentsPage = () => {
           <div className="clay-card" style={{ ...styles.card }}>
             <div style={styles.cardHeader}>
               <div style={styles.cardHeaderTitle}>🏆 Knockout Phase</div>
-              <span style={{ fontSize: '0.7rem', color: '#888' }}>Top 5 · QF → SF → Final</span>
+              <span style={{ fontSize: '0.7rem', color: '#888' }}>
+                {rrAllDone ? 'Top 5 · QF → SF → Final' : '⏳ Players fill in as league results arrive · QF → SF → Final'}
+              </span>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <div style={{ ...styles.bracketGrid, gridTemplateColumns: 'repeat(3, 1fr)', minWidth: 720 }}>
