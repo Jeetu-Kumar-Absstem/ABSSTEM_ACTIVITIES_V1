@@ -125,7 +125,7 @@ const DashboardPage = () => {
         <MetricCard label="Today's slots" value={selectedGameBookings.length} caption={`${selectedGameRecord.name} bookings on ${currentDayName}`} accent="#1a3c6e" />
         <MetricCard label="Leaderboard leader" value={leader ? leader.points : 0} caption={leader ? `${leader.name} is ranked #${leader.rank}` : 'No match results yet'} accent="#1b5e20" />
         <MetricCard label="Active bans" value={activeBanCount} caption={`${selectedGameRecord.name} scope`} accent="#c62828" />
-        <MetricCard label="Employees" value={totalEmployees} caption="Loaded from employee master" accent="#f9a825" />
+        {/* <MetricCard label="Employees" value={totalEmployees} caption="Loaded from employee master" accent="#f9a825" /> */}
       </section>
 
       <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>

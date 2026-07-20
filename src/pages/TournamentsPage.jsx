@@ -238,7 +238,7 @@ const TournamentsPage = () => {
   const [matchToDelete, setMatchToDelete] = useState(null);
   // editTournamentId: tournament being edited by admin (status / registration / date)
   const [editTournamentId, setEditTournamentId] = useState(null);
-  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '', end_date: '' });
+  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '' });
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -468,7 +468,6 @@ const TournamentsPage = () => {
                               status: t.status || 'registration_open',
                               registration_open: t.registration_open !== false,
                               start_date: t.start_date || '',
-                              end_date: t.end_date || '',
                             });
                             setEditTournamentId(t.id);
                           }}
@@ -629,12 +628,11 @@ const TournamentsPage = () => {
       : 'Generate Fixtures';
 
     const renderMatch = (m) => {
-      // Phantom guard: TBD vs TBD should never appear in the DB with the new
-      // engine, but skip rendering just in case.
-      if (!m.player_a_employee_id && !m.player_b_employee_id) return null;
+      // TBD vs TBD shell matches — show as an upcoming placeholder card
+      const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id;
 
-      const a = teamLabel(m.player_a_employee_id, m.team_a_players);
-      const b = teamLabel(m.player_b_employee_id, m.team_b_players);
+      const a = isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players);
+      const b = isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players);
       const hasScore = m.score_a !== null && m.score_b !== null;
       const isFinal  = String(m.round || '').toUpperCase() === 'F';
 
@@ -644,53 +642,84 @@ const TournamentsPage = () => {
         (!m.player_a_employee_id && !!m.player_b_employee_id) ||
         (!!m.player_a_employee_id && !m.player_b_employee_id);
 
+      // Format scheduled time in IST
+      const matchTime = m.scheduled_at
+        ? new Date(m.scheduled_at).toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit', month: 'short',
+            hour: '2-digit', minute: '2-digit',
+            hour12: true,
+          })
+        : null;
+
       return (
-        <div key={m.id} style={{
+        <div key={m.id || m.match_code} style={{
           ...styles.matchCard,
-          border: isFinal ? '2px solid #f9a825' : isBye ? '1px dashed #b0bec5' : '1px solid #d0d0d0',
+          border: isFinal ? '2px solid #f9a825'
+                : isPhantom ? '1px dashed #90caf9'
+                : isBye ? '1px dashed #b0bec5'
+                : '1px solid #d0d0d0',
           opacity: isBye ? 0.82 : 1,
+          background: isPhantom ? '#f8fbff' : 'white',
         }}>
+          {/* Time badge */}
+          {matchTime && (
+            <div style={{
+              fontSize: '0.62rem', fontWeight: 600,
+              color: '#1a3c6e', background: '#e8eef7',
+              borderRadius: 3, padding: '0.12rem 0.4rem',
+              marginBottom: '0.28rem', display: 'inline-block',
+            }}>
+              🕐 {matchTime}
+            </div>
+          )}
+
           <div style={styles.matchLabel}>Match {m.match_code || m.match_number}</div>
 
           {/* Player A */}
           <div style={{
             ...styles.matchPlayer,
             background: hasScore && m.score_a > m.score_b ? '#e8f5e9' : 'transparent',
-            color:      hasScore && m.score_a > m.score_b ? '#1b5e20' : '#212121',
+            color:      isPhantom ? '#90a4ae'
+                        : hasScore && m.score_a > m.score_b ? '#1b5e20' : '#212121',
             fontWeight: hasScore && m.score_a > m.score_b ? 700 : 500,
+            fontStyle:  isPhantom ? 'italic' : 'normal',
           }}>
             <span style={{ fontSize: '0.7rem' }}>{a}</span>
-            <span>{m.score_a ?? '—'}</span>
+            <span>{isPhantom ? '' : (m.score_a ?? '—')}</span>
           </div>
 
-          {/* Player B — show "Bye" when slot is empty */}
+          {/* Player B */}
           <div style={{
             ...styles.matchPlayer,
             background: hasScore && m.score_b > m.score_a ? '#e8f5e9' : 'transparent',
-            color:      hasScore && m.score_b > m.score_a ? '#1b5e20'
-                          : (isBye && !m.player_b_employee_id) ? '#9e9e9e' : '#212121',
+            color:      isPhantom ? '#90a4ae'
+                        : hasScore && m.score_b > m.score_a ? '#1b5e20'
+                        : (isBye && !m.player_b_employee_id) ? '#9e9e9e' : '#212121',
             fontWeight: hasScore && m.score_b > m.score_a ? 700 : 500,
-            fontStyle:  (isBye && !m.player_b_employee_id) ? 'italic' : 'normal',
+            fontStyle:  isPhantom || (isBye && !m.player_b_employee_id) ? 'italic' : 'normal',
           }}>
             <span style={{ fontSize: '0.7rem' }}>{b}</span>
-            <span>{m.score_b ?? '—'}</span>
+            <span>{isPhantom ? '' : (m.score_b ?? '—')}</span>
           </div>
 
           {/* Status line */}
           <div style={styles.matchMeta}>
-            {m.status === 'completed'
-              ? '✓ Final'
-              : isBye
-                ? '✓ Advanced by Bye'
-                : m.status === 'walkover'
-                  ? '↷ Walkover'
-                  : m.status === 'live'
-                    ? '● Live'
-                    : '⏳ Pending'}
+            {isPhantom
+              ? '⏳ Awaiting earlier results'
+              : m.status === 'completed'
+                ? '✓ Final'
+                : isBye
+                  ? '✓ Advanced by Bye'
+                  : m.status === 'walkover'
+                    ? '↷ Walkover'
+                    : m.status === 'live'
+                      ? '● Live'
+                      : '⏳ Pending'}
           </div>
 
-          {/* Enter/Edit result — hidden for bye matches */}
-          {!isBye && canEditMatch(m) && (
+          {/* Enter/Edit result — hidden for bye and phantom matches */}
+          {!isBye && !isPhantom && canEditMatch(m) && (
             <button
               onClick={() => openResultModal(m)}
               style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}
@@ -699,8 +728,8 @@ const TournamentsPage = () => {
             </button>
           )}
 
-          {/* Admin edit/delete — also hidden for bye matches */}
-          {!isBye && isAdmin() && (
+          {/* Admin edit/delete — also hidden for bye and phantom matches */}
+          {!isBye && !isPhantom && isAdmin() && (
             <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
               <button
                 onClick={() => openEditMatchModal(m)}
@@ -902,7 +931,10 @@ const TournamentsPage = () => {
               {isAdmin() && activeTournamentRecord && (
                 <button
                   onClick={async () => {
-                    const result = await generateTournamentFixtures(activeTournamentRecord.id);
+                    const result = await generateTournamentFixtures(activeTournamentRecord.id, {
+                      playersPerTeam: activeTournamentRecord.players_per_team || 1,
+                      tournamentStartDate: activeTournamentRecord.start_date || null,
+                    });
                     if (result.success) {
                       showToast(activeTournamentFormat === 'swiss' && matchesForActive.length > 0 ? 'Swiss round generated' : 'Fixtures generated');
                     } else {
@@ -1489,8 +1521,8 @@ const TournamentsPage = () => {
   };
 
   const handleCreateTournament = async () => {
-    if (!tForm.name.trim() || !tForm.start_date || !tForm.end_date) {
-      showToast('Name, start date and end date are required', 'error');
+    if (!tForm.name.trim() || !tForm.start_date) {
+      showToast('Name and start date are required', 'error');
       return;
     }
     const result = await addTournament({
@@ -1724,16 +1756,11 @@ const TournamentsPage = () => {
   const handleUpdateTournamentMeta = async () => {
     const base = tournaments.find(t => t.id === editTournamentId);
     if (!base) return;
-    if (!tEditForm.end_date) {
-      showToast('End date is required', 'error');
-      return;
-    }
     const result = await updateTournament(editTournamentId, {
       ...base,
       status: tEditForm.status,
       registration_open: tEditForm.registration_open,
       start_date: tEditForm.start_date,
-      end_date: tEditForm.end_date,
     });
     if (result.success) {
       showToast('Tournament updated');
@@ -1824,18 +1851,6 @@ const TournamentsPage = () => {
                     onChange={(e) => setTEditForm(f => ({ ...f, start_date: e.target.value }))}
                   />
                 </div>
-                <div style={styles.formRow}>
-                  <label style={styles.formLabel}>End Date *</label>
-                  <input
-                    type="date"
-                    style={{
-                      ...styles.formInput,
-                      borderColor: !tEditForm.end_date ? '#e53935' : '#d0d0d0',
-                    }}
-                    value={tEditForm.end_date}
-                    onChange={(e) => setTEditForm(f => ({ ...f, end_date: e.target.value }))}
-                  />
-                </div>
                 <div style={{
                   fontSize: '0.68rem', color: '#7b5800',
                   background: '#fff8e1', borderRadius: 4,
@@ -1895,7 +1910,7 @@ const TournamentsPage = () => {
                          onChange={(e) => setTForm(f => ({ ...f, start_date: e.target.value }))} />
                 </div>
                 <div style={styles.formRow}>
-                  <label style={styles.formLabel}>End Date *</label>
+                  <label style={styles.formLabel}>End Date</label>
                   <input style={styles.formInput} type="date" value={tForm.end_date}
                          onChange={(e) => setTForm(f => ({ ...f, end_date: e.target.value }))} />
                 </div>

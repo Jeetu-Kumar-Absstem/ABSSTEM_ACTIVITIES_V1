@@ -16,6 +16,9 @@ import {
   normalizeTournamentFormat,
   isByeMatch,
   refreshKnockoutPlan,
+  stampScheduledTimes,
+  groupIntoTeams,
+  injectTeamPlayers,
 } from '../utils/tournamentFixtures';
 import {
   getDayName,
@@ -998,7 +1001,45 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const generateTournamentFixtures = async (tournamentId) => {
+  // ── Shared helper: insert match payloads + junction-table team players ──
+  // Accepts the flat payload array and the round plan (for team data).
+  // Returns { data, error } from Supabase insert.
+  const insertMatchesWithTeams = async (payloads, rounds) => {
+    const { data: inserted, error: insertErr } = await supabase
+      .from('tournament_matches')
+      .insert(payloads)
+      .select();
+    if (insertErr) return { data: null, error: insertErr };
+
+    // Build a match_code → id map from the inserted rows
+    const byCode = new Map((inserted || []).map((r) => [r.match_code, r]));
+
+    // Insert team players into junction table (only for 2v2+)
+    const teamRows = [];
+    for (const round of rounds) {
+      for (const match of round.matches) {
+        const row = byCode.get(match.match_code);
+        if (!row) continue;
+        const aPlayers = match.team_a_players || [];
+        const bPlayers = match.team_b_players || [];
+        // Only insert if there are non-captain members (ppt > 1)
+        if (aPlayers.length <= 1 && bPlayers.length <= 1) continue;
+        aPlayers.forEach((p, i) => {
+          if (p.employee_id) teamRows.push({ match_id: row.id, employee_id: p.employee_id, team: 'A', position: i + 1 });
+        });
+        bPlayers.forEach((p, i) => {
+          if (p.employee_id) teamRows.push({ match_id: row.id, employee_id: p.employee_id, team: 'B', position: i + 1 });
+        });
+      }
+    }
+    if (teamRows.length > 0) {
+      await supabase.from('tournament_match_players').insert(teamRows);
+    }
+
+    return { data: inserted, error: null };
+  };
+
+  const generateTournamentFixtures = async (tournamentId, opts = {}) => {
     if (!isAdmin()) {
       return { success: false, error: 'Only admins can generate fixtures' };
     }
@@ -1042,65 +1083,81 @@ export const AppProvider = ({ children }) => {
         return { success: false, error: 'Finish the current Swiss round before generating the next one' };
       }
 
+      // ── Build opts for fixture builder ────────────────────────────────
+      const fixtureOpts = {
+        playersPerTeam:      opts.playersPerTeam      ?? tournament.players_per_team ?? 1,
+        tournamentStartDate: opts.tournamentStartDate ?? tournament.start_date       ?? null,
+        startHour:           opts.startHour           ?? 10,
+        intervalMinutes:     opts.intervalMinutes     ?? 30,
+        timezone:            opts.timezone            ?? 'Asia/Kolkata',
+      };
+
       const payloads = [];
       let roundPlan = null;
+
       if (format === 'knockout') {
-        roundPlan = buildKnockoutFixturePlan(participants);
+        roundPlan = buildKnockoutFixturePlan(participants, fixtureOpts);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
-            // Guard: never insert phantom (TBD vs TBD) matches.
-            if (!match.player_a_employee_id && !match.player_b_employee_id &&
-                !match._preplace_a && !match._preplace_b) continue;
+            // Include ALL matches — even TBD shell (upcoming) matches.
+            // Only skip true phantom matches that have no pre-place hints either.
+            const isPhantom = !match.player_a_employee_id && !match.player_b_employee_id &&
+                              !match._preplace_a && !match._preplace_b;
+            // For TBD shells (future rounds): player_a/b both null but they
+            // have no _preplace either — we WANT these to show in the bracket.
+            // Only skip if both _feeds_from are also null (truly unreachable).
+            if (isPhantom && !match._feeds_from_a && !match._feeds_from_b) continue;
 
             payloads.push({
               tournament_id:         tournamentId,
               match_code:            match.match_code,
               round:                 match.round,
               match_number:          match.match_number,
-              // Use _preplace fields when a bye winner is already known for
-              // this slot — fills the next-round match at insert time.
               player_a_employee_id:  match._preplace_a ?? match.player_a_employee_id,
               player_b_employee_id:  match._preplace_b ?? match.player_b_employee_id,
               score_a:               match.score_a,
               score_b:               match.score_b,
               winner_employee_id:    match.winner_employee_id,
               status:                match.status,
+              scheduled_at:          match.scheduled_at ?? null,
               played_at:             match.status === 'bye' ? new Date().toISOString() : null,
             });
           }
         }
       } else if (format === 'round_robin') {
-        roundPlan = buildRoundRobinFixturePlan(participants);
+        roundPlan = buildRoundRobinFixturePlan(participants, fixtureOpts);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             payloads.push({
-              tournament_id: tournamentId,
-              match_code: match.match_code,
-              round: match.round,
-              match_number: match.match_number,
-              player_a_employee_id: match.player_a_employee_id,
-              player_b_employee_id: match.player_b_employee_id,
-              status: match.status,
+              tournament_id:         tournamentId,
+              match_code:            match.match_code,
+              round:                 match.round,
+              match_number:          match.match_number,
+              player_a_employee_id:  match.player_a_employee_id,
+              player_b_employee_id:  match.player_b_employee_id,
+              status:                match.status,
+              scheduled_at:          match.scheduled_at ?? null,
             });
           }
         }
       } else if (format === 'swiss') {
         const nextRoundNumber = latestSwissRound ? latestSwissRound + 1 : 1;
-        roundPlan = buildSwissRoundPlan(participants, existingMatches, nextRoundNumber);
+        roundPlan = buildSwissRoundPlan(participants, existingMatches, nextRoundNumber, fixtureOpts);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             payloads.push({
-              tournament_id: tournamentId,
-              match_code: match.match_code,
-              round: match.round,
-              match_number: match.match_number,
-              player_a_employee_id: match.player_a_employee_id,
-              player_b_employee_id: match.player_b_employee_id,
-              score_a: match.score_a,
-              score_b: match.score_b,
-              winner_employee_id: match.winner_employee_id,
-              status: match.status,
-              played_at: match.status === 'bye' ? new Date().toISOString() : null,
+              tournament_id:         tournamentId,
+              match_code:            match.match_code,
+              round:                 match.round,
+              match_number:          match.match_number,
+              player_a_employee_id:  match.player_a_employee_id,
+              player_b_employee_id:  match.player_b_employee_id,
+              score_a:               match.score_a,
+              score_b:               match.score_b,
+              winner_employee_id:    match.winner_employee_id,
+              status:                match.status,
+              scheduled_at:          match.scheduled_at ?? null,
+              played_at:             match.status === 'bye' ? new Date().toISOString() : null,
             });
           }
         }
@@ -1114,16 +1171,14 @@ export const AppProvider = ({ children }) => {
 
       await supabase
         .from('tournaments')
-        .update({
-          status: 'live',
-          registration_open: false,
-        })
+        .update({ status: 'live', registration_open: false })
         .match({ id: tournamentId });
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('tournament_matches')
-        .insert(payloads)
-        .select();
+      // Insert matches + team junction rows
+      const { data: inserted, error: insertErr } = await insertMatchesWithTeams(
+        payloads,
+        roundPlan?.rounds || []
+      );
       if (insertErr) throw insertErr;
 
       if (format === 'knockout' && roundPlan?.rounds?.length > 1) {
@@ -1149,10 +1204,6 @@ export const AppProvider = ({ children }) => {
         await Promise.all(pointerUpdates);
 
         // ── Step 2: auto-advance bye winners across ALL rounds ──────────
-        // The new engine pre-fills _preplace_a/_preplace_b in the payload
-        // for known bye winners, so many slots are already set. This pass
-        // catches any remaining cases where a bye winner still needs to be
-        // placed into the next-round match slot.
         for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
           const currentRound = roundPlan.rounds[roundIndex];
           const nextRound    = roundPlan.rounds[roundIndex + 1];
@@ -1167,8 +1218,6 @@ export const AppProvider = ({ children }) => {
             const targetRow = byCode.get(nextMatchPlan.match_code);
             if (!sourceRow || !targetRow) continue;
 
-            // Re-read the target row fresh from DB so we see any _preplace
-            // values already written during insert.
             const { data: freshTarget } = await supabase
               .from('tournament_matches')
               .select('player_a_employee_id, player_b_employee_id')
@@ -1937,16 +1986,17 @@ export const AppProvider = ({ children }) => {
             score_b:               match.score_b,
             winner_employee_id:    match.winner_employee_id,
             status:                match.status,
+            scheduled_at:          match.scheduled_at ?? null,
             played_at:             match.status === 'bye' ? new Date().toISOString() : null,
           });
         }
       }
 
       if (payloads.length > 0) {
-        const { data: inserted, error: insErr } = await supabase
-          .from('tournament_matches')
-          .insert(payloads)
-          .select();
+        const { data: inserted, error: insErr } = await insertMatchesWithTeams(
+          payloads,
+          plan.newRounds
+        );
         if (insErr) throw insErr;
 
         // Re-wire next_match_winner_id pointers

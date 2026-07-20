@@ -102,7 +102,158 @@ export const getMatchTeams = (match) => {
   };
 };
 
-// ─── Internal seeding helpers ─────────────────────────────────────────────
+// ─── 2v2 Team helpers ────────────────────────────────────────────────────────
+
+/**
+ * Split a flat participant list into teams of `playersPerTeam`.
+ * Returns an array of team objects: { captain, members[] }
+ * where members includes all players (captain + partners).
+ *
+ * Example for 2v2 with [A, B, C, D, E, F]:
+ *   → [ {captain:A, members:[A,B]}, {captain:C, members:[C,D]}, {captain:E, members:[E,F]} ]
+ *
+ * Odd leftover players at the end are discarded (they can't form a full team).
+ */
+export const groupIntoTeams = (participants = [], playersPerTeam = 1) => {
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+  if (ppt === 1) return participants.map((p) => ({ captain: p, members: [p] }));
+
+  const teams = [];
+  for (let i = 0; i + ppt <= participants.length; i += ppt) {
+    const slice = participants.slice(i, i + ppt);
+    teams.push({ captain: slice[0], members: slice });
+  }
+  return teams;
+};
+
+/**
+ * Promote a match plan produced by any of the build*FixturePlan functions
+ * to carry proper 2v2 data.
+ *
+ * For each match that has `player_a_employee_id` set, looks up the team
+ * in `teamMap` (keyed by captain employee_id) and injects:
+ *   • player_a_employee_id  — captain A (unchanged)
+ *   • player_b_employee_id  — captain B (unchanged)
+ *   • team_a_players        — [{employee_id}, …] for ALL team-A members
+ *   • team_b_players        — [{employee_id}, …] for ALL team-B members
+ *
+ * Bye matches are handled: the single captain's team is expanded on the
+ * appropriate side; the other side stays null/[].
+ */
+export const injectTeamPlayers = (rounds = [], teamMap = {}) => {
+  const expand = (captainId) => {
+    if (!captainId) return [];
+    const team = teamMap[captainId];
+    if (!team) return [{ employee_id: captainId }];
+    return team.members.map((p) => ({ employee_id: p.employee_id }));
+  };
+
+  return rounds.map((round) => ({
+    ...round,
+    matches: round.matches.map((m) => ({
+      ...m,
+      team_a_players: expand(m.player_a_employee_id),
+      team_b_players: expand(m.player_b_employee_id),
+    })),
+  }));
+};
+
+// ─── Scheduled-time helpers ───────────────────────────────────────────────────
+
+/**
+ * Build an ISO timestamp (UTC) for a match slot.
+ *
+ * @param {string|Date} baseDate  — tournament start date ("YYYY-MM-DD" or Date)
+ * @param {number}      slotIndex — 0-based slot index (each slot = intervalMinutes apart)
+ * @param {number}      startHour — local hour to begin scheduling (default 10 = 10:00 AM)
+ * @param {number}      intervalMinutes — gap between matches in minutes (default 30)
+ * @param {string}      timezone  — IANA timezone (default "Asia/Kolkata")
+ *
+ * Returns an ISO-8601 UTC string suitable for storing in a `timestamptz` column.
+ */
+export const buildMatchTimestamp = (
+  baseDate,
+  slotIndex = 0,
+  startHour = 10,
+  intervalMinutes = 30,
+  timezone = 'Asia/Kolkata'
+) => {
+  if (!baseDate) return null;
+
+  // Parse the date part in the target timezone so we don't shift days
+  const dateStr = baseDate instanceof Date
+    ? baseDate.toLocaleDateString('en-CA', { timeZone: timezone }) // "YYYY-MM-DD"
+    : String(baseDate).slice(0, 10);
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+
+  // Build a Date representing `startHour:00` local time in `timezone`
+  // Strategy: use Intl to find the UTC offset for that local time
+  const localBase = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)); // noon UTC as anchor
+
+  // Convert noon-UTC to the target timezone to find offset
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(localBase);
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const localHour = get('hour');
+
+  // Offset in ms between UTC noon and local noon
+  const utcOffsetMs = (12 - localHour) * 60 * 60 * 1000;
+  // Moment when local clock reads startHour:00:00 on dateStr
+  const startMs = Date.UTC(year, month - 1, day, startHour, 0, 0) + utcOffsetMs;
+
+  const slotMs = startMs + slotIndex * intervalMinutes * 60 * 1000;
+  return new Date(slotMs).toISOString();
+};
+
+/**
+ * Stamp every match in `rounds` with a `scheduled_at` value.
+ *
+ * Matches are numbered globally across all rounds in order, starting at
+ * slotIndex 0.  Each subsequent match is spaced `intervalMinutes` apart.
+ *
+ * @param {Round[]} rounds           — output of any build*FixturePlan
+ * @param {string}  tournamentStartDate — "YYYY-MM-DD"
+ * @param {object}  opts
+ *   @param {number} opts.startHour       — local hour (default 10)
+ *   @param {number} opts.intervalMinutes — minutes between matches (default 30)
+ *   @param {string} opts.timezone        — IANA tz (default "Asia/Kolkata")
+ * @returns {Round[]} — deep copy with scheduled_at set on each match
+ */
+export const stampScheduledTimes = (rounds = [], tournamentStartDate = null, opts = {}) => {
+  if (!tournamentStartDate) return rounds;
+
+  const {
+    startHour       = 10,
+    intervalMinutes = 30,
+    timezone        = 'Asia/Kolkata',
+  } = opts;
+
+  let slotIndex = 0;
+  return rounds.map((round) => ({
+    ...round,
+    matches: round.matches.map((m) => {
+      // Bye matches are auto-completed; no real play time needed, but we
+      // still assign a slot so times are contiguous and editable later.
+      const scheduled_at = buildMatchTimestamp(
+        tournamentStartDate,
+        slotIndex,
+        startHour,
+        intervalMinutes,
+        timezone
+      );
+      slotIndex += 1;
+      return { ...m, scheduled_at };
+    }),
+  }));
+};
+
+
 
 /**
  * Classic bracket seeding permutation for a bracket of `n` slots (power of 2).
@@ -133,10 +284,43 @@ const _buildSeededSlots = (players) => {
 
 // ─── Main builder ─────────────────────────────────────────────────────────
 
-export const buildKnockoutFixturePlan = (participants = []) => {
+/**
+ * @param {object[]} participants     — array of participant objects (each has employee_id)
+ * @param {object}   opts
+ *   @param {number}  opts.playersPerTeam   — 1 (singles), 2 (doubles), 3 (triples). Default 1.
+ *   @param {string}  opts.tournamentStartDate — "YYYY-MM-DD" for auto-scheduling
+ *   @param {number}  opts.startHour           — local hour for first match (default 10)
+ *   @param {number}  opts.intervalMinutes      — minutes between matches (default 30)
+ *   @param {string}  opts.timezone             — IANA tz (default "Asia/Kolkata")
+ */
+export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
   if (!participants || participants.length < 2) return { rounds: [], bracketSize: 2 };
 
-  const shuffled = shuffleArray(participants);
+  const {
+    playersPerTeam      = 1,
+    tournamentStartDate = null,
+    startHour           = 10,
+    intervalMinutes     = 30,
+    timezone            = 'Asia/Kolkata',
+  } = opts;
+
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+
+  // For team play: group participants into teams, use the captain as the
+  // "player" slot in the bracket.  Build a lookup map for later team injection.
+  let teamMap = {};
+  let bracketParticipants = participants;
+
+  if (ppt > 1) {
+    const shuffledAll = shuffleArray(participants);
+    const teams = groupIntoTeams(shuffledAll, ppt);
+    teamMap = Object.fromEntries(
+      teams.map((t) => [t.captain.employee_id, t])
+    );
+    bracketParticipants = teams.map((t) => t.captain);
+  }
+
+  const shuffled = ppt > 1 ? bracketParticipants : shuffleArray(participants);
   const size = nextPowerOfTwo(shuffled.length);
   const slots = _buildSeededSlots(shuffled); // length = size, null = bye slot
 
@@ -289,7 +473,17 @@ export const buildKnockoutFixturePlan = (participants = []) => {
     prevEffective = nextEffective;
   }
 
-  return { rounds, bracketSize: size };
+  // Inject team members for 2v2+ matches
+  let finalRounds = ppt > 1 ? injectTeamPlayers(rounds, teamMap) : rounds;
+
+  // Stamp scheduled times if a start date was provided
+  if (tournamentStartDate) {
+    finalRounds = stampScheduledTimes(finalRounds, tournamentStartDate, {
+      startHour, intervalMinutes, timezone,
+    });
+  }
+
+  return { rounds: finalRounds, bracketSize: size };
 };
 
 // ─── UI helpers ───────────────────────────────────────────────────────────
@@ -383,17 +577,40 @@ export const refreshKnockoutPlan = (existingMatches = [], participants = []) => 
   };
 };
 
-export const buildRoundRobinFixturePlan = (participants = []) => {
+/**
+ * @param {object[]} participants
+ * @param {object}   opts  — same shape as buildKnockoutFixturePlan opts
+ */
+export const buildRoundRobinFixturePlan = (participants = [], opts = {}) => {
+  const {
+    playersPerTeam      = 1,
+    tournamentStartDate = null,
+    startHour           = 10,
+    intervalMinutes     = 30,
+    timezone            = 'Asia/Kolkata',
+  } = opts;
+
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+
+  let teamMap = {};
+  let bracketParticipants = participants;
+
+  if (ppt > 1) {
+    const teams = groupIntoTeams(participants, ppt);
+    teamMap = Object.fromEntries(teams.map((t) => [t.captain.employee_id, t]));
+    bracketParticipants = teams.map((t) => t.captain);
+  }
+
   const matches = [];
   let counter = 1;
-  for (let i = 0; i < participants.length; i += 1) {
-    for (let j = i + 1; j < participants.length; j += 1) {
+  for (let i = 0; i < bracketParticipants.length; i += 1) {
+    for (let j = i + 1; j < bracketParticipants.length; j += 1) {
       matches.push({
         round: 'RR',
         match_number: counter,
         match_code: `RR${counter}`,
-        player_a_employee_id: participants[i]?.employee_id || null,
-        player_b_employee_id: participants[j]?.employee_id || null,
+        player_a_employee_id: bracketParticipants[i]?.employee_id || null,
+        player_b_employee_id: bracketParticipants[j]?.employee_id || null,
         status: 'scheduled',
         winner_employee_id: null,
         score_a: null,
@@ -402,13 +619,15 @@ export const buildRoundRobinFixturePlan = (participants = []) => {
       counter += 1;
     }
   }
-  return {
-    rounds: [{
-      round: 'RR',
-      label: 'Round Robin',
-      matches,
-    }],
-  };
+
+  let rounds = [{ round: 'RR', label: 'Round Robin', matches }];
+
+  if (ppt > 1) rounds = injectTeamPlayers(rounds, teamMap);
+  if (tournamentStartDate) {
+    rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
+  }
+
+  return { rounds };
 };
 
 const buildOpponentMap = (matches = []) => {
@@ -585,7 +804,7 @@ export const computeRoundRobinStandings = (matches = [], participants = []) => {
 //
 // Returns an array of match payload objects ready for Supabase insert
 // (tournament_id must be set by the caller).
-export const buildRoundRobinKnockoutPlan = (standings = []) => {
+export const buildRoundRobinKnockoutPlan = (standings = [], opts = {}) => {
   const top5 = standings.slice(0, 5);
   if (top5.length < 2) return [];
 
@@ -653,10 +872,32 @@ export const buildRoundRobinKnockoutPlan = (standings = []) => {
     matches[1].player_b_employee_id = seed(4);
   }
 
+  const {
+    tournamentStartDate = null,
+    startHour           = 10,
+    intervalMinutes     = 30,
+    timezone            = 'Asia/Kolkata',
+  } = opts;
+
+  if (tournamentStartDate) {
+    const stamped = stampScheduledTimes(
+      [{ round: 'KO', label: 'Knockout', matches }],
+      tournamentStartDate,
+      { startHour, intervalMinutes, timezone }
+    );
+    return stamped[0].matches;
+  }
+
   return matches;
 };
 
-export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber = 1) => {
+/**
+ * @param {object[]} participants
+ * @param {object[]} matches       — existing matches (for standing + opponent tracking)
+ * @param {number}   roundNumber
+ * @param {object}   opts          — same shape as buildKnockoutFixturePlan opts
+ */
+export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber = 1, opts = {}) => {
   const standings = computeSwissStandings(participants, matches);
   const opponentMap = buildOpponentMap(matches);
   const byPoints = new Map();
@@ -740,12 +981,31 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
     }
   }
 
-  return {
-    standings,
-    rounds: [{
-      round: `SW${roundNumber}`,
-      label: `Swiss Round ${roundNumber}`,
-      matches: roundMatches,
-    }],
-  };
+  const {
+    playersPerTeam      = 1,
+    tournamentStartDate = null,
+    startHour           = 10,
+    intervalMinutes     = 30,
+    timezone            = 'Asia/Kolkata',
+  } = opts;
+
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+  let teamMap = {};
+  if (ppt > 1) {
+    const teams = groupIntoTeams(participants, ppt);
+    teamMap = Object.fromEntries(teams.map((t) => [t.captain.employee_id, t]));
+  }
+
+  let rounds = [{
+    round: `SW${roundNumber}`,
+    label: `Swiss Round ${roundNumber}`,
+    matches: roundMatches,
+  }];
+
+  if (ppt > 1) rounds = injectTeamPlayers(rounds, teamMap);
+  if (tournamentStartDate) {
+    rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
+  }
+
+  return { standings, rounds };
 };
