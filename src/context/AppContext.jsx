@@ -1861,6 +1861,33 @@ export const AppProvider = ({ children }) => {
         }
       }
 
+      // ── Revert next-match advancement when a result is "un-finished" ──────
+      // If the match previously had a winner who was advanced into the next
+      // match, and the new result_type is non-finishing (rescheduled, cancelled,
+      // disputed) or a no_show/walkover without a winner, clear that slot so the
+      // bracket card reverts to TBD.
+      const NON_FINISHING = new Set(['rescheduled', 'cancelled', 'disputed']);
+      const wasAdvanceable = !isFirstEntry; // had a previous result
+      if (wasAdvanceable && NON_FINISHING.has(status) && match.next_match_winner_id) {
+        const prevWinner = match.winner_employee_id; // value before this update
+        if (prevWinner) {
+          const nextMatch = tournamentMatches.find((m) => m.id === match.next_match_winner_id);
+          if (nextMatch) {
+            const revertPayload = {};
+            const aMatch = String(nextMatch.player_a_employee_id || '').toUpperCase() === String(prevWinner).toUpperCase();
+            const bMatch = String(nextMatch.player_b_employee_id || '').toUpperCase() === String(prevWinner).toUpperCase();
+            if (aMatch) revertPayload.player_a_employee_id = null;
+            else if (bMatch) revertPayload.player_b_employee_id = null;
+            if (Object.keys(revertPayload).length > 0) {
+              await supabase
+                .from('tournament_matches')
+                .update(revertPayload)
+                .match({ id: nextMatch.id });
+            }
+          }
+        }
+      }
+
       // ── Auto-fill KO bracket shells when a League (round_robin) RR match completes ──
       // After each RR result, recompute standings and push updated seeds into
       // the KO_QF1, KO_SF1, KO_SF2 shell matches (F1 is filled by advanceWinner).

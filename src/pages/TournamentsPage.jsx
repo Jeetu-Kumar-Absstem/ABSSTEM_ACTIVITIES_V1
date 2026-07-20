@@ -647,11 +647,20 @@ const TournamentsPage = () => {
       const hasScore = m.score_a !== null && m.score_b !== null;
       const isFinal  = String(m.round || '').toUpperCase() === 'F';
 
-      // A bye match has only one real player, or status is explicitly 'bye'.
+      // A bye match has only one real player AND no real status assigned yet,
+      // or status is explicitly 'bye'.
+      // Matches that already have a meaningful status (pending, completed,
+      // cancelled, etc.) are NOT byes — the missing second player is simply
+      // waiting to be filled in from an earlier round result.
+      const explicitStatus = String(m.status || '').toLowerCase();
+      const hasRealStatus = explicitStatus !== '' && explicitStatus !== 'bye';
       const isBye =
-        String(m.status || '').toLowerCase() === 'bye' ||
-        (!m.player_a_employee_id && !!m.player_b_employee_id) ||
-        (!!m.player_a_employee_id && !m.player_b_employee_id);
+        explicitStatus === 'bye' ||
+        (
+          ((!m.player_a_employee_id && !!m.player_b_employee_id) ||
+           (!!m.player_a_employee_id && !m.player_b_employee_id)) &&
+          !hasRealStatus
+        );
 
       // Format scheduled time in IST
       const matchTime = m.scheduled_at
@@ -715,7 +724,13 @@ const TournamentsPage = () => {
           </div>
 
           {/* Status line */}
-          <div style={styles.matchMeta}>
+          <div style={{
+            ...styles.matchMeta,
+            ...(m.status === 'rescheduled' ? { color: '#e65100', fontWeight: 600 } : {}),
+            ...(m.status === 'cancelled'   ? { color: '#c62828', fontWeight: 600 } : {}),
+            ...(m.status === 'disputed'    ? { color: '#6a1b9a', fontWeight: 600 } : {}),
+            ...(m.status === 'no_show'     ? { color: '#5c6bc0', fontWeight: 600 } : {}),
+          }}>
             {isPhantom
               ? '⏳ Awaiting earlier results'
               : m.status === 'completed'
@@ -724,9 +739,17 @@ const TournamentsPage = () => {
                   ? '✓ Advanced by Bye'
                   : m.status === 'walkover'
                     ? '↷ Walkover'
-                    : m.status === 'live'
-                      ? '● Live'
-                      : '⏳ Pending'}
+                    : m.status === 'rescheduled'
+                      ? '📅 Rescheduled'
+                      : m.status === 'cancelled'
+                        ? '✕ Cancelled'
+                        : m.status === 'disputed'
+                          ? '⚠ Disputed'
+                          : m.status === 'no_show'
+                            ? '👻 No Show'
+                            : m.status === 'live'
+                              ? '● Live'
+                              : '⏳ Pending'}
           </div>
 
           {/* Enter/Edit result — hidden for bye and phantom matches */}
@@ -1708,11 +1731,14 @@ const TournamentsPage = () => {
       showToast('Pick a winner', 'error');
       return;
     }
+    // Non-finishing statuses reset scores and winner so the bracket reverts cleanly.
+    const NON_FINISHING_TYPES = ['rescheduled', 'cancelled', 'disputed'];
+    const isNonFinishing = NON_FINISHING_TYPES.includes(rForm.result_type);
     const result = await recordMatchResult(resultMatchId, {
       result_type: rForm.result_type,
-      score_a: parseInt(rForm.score_a, 10) || 0,
-      score_b: parseInt(rForm.score_b, 10) || 0,
-      winner_employee_id: rForm.winner,
+      score_a: isNonFinishing ? null : (parseInt(rForm.score_a, 10) || 0),
+      score_b: isNonFinishing ? null : (parseInt(rForm.score_b, 10) || 0),
+      winner_employee_id: isNonFinishing ? null : rForm.winner,
       duration_seconds: parseInt(rForm.duration, 10) || null,
       absent_participant_employee_id: rForm.absent_participant_employee_id,
       reason: rForm.reason,
