@@ -1,5 +1,5 @@
 // src/pages/DashboardPage.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { GAMES, SLOTS } from '../utils/constants';
 import {
@@ -20,7 +20,30 @@ const DashboardPage = () => {
     matchResults,
     bans,
     games,
+    events,
+    getUpcomingEvents,
+    isAdmin,
+    tournamentMatches,
+    tournaments,
+    currentUser,
   } = useApp();
+
+  const [showGameDropdown, setShowGameDropdown] = useState(false);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [flipDirection, setFlipDirection] = useState('next');
+  const dropdownRef = React.useRef(null);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowGameDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const selectedGameRecord = games.find((game) => String(game.id) === String(selectedGame) || String(game.name).toLowerCase() === String(selectedGame).toLowerCase())
     || GAMES.find((game) => String(game.id) === String(selectedGame))
@@ -51,6 +74,8 @@ const DashboardPage = () => {
   const weekLabel = `${start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
 
   const dayBookings = weekBookings[currentDayName] || {};
+  
+  // Calculate today's bookings - count each player in each slot
   const selectedGameBookings = SLOTS.flatMap((slot) =>
     (dayBookings[slot.id] || []).filter((booking) =>
       String(booking.game) === String(selectedGameRecord.id) ||
@@ -59,6 +84,22 @@ const DashboardPage = () => {
     )
   );
 
+  // Calculate available slots - a slot is available if it's NOT full
+  const maxPerSlot = selectedGameRecord?.maxPlayers || 4;
+  let availableSlotsCount = 0;
+  let totalSlots = SLOTS.length;
+  
+  SLOTS.forEach((slot) => {
+    const players = (dayBookings[slot.id] || []).filter((booking) =>
+      String(booking.game) === String(selectedGameRecord.id) ||
+      booking.game === selectedGameRecord.name ||
+      String(booking.game).toLowerCase() === String(selectedGameRecord.name || '').toLowerCase()
+    );
+    if (players.length < maxPerSlot) {
+      availableSlotsCount++;
+    }
+  });
+
   const activeBanCount = bans.filter(
     (ban) =>
       ban.active !== false &&
@@ -66,175 +107,955 @@ const DashboardPage = () => {
       (String(ban.game) === String(selectedGameRecord.id) || ban.game === selectedGameRecord.name || String(ban.game).toLowerCase() === String(selectedGameRecord.name || '').toLowerCase() || ban.game === 'All Games')
   ).length;
 
-  const leader = leaderboard[0];
-  const totalEmployees = leaderboard.length;
+  // Get upcoming events
+  const upcomingEvents = useMemo(() => getUpcomingEvents(), [getUpcomingEvents, events]);
+
+  // Helper to format event date
+  const formatEventDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Get top 5 leaderboard entries
+  const topLeaderboard = leaderboard.slice(0, 5);
+
+  // Get all slots with booking info
+  const allSlotsWithBookings = SLOTS.map((slot) => ({
+    slot,
+    players: (dayBookings[slot.id] || []).filter(
+      (booking) => String(booking.game) === String(selectedGameRecord.id) || booking.game === selectedGameRecord.name
+    ),
+  }));
+
+  // Get user's employee ID
+  const getCurrentEmpId = () => {
+    return String(
+      currentUser?.user_metadata?.emp_id ||
+      currentUser?.user_metadata?.employee_code ||
+      currentUser?.user_metadata?.empId ||
+      ''
+    ).trim().toUpperCase();
+  };
+
+  const currentEmpId = getCurrentEmpId();
+
+  // Get upcoming matches from tournaments AND slot bookings
+  const upcomingMatches = useMemo(() => {
+    const now = new Date();
+    const allMatches = [];
+    const userEmpId = currentEmpId;
+    
+    // 1. Get tournament matches
+    tournamentMatches.forEach(match => {
+      const status = String(match.status || '').toLowerCase();
+      if (['scheduled', 'in_progress'].includes(status) && match.scheduled_at) {
+        const matchDate = new Date(match.scheduled_at);
+        if (matchDate >= now) {
+          const tournament = tournaments.find(t => t.id === match.tournament_id);
+          const getEmployeeName = (empId) => {
+            if (!empId) return 'TBD';
+            const emp = employees.find(e => e.employee_code?.toUpperCase() === String(empId).toUpperCase());
+            return emp?.name || empId;
+          };
+          
+          // Check if current user is in this match
+          const isUserInMatch = 
+            String(match.player_a_employee_id || '').toUpperCase() === userEmpId ||
+            String(match.player_b_employee_id || '').toUpperCase() === userEmpId;
+          
+          allMatches.push({
+            id: match.id,
+            type: 'tournament',
+            title: `${getEmployeeName(match.player_a_employee_id)} vs ${getEmployeeName(match.player_b_employee_id)}`,
+            tournamentName: tournament?.name || 'Unknown Tournament',
+            game: tournament?.game || 'Unknown Game',
+            scheduled_at: match.scheduled_at,
+            playerAName: getEmployeeName(match.player_a_employee_id),
+            playerBName: getEmployeeName(match.player_b_employee_id),
+            status: status,
+            isUserInMatch: isUserInMatch,
+          });
+        }
+      }
+    });
+
+    // 2. Get slot bookings for today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Get today's bookings from all slots
+    const todayBookings = bookings[currentDayName] || {};
+    Object.keys(todayBookings).forEach(slotId => {
+      const players = todayBookings[slotId] || [];
+      players.forEach(booking => {
+        // Check if the booking belongs to the current user
+        const isUserBooking = String(booking.employee_id || '').toUpperCase() === userEmpId;
+        
+        // Find slot info
+        const slot = SLOTS.find(s => s.id === slotId);
+        if (slot && (isUserBooking || true)) { // Show all slot bookings, but highlight user's
+          // Parse time from slot
+          const [startTime, endTime] = slot.time.split(' - ');
+          const [startHour, startMin] = startTime.split(':');
+          
+          const matchDate = new Date(currentDate);
+          matchDate.setHours(parseInt(startHour), parseInt(startMin), 0);
+          
+          // Only show upcoming slots (not past)
+          if (matchDate >= now) {
+            const gameName = String(booking.game || '');
+            const gameRecord = games.find(g => String(g.id) === gameName || g.name === gameName);
+            
+            allMatches.push({
+              id: `${slotId}-${booking.user_id}`,
+              type: 'slot',
+              title: `${booking.name}`,
+              tournamentName: 'Slot Booking',
+              game: gameRecord?.name || gameName || 'Unknown Game',
+              scheduled_at: matchDate.toISOString(),
+              playerAName: booking.name,
+              playerBName: 'Available',
+              status: 'scheduled',
+              slotLabel: slot.label,
+              slotTime: slot.time,
+              isUserBooking: isUserBooking,
+              gameIcon: gameRecord?.icon || '🎯',
+            });
+          }
+        }
+      });
+    });
+    
+    // Sort by scheduled time (earliest first)
+    allMatches.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+    
+    // Prioritize user's matches (tournament matches where user is playing OR user's slot bookings)
+    const userMatches = allMatches.filter(m => m.isUserInMatch || m.isUserBooking);
+    const otherMatches = allMatches.filter(m => !m.isUserInMatch && !m.isUserBooking);
+    
+    // Combine: user's matches first, then others
+    return [...userMatches, ...otherMatches].slice(0, 10);
+  }, [tournamentMatches, tournaments, employees, bookings, currentDate, currentDayName, games, currentEmpId]);
+
+  // Handle navigation with flip animation
+  const navigateMatch = (direction) => {
+    if (isFlipping || upcomingMatches.length === 0) return;
+    
+    setFlipDirection(direction);
+    setIsFlipping(true);
+    
+    setTimeout(() => {
+      if (direction === 'next') {
+        setCurrentMatchIndex((prev) => (prev + 1) % upcomingMatches.length);
+      } else {
+        setCurrentMatchIndex((prev) => (prev - 1 + upcomingMatches.length) % upcomingMatches.length);
+      }
+      setIsFlipping(false);
+    }, 300);
+  };
+
+  // Format time
+  const formatMatchTime = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatMatchDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Check if a match is today
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  // Get current match
+  const currentMatch = upcomingMatches.length > 0 ? upcomingMatches[currentMatchIndex] : null;
+
+  // Color palette for leaderboard ranks
+  const getRankColor = (rank) => {
+    const colors = {
+      1: { bg: '#FFD700', text: '#8B6914', glow: 'rgba(255,215,0,0.3)' },
+      2: { bg: '#C0C0C0', text: '#6B6B6B', glow: 'rgba(192,192,192,0.3)' },
+      3: { bg: '#CD7F32', text: '#6B3A2A', glow: 'rgba(205,127,50,0.3)' },
+    };
+    return colors[rank] || { bg: '#e8edf5', text: '#444466', glow: 'rgba(200,210,230,0.2)' };
+  };
+
+  const getPointsColor = (points) => {
+    if (points >= 10) return '#1b5e20';
+    if (points >= 5) return '#f9a825';
+    return '#c62828';
+  };
+
+  const getMedal = (rank) => {
+    const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+    return medals[rank] || `#${rank}`;
+  };
 
   return (
     <div style={{ display: 'grid', gap: '18px' }}>
-      <section
-        className="clay-card"
+      {/* Header Section - Clean with only background color */}
+      <div
         style={{
-          padding: '24px',
-          borderRadius: '32px',
-          background: 'linear-gradient(135deg, rgba(26,60,110,0.98), rgba(17,55,104,0.92))',
-          color: 'white',
-          boxShadow: '0 20px 48px rgba(26,60,110,0.22)',
+          padding: '24px 32px',
+          borderRadius: '24px',
+          background: '#f0f4ff',
+          color: '#1a1a2e',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '0.8rem', opacity: 0.78, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Planning Dashboard
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <div style={{ fontSize: '0.75rem', color: '#6a6a8a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>
+              PLANNING DASHBOARD
             </div>
-            <h1 style={{ margin: '8px 0 6px', fontSize: '2rem', lineHeight: 1.05 }}>
+            <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
               Employee activity at a glance
             </h1>
-            <div style={{ fontSize: '0.86rem', opacity: 0.88 }}>
-              Week view: {weekLabel} | Today: {formatDate(currentDate)}
+            <div style={{ fontSize: '0.8rem', color: '#8888aa' }}>
+              {formatDate(currentDate)} • Week: {weekLabel}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {GAMES.map((game) => {
-              const active = String(selectedGame) === String(game.id) || String(selectedGame).toLowerCase() === String(game.name).toLowerCase();
-              return (
-                <button
-                  key={game.id}
-                  type="button"
-                  onClick={() => setSelectedGame(String(game.id))}
-                  style={{
-                    border: '1px solid rgba(255,255,255,0.22)',
-                    background: active ? 'white' : 'rgba(255,255,255,0.08)',
-                    color: active ? '#1a3c6e' : 'white',
-                    padding: '10px 16px',
-                    borderRadius: '999px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    minWidth: '120px',
-                  }}
-                >
-                  {game.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+          {/* Up Next For You - Matches Carousel */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '12px',
+            background: 'rgba(255,255,255,0.7)',
+            borderRadius: '16px',
+            padding: '12px 16px',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.5)',
+            minWidth: '260px',
+            maxWidth: '360px',
+            position: 'relative',
+          }}>
+            {/* Previous Button */}
+            <button
+              onClick={() => navigateMatch('prev')}
+              disabled={upcomingMatches.length === 0 || isFlipping}
+              style={{
+                background: 'rgba(26,60,110,0.08)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '28px',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: upcomingMatches.length > 0 && !isFlipping ? 'pointer' : 'default',
+                color: '#1a3c6e',
+                fontSize: '12px',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                opacity: upcomingMatches.length === 0 ? 0.3 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (upcomingMatches.length > 0 && !isFlipping) {
+                  e.currentTarget.style.background = 'rgba(26,60,110,0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(26,60,110,0.08)';
+              }}
+            >
+              ◀
+            </button>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-        <MetricCard label="Today's slots" value={selectedGameBookings.length} caption={`${selectedGameRecord.name} bookings on ${currentDayName}`} accent="#1a3c6e" />
-        <MetricCard label="Leaderboard leader" value={leader ? leader.points : 0} caption={leader ? `${leader.name} is ranked #${leader.rank}` : 'No match results yet'} accent="#1b5e20" />
-        <MetricCard label="Active bans" value={activeBanCount} caption={`${selectedGameRecord.name} scope`} accent="#c62828" />
-        {/* <MetricCard label="Employees" value={totalEmployees} caption="Loaded from employee master" accent="#f9a825" /> */}
-      </section>
+            {/* Match Card with Flip Animation */}
+            <div style={{
+              flex: 1,
+              position: 'relative',
+              minHeight: '60px',
+              perspective: '800px',
+            }}>
+              {upcomingMatches.length > 0 && currentMatch ? (
+                <div style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '100%',
+                  transition: 'transform 0.35s ease-in-out',
+                  transformStyle: 'preserve-3d',
+                  transform: isFlipping 
+                    ? flipDirection === 'next' 
+                      ? 'rotateY(-90deg)' 
+                      : 'rotateY(90deg)'
+                    : 'rotateY(0deg)',
+                }}>
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    backfaceVisibility: 'hidden',
+                  }}>
+                    {/* "Up next for you" label */}
+                    {currentMatch.isUserInMatch || currentMatch.isUserBooking ? (
+                      <div style={{
+                        fontSize: '0.5rem',
+                        color: '#1a3c6e',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        marginBottom: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}>
+                        <span>⭐</span> Up next for you
+                      </div>
+                    ) : (
+                      <div style={{
+                        fontSize: '0.5rem',
+                        color: '#8888aa',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        marginBottom: '2px',
+                      }}>
+                        Upcoming Match
+                      </div>
+                    )}
 
-      <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-        <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Today&apos;s bookings
-        </div>
-        <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
-          {selectedGameRecord.name} on {currentDayName}
-        </h2>
-
-        {(() => {
-          const bookedSlots = SLOTS.map((slot) => ({
-            slot,
-            players: (dayBookings[slot.id] || []).filter(
-              (booking) => String(booking.game) === String(selectedGameRecord.id) || booking.game === selectedGameRecord.name
-            ),
-          })).filter(({ players }) => players.length > 0);
-
-          return bookedSlots.length > 0 ? (
-            <div style={{ display: 'grid', gap: '10px' }}>
-              {bookedSlots.map(({ slot, players }) => (
-                <div key={slot.id} style={{ padding: '10px 12px', borderRadius: '16px', background: 'rgba(26,60,110,0.04)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1e2f' }}>{slot.label}</div>
-                      <div style={{ fontSize: '0.64rem', color: '#8888aa' }}>{slot.time}</div>
+                    {/* Match Title - Game name or slot label */}
+                    <div style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: currentMatch.isUserInMatch || currentMatch.isUserBooking ? '#1a3c6e' : '#1a1a2e',
+                      marginBottom: '1px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {currentMatch.type === 'slot' 
+                        ? `${currentMatch.game} • ${currentMatch.slotLabel}`
+                        : `${currentMatch.playerAName} vs ${currentMatch.playerBName}`
+                      }
                     </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1a3c6e' }}>
-                      {players.length}
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {players.map((player) => (
-                      <span key={`${slot.id}-${player.booking_id || player.user_id}-${player.name}`} className="clay-badge clay-badge-navy">
-                        {player.name}
+
+                    {/* Match Time */}
+                    <div style={{
+                      fontSize: '0.6rem',
+                      color: '#8888aa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}>
+                      <span>
+                        {isToday(currentMatch.scheduled_at) ? 'Today' : formatMatchDate(currentMatch.scheduled_at)}
                       </span>
-                    ))}
+                      <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8888aa' }} />
+                      <span>{formatMatchTime(currentMatch.scheduled_at)}</span>
+                      {currentMatch.type === 'slot' && (
+                        <>
+                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8888aa' }} />
+                          <span style={{ color: '#1a3c6e', fontWeight: 500 }}>
+                            {currentMatch.playerAName}
+                          </span>
+                        </>
+                      )}
+                      {currentMatch.isUserInMatch && (
+                        <>
+                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8888aa' }} />
+                          <span style={{ color: '#1b5e20', fontWeight: 600, fontSize: '0.55rem' }}>Your Match</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))}
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  fontSize: '0.7rem',
+                  color: '#8888aa',
+                }}>
+                  No upcoming matches
+                </div>
+              )}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={() => navigateMatch('next')}
+              disabled={upcomingMatches.length === 0 || isFlipping}
+              style={{
+                background: 'rgba(26,60,110,0.08)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '28px',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: upcomingMatches.length > 0 && !isFlipping ? 'pointer' : 'default',
+                color: '#1a3c6e',
+                fontSize: '12px',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                opacity: upcomingMatches.length === 0 ? 0.3 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (upcomingMatches.length > 0 && !isFlipping) {
+                  e.currentTarget.style.background = 'rgba(26,60,110,0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(26,60,110,0.08)';
+              }}
+            >
+              ▶
+            </button>
+
+            {/* Match counter */}
+            {upcomingMatches.length > 0 && (
+              <div style={{
+                fontSize: '0.45rem',
+                color: '#8888aa',
+                whiteSpace: 'nowrap',
+                position: 'absolute',
+                bottom: '4px',
+                right: '14px',
+              }}>
+                {currentMatchIndex + 1} / {upcomingMatches.length}
+              </div>
+            )}
+          </div>
+
+          {/* Game Selection Dropdown */}
+          <div style={{ position: 'relative', zIndex: 100 }} ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowGameDropdown(!showGameDropdown)}
+              style={{
+                background: 'rgba(255,255,255,0.85)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                color: '#1a1a2e',
+                padding: '8px 18px',
+                borderRadius: '999px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '14px',
+                transition: 'all 0.2s ease',
+                minWidth: '120px',
+                justifyContent: 'space-between',
+                backdropFilter: 'blur(4px)',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.95)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.85)'}
+            >
+              <span>{selectedGameRecord?.name || 'Select Game'}</span>
+              <span style={{
+                transition: 'transform 0.2s ease',
+                transform: showGameDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                fontSize: '10px',
+                color: '#8888aa',
+              }}>▼</span>
+            </button>
+
+            {showGameDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                  minWidth: '160px',
+                  padding: '6px 0',
+                  border: '1px solid #e8edf5',
+                  zIndex: 9999,
+                  overflow: 'hidden',
+                }}
+              >
+                {games.map((game) => {
+                  const isActive = String(selectedGame) === String(game.id) || 
+                                   String(selectedGame).toLowerCase() === String(game.name).toLowerCase();
+                  return (
+                    <div
+                      key={game.id}
+                      onClick={() => {
+                        setSelectedGame(String(game.id));
+                        setShowGameDropdown(false);
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        color: isActive ? '#080b5c' : '#1a1a2e',
+                        backgroundColor: isActive ? '#e8edf5' : 'transparent',
+                        fontWeight: isActive ? 600 : 400,
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = '#f8f9fc';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <span>{game.name}</span>
+                      {isActive && (
+                        <span style={{ color: '#080b5c', fontSize: '12px' }}>✓</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Metrics Section */}
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+        <MetricCard 
+          label="Today's bookings" 
+          value={selectedGameBookings.length} 
+          caption={`${selectedGameRecord.name} bookings on ${currentDayName}`} 
+          accent="#1a3c6e" 
+        />
+        <MetricCard 
+          label="Available slots" 
+          value={availableSlotsCount} 
+          caption={`${availableSlotsCount} of ${totalSlots} slots available`} 
+          accent="#1b5e20" 
+        />
+        <MetricCard 
+          label="Active bans" 
+          value={activeBanCount} 
+          caption={`${selectedGameRecord.name} scope`} 
+          accent="#c62828" 
+        />
+        <MetricCard 
+          label="Game Masters" 
+          value="2" 
+          caption="Active" 
+          accent="#f9a825" 
+        />
+      </section>
+
+      {/* 80/20 Layout: Today's Bookings + Upcoming Events */}
+      <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
+        {/* Today's Bookings - 80% with 5 slots per row */}
+        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
+          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Today&apos;s bookings
+          </div>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
+            {selectedGameRecord.name} on {currentDayName}
+          </h2>
+
+          {allSlotsWithBookings.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+              {allSlotsWithBookings.map(({ slot, players }) => {
+                const isFull = players.length >= maxPerSlot;
+                return (
+                  <div 
+                    key={slot.id} 
+                    style={{ 
+                      padding: '10px 12px', 
+                      borderRadius: '16px', 
+                      background: isFull 
+                        ? 'rgba(198,40,40,0.06)' 
+                        : players.length > 0 
+                          ? 'rgba(26,60,110,0.04)' 
+                          : '#f8f9fc',
+                      border: isFull 
+                        ? '1px solid rgba(198,40,40,0.3)' 
+                        : players.length > 0 
+                          ? '1px solid rgba(26,60,110,0.1)' 
+                          : '1px solid #e8edf5',
+                      minHeight: '80px',
+                      opacity: isFull ? 0.85 : 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ 
+                          fontSize: '0.7rem', 
+                          fontWeight: 700, 
+                          color: isFull ? '#c62828' : '#1e1e2f',
+                        }}>
+                          {slot.label}
+                        </div>
+                        <div style={{ fontSize: '0.55rem', color: '#8888aa' }}>{slot.time}</div>
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.7rem', 
+                        fontWeight: 700, 
+                        color: isFull ? '#c62828' : players.length > 0 ? '#1a3c6e' : '#8888aa',
+                        background: isFull ? 'rgba(198,40,40,0.1)' : players.length > 0 ? 'rgba(26,60,110,0.08)' : 'transparent',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                      }}>
+                        {players.length}/{maxPerSlot}
+                      </div>
+                    </div>
+                    {players.length > 0 && (
+                      <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {players.map((player) => (
+                          <span 
+                            key={`${slot.id}-${player.booking_id || player.user_id}-${player.name}`} 
+                            style={{
+                              fontSize: '0.55rem',
+                              background: isFull ? '#c62828' : '#1a3c6e',
+                              color: 'white',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {player.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {players.length === 0 && (
+                      <div style={{ 
+                        fontSize: '0.55rem', 
+                        color: '#b0b0b0', 
+                        marginTop: '6px',
+                        fontStyle: 'italic',
+                      }}>
+                        Empty
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div style={{ padding: '18px', color: '#8888aa', fontSize: '0.8rem' }}>
               No bookings for {selectedGameRecord.name} today.
             </div>
-          );
-        })()}
-      </section>
+          )}
+        </section>
 
-      <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#01010f', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Leaderboard
+        {/* Upcoming Events - 20% */}
+        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
+          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Upcoming Events
+          </div>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
+            What's next
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {upcomingEvents.slice(0, 3).map((event, index) => {
+              const eventDate = formatEventDate(event.start_date);
+              return (
+                <div 
+                  key={event.id}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: index % 2 === 0 ? 'rgba(26,60,110,0.04)' : 'transparent',
+                    borderLeft: `3px solid #1a3c6e`,
+                  }}
+                >
+                  <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '2px' }}>
+                    {eventDate}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e1e2f' }}>
+                    {event.title}
+                  </div>
+                  <div style={{ fontSize: '0.6rem', color: '#8888aa', marginTop: '2px' }}>
+                    {event.event_type?.charAt(0).toUpperCase() + event.event_type?.slice(1) || 'Event'}
+                  </div>
+                </div>
+              );
+            })}
+            {upcomingEvents.length === 0 && (
+              <div style={{ padding: '18px', color: '#8888aa', fontSize: '0.75rem', textAlign: 'center' }}>
+                No upcoming events
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* 80/20 Layout: Leaderboard + Quick Actions (Admin Only) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
+        {/* Leaderboard - 80% with colors */}
+        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
+            <div>
+              <div style={{ fontSize: '0.72rem', color: '#01010f', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Leaderboard
+              </div>
+              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: '#1e1e2f' }}>
+                Points and Ranking
+              </h2>
             </div>
-            <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: '#1e1e2f' }}>
-               Points and Ranking
-            </h2>
+            <div style={{ fontSize: '0.72rem', color: '#666' }}>
+              Points: win = 4, draw = 2, loss = 1
+            </div>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#666' }}>
-            Points: win = 4, draw = 2, loss = 1
-          </div>
-        </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-            <thead>
-              <tr style={{ background: 'rgba(12, 83, 189, 0.05)' }}>
-                <th style={thStyle}>Rank</th>
-                <th style={thStyle}>Employee</th>
-                <th style={thStyle}>Employee ID</th>
-                <th style={thStyle}>Department</th>
-                <th style={thStyle}>Played</th>
-                <th style={thStyle}>Wins</th>
-                <th style={thStyle}>Losses</th>
-                <th style={thStyle}>Draws</th>
-                <th style={thStyle}>Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.map((row) => (
-                <tr key={`${row.employee_id || row.name}-${row.rank}`} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-                  <td style={tdStyle}>
-                    <span className="clay-badge clay-badge-navy">#{row.rank}</span>
-                  </td>
-                  <td style={tdStyle}>{row.name}</td>
-                  <td style={tdStyle}>{row.employee_id || 'N/A'}</td>
-                  <td style={tdStyle}>{row.department || 'General'}</td>
-                  <td style={tdStyle}>{row.gamesPlayed}</td>
-                  <td style={tdStyle}>{row.wins}</td>
-                  <td style={tdStyle}>{row.losses}</td>
-                  <td style={tdStyle}>{row.draws}</td>
-                  <td style={tdStyle}>
-                    <strong style={{ color: '#1a3c6e' }}>{row.points}</strong>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+              <thead>
+                <tr style={{ background: 'linear-gradient(135deg, #1a3c6e, #2a5c8e)', color: 'white' }}>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Rank</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Employee</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Employee ID</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Department</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Played</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Wins</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Losses</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Draws</th>
+                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Points</th>
                 </tr>
-              ))}
-              {leaderboard.length === 0 && (
-                <tr>
-                  <td colSpan="9" style={{ padding: '18px', textAlign: 'center', color: '#8888aa' }}>
-                    No employees found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {topLeaderboard.map((row, index) => {
+                  const rankColor = getRankColor(row.rank);
+                  const pointsColor = getPointsColor(row.points);
+                  const isTop3 = row.rank <= 3;
+                  return (
+                    <tr 
+                      key={`${row.employee_id || row.name}-${row.rank}`} 
+                      style={{ 
+                        borderBottom: '1px solid rgba(200,210,230,0.2)',
+                        background: isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, transparent)` : 'transparent',
+                        transition: 'background 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, rgba(200,210,230,0.1))` : '#f8f9fc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, transparent)` : 'transparent';
+                      }}
+                    >
+                      <td style={{ ...tdStyle, padding: '8px 12px' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: rankColor.bg,
+                          color: rankColor.text,
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontWeight: 700,
+                          fontSize: '0.7rem',
+                          minWidth: '40px',
+                          boxShadow: `0 2px 8px ${rankColor.glow}`,
+                        }}>
+                          {getMedal(row.rank)}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', fontWeight: isTop3 ? 600 : 400 }}>
+                        <span style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px',
+                          color: isTop3 ? rankColor.text : '#1a1a2e',
+                        }}>
+                          {row.name}
+                          {isTop3 && (
+                            <span style={{ 
+                              fontSize: '0.55rem', 
+                              background: rankColor.bg,
+                              color: rankColor.text,
+                              padding: '1px 6px',
+                              borderRadius: '10px',
+                              fontWeight: 600,
+                            }}>
+                              {row.rank === 1 ? '🏆' : row.rank === 2 ? '🥈' : '🥉'}
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', color: '#666' }}>{row.employee_id || 'N/A'}</td>
+                      <td style={{ ...tdStyle, padding: '8px 12px' }}>
+                        <span style={{
+                          background: '#e8edf5',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.65rem',
+                          color: '#444466',
+                        }}>
+                          {row.department || 'General'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          background: '#e3f2fd',
+                          padding: '2px 10px',
+                          borderRadius: '12px',
+                          color: '#1565c0',
+                          fontWeight: 600,
+                          fontSize: '0.7rem',
+                        }}>
+                          {row.gamesPlayed}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          background: '#e8f5e9',
+                          padding: '2px 10px',
+                          borderRadius: '12px',
+                          color: '#2e7d32',
+                          fontWeight: 600,
+                          fontSize: '0.7rem',
+                        }}>
+                          {row.wins}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          background: '#ffebee',
+                          padding: '2px 10px',
+                          borderRadius: '12px',
+                          color: '#c62828',
+                          fontWeight: 600,
+                          fontSize: '0.7rem',
+                        }}>
+                          {row.losses}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          background: '#fff3e0',
+                          padding: '2px 10px',
+                          borderRadius: '12px',
+                          color: '#e65100',
+                          fontWeight: 600,
+                          fontSize: '0.7rem',
+                        }}>
+                          {row.draws}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          background: `linear-gradient(135deg, ${pointsColor}, ${pointsColor}dd)`,
+                          color: 'white',
+                          padding: '4px 14px',
+                          borderRadius: '20px',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          display: 'inline-block',
+                          boxShadow: `0 2px 8px ${pointsColor}44`,
+                        }}>
+                          {row.points}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {topLeaderboard.length === 0 && (
+                  <tr>
+                    <td colSpan="9" style={{ padding: '18px', textAlign: 'center', color: '#8888aa' }}>
+                      No employees found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Quick Actions - 20% (Admin Only) */}
+        {isAdmin && isAdmin() ? (
+          <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
+            <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Quick Actions
+            </div>
+            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
+              Admin Tools
+            </h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <QuickActionButton 
+                icon="📅" 
+                label="Create Slot Booking" 
+                onClick={() => console.log('Create Slot Booking')}
+              />
+              <QuickActionButton 
+                icon="📋" 
+                label="Create Event" 
+                onClick={() => console.log('Create Event')}
+              />
+              <QuickActionButton 
+                icon="🏆" 
+                label="Create Tournament" 
+                onClick={() => console.log('Create Tournament')}
+              />
+              <QuickActionButton 
+                icon="📜" 
+                label="Add Rule" 
+                onClick={() => console.log('Add Rule')}
+              />
+              <QuickActionButton 
+                icon="🚫" 
+                label="Manage Bans" 
+                onClick={() => console.log('Manage Bans')}
+              />
+              <QuickActionButton 
+                icon="📊" 
+                label="Export Report" 
+                onClick={() => console.log('Export Report')}
+              />
+            </div>
+          </section>
+        ) : null}
+      </div>
     </div>
+  );
+};
+
+const QuickActionButton = ({ icon, label, onClick }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        padding: '8px 12px',
+        borderRadius: '10px',
+        border: '1px solid #e8edf5',
+        background: hovered ? '#f0f2f7' : 'transparent',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        width: '100%',
+        fontSize: '0.7rem',
+        color: '#1a1a2e',
+        fontWeight: 500,
+        fontFamily: 'inherit',
+      }}
+    >
+      <span style={{ fontSize: '1rem' }}>{icon}</span>
+      <span>{label}</span>
+    </button>
   );
 };
 
@@ -246,26 +1067,72 @@ const MetricCard = ({ label, value, caption, accent }) => {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '18px',
+        padding: '18px 20px',
         borderRadius: '24px',
-        background: 'rgba(255,255,255,0.96)',
-        borderTop: `4px solid ${accent}`,
-        borderRight: `2px solid ${hovered ? accent : 'transparent'}`,
-        borderBottom: `2px solid ${hovered ? accent : 'transparent'}`,
-        borderLeft: `2px solid ${hovered ? accent : 'transparent'}`,
-        transform: hovered ? 'translateY(-5px) scale(1.03)' : 'translateY(0) scale(1)',
-        boxShadow: hovered ? `0 8px 20px ${accent}33` : 'none',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+        background: hovered ? accent : 'rgba(255,255,255,0.96)',
+        border: 'none',
+        boxShadow: hovered 
+          ? `0 8px 30px ${accent}44` 
+          : '0 2px 8px rgba(0,0,0,0.04)',
+        transform: hovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: 'default',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      <div style={{ fontSize: '0.68rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-        {label}
+      {/* Top accent line - only visible when not hovered */}
+      {!hovered && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: accent,
+          borderRadius: '24px 24px 0 0',
+        }} />
+      )}
+
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start', 
+        marginBottom: '4px',
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        <div style={{ 
+          fontSize: '0.65rem', 
+          color: hovered ? 'rgba(255,255,255,0.85)' : '#8888aa', 
+          textTransform: 'uppercase', 
+          letterSpacing: '0.08em', 
+          fontWeight: 600,
+        }}>
+          {label}
+        </div>
       </div>
-      <div style={{ marginTop: '8px', fontSize: '1.9rem', fontWeight: 800, color: accent, lineHeight: 1 }}>
+
+      <div style={{ 
+        fontSize: '2.2rem', 
+        fontWeight: 800, 
+        color: hovered ? '#ffffff' : accent, 
+        lineHeight: 1,
+        letterSpacing: '-0.02em',
+        marginBottom: '2px',
+        position: 'relative',
+        zIndex: 1,
+      }}>
         {value}
       </div>
-      <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#667' }}>
+
+      <div style={{ 
+        fontSize: '0.68rem', 
+        color: hovered ? 'rgba(255,255,255,0.8)' : '#667',
+        opacity: 0.8,
+        position: 'relative',
+        zIndex: 1,
+      }}>
         {caption}
       </div>
     </div>
@@ -276,7 +1143,6 @@ const thStyle = {
   padding: '8px 10px',
   textAlign: 'left',
   fontWeight: 700,
-  color: '#444466',
 };
 
 const tdStyle = {
