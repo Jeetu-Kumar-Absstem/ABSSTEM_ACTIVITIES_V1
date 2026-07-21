@@ -293,6 +293,18 @@ const _buildSeededSlots = (players) => {
  *   @param {number}  opts.intervalMinutes      — minutes between matches (default 30)
  *   @param {string}  opts.timezone             — IANA tz (default "Asia/Kolkata")
  */
+// In tournamentFixtures.js, replace the buildKnockoutFixturePlan function
+// with this corrected version:
+
+// In tournamentFixtures.js, replace the buildKnockoutFixturePlan function
+// with this corrected version:
+
+// In tournamentFixtures.js, replace the entire buildKnockoutFixturePlan function
+// with this corrected version:
+
+// In tournamentFixtures.js, replace the buildKnockoutFixturePlan function
+// with this corrected version:
+
 export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
   if (!participants || participants.length < 2) return { rounds: [], bracketSize: 2 };
 
@@ -306,8 +318,7 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
 
   const ppt = Math.max(1, Number(playersPerTeam) || 1);
 
-  // For team play: group participants into teams, use the captain as the
-  // "player" slot in the bracket.  Build a lookup map for later team injection.
+  // For team play: group participants into teams
   let teamMap = {};
   let bracketParticipants = participants;
 
@@ -322,13 +333,12 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
 
   const shuffled = ppt > 1 ? bracketParticipants : shuffleArray(participants);
   const size = nextPowerOfTwo(shuffled.length);
-  const slots = _buildSeededSlots(shuffled); // length = size, null = bye slot
+  const slots = _buildSeededSlots(shuffled);
 
   const rounds = [];
-
+  const matchByCode = new Map();
+  
   // ── Round 0 (first round played) ────────────────────────────────────────
-  // Pair slots: [0,1], [2,3], …
-  // Skip pair if BOTH are null → phantom match (never create).
   const round0RoundSize = size;
   const round0Code = (() => {
     if (round0RoundSize === 2) return 'F';
@@ -338,15 +348,13 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
   })();
 
   const r0Matches = [];
-  // Track the "effective winner slot" for each pair so later rounds can
-  // reference it. Each entry: { type: 'match'|'bye', matchCode?, playerId? }
   const r0EffectiveSlots = [];
 
   for (let i = 0; i < size; i += 2) {
     const playerA = slots[i];
     const playerB = slots[i + 1];
 
-    // Both null → phantom: skip, mark both slots as empty
+    // Both null → phantom: skip
     if (!playerA && !playerB) {
       r0EffectiveSlots.push({ type: 'empty' });
       continue;
@@ -357,7 +365,7 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
     const matchNum = r0Matches.length + 1;
     const matchCode = `${round0Code}${matchNum}`;
 
-    r0Matches.push({
+    const match = {
       round:                 round0Code,
       match_number:          matchNum,
       match_code:            matchCode,
@@ -365,18 +373,22 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
       player_b_employee_id:  playerB?.employee_id || null,
       status:                isBye ? 'bye' : 'scheduled',
       winner_employee_id:    winnerId,
-      score_a:               isBye ? 1 : null,
-      score_b:               isBye ? 0 : null,
-      // Internal — used by AppContext pointer-wiring
+      score_a:               null,
+      score_b:               null,
       _bye_winner:           winnerId,
-      // Filled in after the next round is built (see below)
       _feeds_into:           null,
-    });
+      _feeds_from_a:         null,
+      _feeds_from_b:         null,
+      _has_advanced:         false,  // Track if this has been advanced
+    };
+
+    r0Matches.push(match);
+    matchByCode.set(matchCode, match);
 
     r0EffectiveSlots.push(
       isBye
-        ? { type: 'bye', playerId: winnerId }
-        : { type: 'match', matchCode }
+        ? { type: 'bye', playerId: winnerId, matchCode, hasAdvanced: false }
+        : { type: 'match', matchCode, hasAdvanced: false }
     );
   }
 
@@ -389,21 +401,8 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
   }
 
   // ── Subsequent rounds ────────────────────────────────────────────────────
-  // For each round we pair up the effective slots from the previous round.
-  // Pairing rules:
-  //   both empty            → skip, mark next slot as empty
-  //   one real + one empty  → the real slot advances for free (no new match)
-  //   both real             → create a match; pre-fill any known bye winners
-  //
-  // We also back-fill `_feeds_into` on every feeder match so AppContext can
-  // wire next_match_winner_id and auto-advance byes using a reliable
-  // code→code map instead of fragile Math.floor(index/2) arithmetic.
   let prevEffective = r0EffectiveSlots;
-
-  // Flat map of matchCode → match object across ALL rounds built so far
-  const matchByCode = new Map(r0Matches.map((m) => [m.match_code, m]));
-
-  const numRounds = Math.log2(size); // total rounds in the bracket
+  const numRounds = Math.log2(size);
 
   for (let depth = numRounds - 2; depth >= 0; depth--) {
     const roundSize = 2 ** (depth + 1);
@@ -427,32 +426,73 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
         continue;
       }
 
-      // One empty → the real slot advances without a new shell match.
-      // Propagate unchanged so it can feed a real match in a later round.
+      // ── ONE EMPTY ─────────────────────────────────────────────────────────
+      // One slot is empty, the other is real (bye or match).
+      // The real slot advances ONE round, but we need to check:
+      // If it's a bye, it should only advance if it hasn't already been advanced.
       if (slotA.type === 'empty' || slotB.type === 'empty') {
         const real = slotA.type !== 'empty' ? slotA : slotB;
-        nextEffective.push(real);
+        
+        // CRITICAL FIX: If this is a match (not a bye), it advances as a match
+        // If it's a bye, it advances as a bye (but only ONE round)
+        // The key is: a bye winner should advance, but should NOT be chained
+        // through multiple rounds without playing.
+        
+        // Mark the source match as having advanced
+        if (real.matchCode) {
+          const sourceMatch = matchByCode.get(real.matchCode);
+          if (sourceMatch) {
+            sourceMatch._has_advanced = true;
+          }
+        }
+        
+        // The slot advances as-is (bye or match)
+        nextEffective.push({ 
+          ...real,
+          hasAdvanced: true,
+        });
         continue;
       }
 
-      // Both real → create a match
-      const matchNum  = roundMatches.length + 1;
+      // ── BOTH REAL ─────────────────────────────────────────────────────────
+      // Both slots are real. They should be paired into a single match.
+      // This is the case where both feeders have winners (or will have winners).
+
+      const matchNum = roundMatches.length + 1;
       const matchCode = `${roundCode}${matchNum}`;
 
-      // Pre-fill slots when the feeder is already a known bye winner
+      // Determine player IDs for the new match
+      // If a slot is a bye, we know the player ID
+      // If a slot is a match, the winner is TBD (so player is null)
       const playerAId = slotA.type === 'bye' ? slotA.playerId : null;
       const playerBId = slotB.type === 'bye' ? slotB.playerId : null;
 
-      const isBye = slotA.type === 'bye' && slotB.type === 'bye';
-      const winnerId = isBye ? playerAId : null;
-
-      // Back-fill _feeds_into on both feeder matches so AppContext can use it
+      // Back-fill _feeds_into on both feeder matches
+      // This creates the pointer chain: QF → SF → F
       for (const slot of [slotA, slotB]) {
         if (slot.matchCode) {
           const feeder = matchByCode.get(slot.matchCode);
-          if (feeder) feeder._feeds_into = matchCode;
+          if (feeder && !feeder._feeds_into) {
+            feeder._feeds_into = matchCode;
+          }
         }
       }
+
+      // Determine the status of the new match
+      // - Both byes: they play each other → scheduled
+      // - One bye + one match: they play each other → scheduled
+      // - Both matches: they play each other → scheduled
+      // - Solo bye (one empty + one bye) was handled above
+      const bothAreByes = slotA.type === 'bye' && slotB.type === 'bye';
+      const isSoloBye = false; // Solo bye is handled in the "one empty" case above
+      
+      // For both byes, we know both players, so they play each other
+      // For one bye + one match, the match winner is TBD, so it's scheduled
+      const status = 'scheduled'; // Always scheduled when both are real
+
+      // If both are byes, we know both players, so they play each other
+      // The winner is not determined yet (they need to play)
+      const winnerId = null;
 
       const newMatch = {
         round:                 roundCode,
@@ -460,28 +500,30 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
         match_code:            matchCode,
         player_a_employee_id:  playerAId,
         player_b_employee_id:  playerBId,
-        status:                isBye ? 'bye' : 'scheduled',
+        status:                status,
         winner_employee_id:    winnerId,
-        score_a:               isBye ? 1 : null,
-        score_b:               isBye ? 0 : null,
-        // Internal hints for AppContext: which bye winner to pre-place
+        score_a:               null,
+        score_b:               null,
         _preplace_a:           slotA.type === 'bye' ? slotA.playerId : null,
         _preplace_b:           slotB.type === 'bye' ? slotB.playerId : null,
-        // Which prior match feeds each slot (used for pointer wiring)
         _feeds_from_a:         slotA.type === 'match' ? slotA.matchCode : null,
         _feeds_from_b:         slotB.type === 'match' ? slotB.matchCode : null,
-        _bye_winner:           winnerId,
-        _feeds_into:           null, // filled when the next round is built
+        _bye_winner:           null,
+        _feeds_into:           null,
+        _both_byes:            bothAreByes,
+        _has_advanced:         false,
       };
 
       roundMatches.push(newMatch);
       matchByCode.set(matchCode, newMatch);
 
-      nextEffective.push(
-        isBye
-          ? { type: 'bye', playerId: winnerId, matchCode }
-          : { type: 'match', matchCode }
-      );
+      // The effective slot for this pair is a match (winner TBD)
+      // Even if both are byes, they still need to play each other
+      nextEffective.push({ 
+        type: 'match', 
+        matchCode,
+        hasAdvanced: false,
+      });
     }
 
     if (roundMatches.length > 0) {

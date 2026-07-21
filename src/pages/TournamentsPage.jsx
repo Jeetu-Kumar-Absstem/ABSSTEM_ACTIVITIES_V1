@@ -316,23 +316,41 @@ const TournamentsPage = () => {
   // Permission helper for editing a match result.
   // Admin can always edit. Non-admin can edit only if they actually played
   // the match (player_a or player_b) AND both slots are filled (not TBD).
-  const canEditMatch = (m) => {
-    if (!m) return false;
-    if (isAdmin()) return true;
-    if (!currentEmpId) return false;
-    const me = currentEmpId.toUpperCase();
-    const a = (m.player_a_employee_id || '').toUpperCase();
-    const b = (m.player_b_employee_id || '').toUpperCase();
-    if (!a || !b) return false; // TBD slots — only admin can fill them in
-    // Check captain columns first
-    if (me === a || me === b) return true;
-    // Then check all team members from junction table
-    const allPlayers = [
-      ...(m.team_a_players || []),
-      ...(m.team_b_players || []),
-    ].map(p => (p.employee_id || '').toUpperCase());
-    return allPlayers.includes(me);
-  };
+ // In TournamentsPage.jsx, find the canEditMatch function and update it:
+
+// Permission helper for editing a match result.
+// Admin can always edit. Non-admin can edit only if they actually played
+// the match (player_a or player_b) AND both slots are filled (not TBD).
+const canEditMatch = (m) => {
+  if (!m) return false;
+  
+  // CRITICAL FIX: If either side is TBD (waiting for a winner), 
+  // ONLY admin can enter a result (and only to fill in the TBD slot)
+  const hasTBD = !m.player_a_employee_id || !m.player_b_employee_id;
+  
+  if (hasTBD) {
+    // Only admin can edit matches with TBD (to fill in the winner)
+    return isAdmin();
+  }
+  
+  // Both players are known - check permissions
+  if (isAdmin()) return true;
+  if (!currentEmpId) return false;
+  
+  const me = currentEmpId.toUpperCase();
+  const a = (m.player_a_employee_id || '').toUpperCase();
+  const b = (m.player_b_employee_id || '').toUpperCase();
+  
+  // Check captain columns first
+  if (me === a || me === b) return true;
+  
+  // Then check all team members from junction table
+  const allPlayers = [
+    ...(m.team_a_players || []),
+    ...(m.team_b_players || []),
+  ].map(p => (p.employee_id || '').toUpperCase());
+  return allPlayers.includes(me);
+};
 
   // ── Sub-tab renderers ─────────────────────────────────────────────────
   const renderActiveTournaments = () => {
@@ -640,149 +658,199 @@ const TournamentsPage = () => {
       ? 'Generate Next Swiss Round'
       : 'Generate Fixtures';
 
-    const renderMatch = (m) => {
-      // TBD vs TBD shell matches — show as an upcoming placeholder card
-      const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id;
+    // In TournamentsPage.jsx, find the renderMatch function inside renderBracket
+// and update the part that displays the player names:
 
-      const a = isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players);
-      const b = isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players);
-      const hasScore = m.score_a !== null && m.score_b !== null;
-      const isFinal  = String(m.round || '').toUpperCase() === 'F';
+// In TournamentsPage.jsx, update the renderMatch function:
 
-      // A bye match has only one real player AND no real status assigned yet,
-      // or status is explicitly 'bye'.
-      // Matches that already have a meaningful status (pending, completed,
-      // cancelled, etc.) are NOT byes — the missing second player is simply
-      // waiting to be filled in from an earlier round result.
-      const explicitStatus = String(m.status || '').toLowerCase();
-      const hasRealStatus = explicitStatus !== '' && explicitStatus !== 'bye';
-      const isBye =
-        explicitStatus === 'bye' ||
-        (
-          ((!m.player_a_employee_id && !!m.player_b_employee_id) ||
-           (!!m.player_a_employee_id && !m.player_b_employee_id)) &&
-          !hasRealStatus
-        );
+const renderMatch = (m) => {
+  // TBD vs TBD shell matches — show as an upcoming placeholder card
+  const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id;
 
-      // Format scheduled time in IST
-      const matchTime = m.scheduled_at
-        ? new Date(m.scheduled_at).toLocaleString('en-IN', {
-            timeZone: 'Asia/Kolkata',
-            day: '2-digit', month: 'short',
-            hour: '2-digit', minute: '2-digit',
-            hour12: true,
-          })
-        : null;
+  // Check if this match is waiting for a winner from a previous match
+  const waitingForWinnerA = m._feeds_from_a && !m.player_a_employee_id;
+  const waitingForWinnerB = m._feeds_from_b && !m.player_b_employee_id;
+  
+  // Check if this match has TBD on either side (waiting for previous match)
+  const hasTBD = !m.player_a_employee_id || !m.player_b_employee_id;
 
-      return (
-        <div key={m.id || m.match_code} style={{
-          ...styles.matchCard,
-          border: isFinal ? '2px solid #f9a825'
-                : isPhantom ? '1px dashed #90caf9'
-                : isBye ? '1px dashed #b0bec5'
-                : '1px solid #d0d0d0',
-          opacity: isBye ? 0.82 : 1,
-          background: isPhantom ? '#f8fbff' : 'white',
+  const a = isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players);
+  const b = isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players);
+  
+  const hasScore = m.score_a !== null && m.score_b !== null;
+  const isFinal  = String(m.round || '').toUpperCase() === 'F';
+
+  const explicitStatus = String(m.status || '').toLowerCase();
+  const hasRealStatus = explicitStatus !== '' && explicitStatus !== 'bye';
+  const isBye =
+    explicitStatus === 'bye' ||
+    (
+      ((!m.player_a_employee_id && !!m.player_b_employee_id) ||
+       (!!m.player_a_employee_id && !m.player_b_employee_id)) &&
+      !hasRealStatus
+    );
+
+  const matchTime = m.scheduled_at
+    ? new Date(m.scheduled_at).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit', month: 'short',
+        hour: '2-digit', minute: '2-digit',
+        hour12: true,
+      })
+    : null;
+
+  // Determine match status for display
+  const isWaitingForWinner = (waitingForWinnerA || waitingForWinnerB) && !isBye;
+  const isTBDMatch = hasTBD && !isBye && !isPhantom;
+  
+  // Determine if result can be entered
+  const canEnterResult = canEditMatch(m) && !isBye && !isPhantom && !isTBDMatch;
+
+  return (
+    <div key={m.id || m.match_code} style={{
+      ...styles.matchCard,
+      border: isFinal ? '2px solid #f9a825'
+            : isPhantom ? '1px dashed #90caf9'
+            : isBye ? '1px dashed #b0bec5'
+            : isTBDMatch ? '1px dashed #ff9800'
+            : '1px solid #d0d0d0',
+      opacity: isBye || isPhantom ? 0.82 : 1,
+      background: isPhantom ? '#f8fbff' : isTBDMatch ? '#fff8e1' : 'white',
+    }}>
+      {/* Time badge */}
+      {matchTime && (
+        <div style={{
+          fontSize: '0.62rem', fontWeight: 600,
+          color: '#1a3c6e', background: '#e8eef7',
+          borderRadius: 3, padding: '0.12rem 0.4rem',
+          marginBottom: '0.28rem', display: 'inline-block',
         }}>
-          {/* Time badge */}
-          {matchTime && (
-            <div style={{
-              fontSize: '0.62rem', fontWeight: 600,
-              color: '#1a3c6e', background: '#e8eef7',
-              borderRadius: 3, padding: '0.12rem 0.4rem',
-              marginBottom: '0.28rem', display: 'inline-block',
-            }}>
-              🕐 {matchTime}
-            </div>
-          )}
-
-          <div style={styles.matchLabel}>Match {m.match_code || m.match_number}</div>
-
-          {/* Player A */}
-          <div style={{
-            ...styles.matchPlayer,
-            background: hasScore && m.score_a > m.score_b ? '#e8f5e9' : 'transparent',
-            color:      isPhantom ? '#90a4ae'
-                        : hasScore && m.score_a > m.score_b ? '#1b5e20' : '#212121',
-            fontWeight: hasScore && m.score_a > m.score_b ? 700 : 500,
-            fontStyle:  isPhantom ? 'italic' : 'normal',
-          }}>
-            <span style={{ fontSize: '0.7rem' }}>{a}</span>
-            <span>{isPhantom ? '' : (m.score_a ?? '—')}</span>
-          </div>
-
-          {/* Player B */}
-          <div style={{
-            ...styles.matchPlayer,
-            background: hasScore && m.score_b > m.score_a ? '#e8f5e9' : 'transparent',
-            color:      isPhantom ? '#90a4ae'
-                        : hasScore && m.score_b > m.score_a ? '#1b5e20'
-                        : (isBye && !m.player_b_employee_id) ? '#9e9e9e' : '#212121',
-            fontWeight: hasScore && m.score_b > m.score_a ? 700 : 500,
-            fontStyle:  isPhantom || (isBye && !m.player_b_employee_id) ? 'italic' : 'normal',
-          }}>
-            <span style={{ fontSize: '0.7rem' }}>{b}</span>
-            <span>{isPhantom ? '' : (m.score_b ?? '—')}</span>
-          </div>
-
-          {/* Status line */}
-          <div style={{
-            ...styles.matchMeta,
-            ...(m.status === 'rescheduled' ? { color: '#e65100', fontWeight: 600 } : {}),
-            ...(m.status === 'cancelled'   ? { color: '#c62828', fontWeight: 600 } : {}),
-            ...(m.status === 'disputed'    ? { color: '#6a1b9a', fontWeight: 600 } : {}),
-            ...(m.status === 'no_show'     ? { color: '#5c6bc0', fontWeight: 600 } : {}),
-          }}>
-            {isPhantom
-              ? '⏳ Awaiting earlier results'
-              : m.status === 'completed'
-                ? '✓ Final'
-                : isBye
-                  ? '✓ Advanced by Bye'
-                  : m.status === 'walkover'
-                    ? '↷ Walkover'
-                    : m.status === 'rescheduled'
-                      ? '📅 Rescheduled'
-                      : m.status === 'cancelled'
-                        ? '✕ Cancelled'
-                        : m.status === 'disputed'
-                          ? '⚠ Disputed'
-                          : m.status === 'no_show'
-                            ? '👻 No Show'
-                            : m.status === 'live'
-                              ? '● Live'
-                              : '⏳ Pending'}
-          </div>
-
-          {/* Enter/Edit result — hidden for bye and phantom matches */}
-          {!isBye && !isPhantom && canEditMatch(m) && (
-            <button
-              onClick={() => openResultModal(m)}
-              style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}
-            >
-              {m.status === 'completed' ? '✎ Edit Result' : '⏎ Enter Result'}
-            </button>
-          )}
-
-          {/* Admin edit/delete — also hidden for bye and phantom matches */}
-          {!isBye && !isPhantom && isAdmin() && (
-            <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
-              <button
-                onClick={() => openEditMatchModal(m)}
-                style={{ ...styles.tinyEnterBtn, background: '#5c6bc0', flex: 1 }}
-                title="Edit match players / schedule"
-              >✎ Edit</button>
-              <button
-                onClick={() => setMatchToDelete(m)}
-                style={{ ...styles.tinyEnterBtn, background: '#c62828', flex: 1 }}
-                title="Delete this match"
-              >🗑 Delete</button>
-            </div>
-          )}
+          🕐 {matchTime}
         </div>
-      );
-    };
+      )}
 
+      <div style={styles.matchLabel}>
+        Match {m.match_code || m.match_number}
+        {isTBDMatch && (
+          <span style={{ fontSize: '0.55rem', color: '#e65100', marginLeft: '0.4rem' }}>
+            ⏳ Waiting for previous match
+          </span>
+        )}
+      </div>
+
+      {/* Player A */}
+      <div style={{
+        ...styles.matchPlayer,
+        background: hasScore && m.score_a > m.score_b ? '#e8f5e9' : 
+                    waitingForWinnerA ? '#fff3e0' : 'transparent',
+        color: isPhantom ? '#90a4ae'
+              : hasScore && m.score_a > m.score_b ? '#1b5e20' 
+              : waitingForWinnerA ? '#e65100'
+              : '#212121',
+        fontWeight: hasScore && m.score_a > m.score_b ? 700 : 
+                    waitingForWinnerA ? 600 : 500,
+        fontStyle: isPhantom || waitingForWinnerA ? 'italic' : 'normal',
+      }}>
+        <span style={{ fontSize: '0.7rem' }}>
+          {waitingForWinnerA ? `← Winner of ${m._feeds_from_a || 'previous match'}` : a}
+        </span>
+        <span>{isPhantom ? '' : (m.score_a ?? '—')}</span>
+      </div>
+
+      {/* Player B */}
+      <div style={{
+        ...styles.matchPlayer,
+        background: hasScore && m.score_b > m.score_a ? '#e8f5e9' : 
+                    waitingForWinnerB ? '#fff3e0' : 'transparent',
+        color: isPhantom ? '#90a4ae'
+              : hasScore && m.score_b > m.score_a ? '#1b5e20'
+              : waitingForWinnerB ? '#e65100'
+              : (isBye && !m.player_b_employee_id) ? '#9e9e9e' : '#212121',
+        fontWeight: hasScore && m.score_b > m.score_a ? 700 : 
+                    waitingForWinnerB ? 600 : 500,
+        fontStyle: isPhantom || (isBye && !m.player_b_employee_id) || waitingForWinnerB ? 'italic' : 'normal',
+      }}>
+        <span style={{ fontSize: '0.7rem' }}>
+          {waitingForWinnerB ? `← Winner of ${m._feeds_from_b || 'previous match'}` : b}
+        </span>
+        <span>{isPhantom ? '' : (m.score_b ?? '—')}</span>
+      </div>
+
+      {/* Status line */}
+      <div style={{
+        ...styles.matchMeta,
+        ...(m.status === 'rescheduled' ? { color: '#e65100', fontWeight: 600 } : {}),
+        ...(m.status === 'cancelled'   ? { color: '#c62828', fontWeight: 600 } : {}),
+        ...(m.status === 'disputed'    ? { color: '#6a1b9a', fontWeight: 600 } : {}),
+        ...(m.status === 'no_show'     ? { color: '#5c6bc0', fontWeight: 600 } : {}),
+      }}>
+        {isPhantom
+          ? '⏳ Awaiting earlier results'
+          : m.status === 'completed'
+            ? '✓ Final'
+            : isBye
+              ? '✓ Advanced by Bye'
+              : isTBDMatch
+                ? `⏳ Waiting for ${m._feeds_from_a || m._feeds_from_b || 'previous'} match winner`
+                : m.status === 'walkover'
+                  ? '↷ Walkover'
+                  : m.status === 'rescheduled'
+                    ? '📅 Rescheduled'
+                    : m.status === 'cancelled'
+                      ? '✕ Cancelled'
+                      : m.status === 'disputed'
+                        ? '⚠ Disputed'
+                        : m.status === 'no_show'
+                          ? '👻 No Show'
+                          : m.status === 'live'
+                            ? '● Live'
+                            : '⏳ Pending'}
+      </div>
+
+      {/* Enter/Edit result — ONLY when both players are known and match is not a bye */}
+      {!isBye && !isPhantom && !isTBDMatch && canEditMatch(m) && (
+        <button
+          onClick={() => openResultModal(m)}
+          style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}
+        >
+          {m.status === 'completed' ? '✎ Edit Result' : '⏎ Enter Result'}
+        </button>
+      )}
+
+      {/* For TBD matches, show a disabled/info button */}
+      {!isBye && !isPhantom && isTBDMatch && (
+        <div style={{ 
+          marginTop: '0.4rem', 
+          padding: '0.2rem 0.55rem', 
+          fontSize: '0.66rem', 
+          color: '#e65100', 
+          background: '#fff3e0', 
+          borderRadius: 4,
+          textAlign: 'center',
+          border: '1px dashed #ff9800'
+        }}>
+          🔒 Waiting for previous match result
+        </div>
+      )}
+
+      {/* Admin edit/delete — show for all non-phantom matches */}
+      {!isPhantom && isAdmin() && (
+        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
+          <button
+            onClick={() => openEditMatchModal(m)}
+            style={{ ...styles.tinyEnterBtn, background: '#5c6bc0', flex: 1 }}
+            title="Edit match players / schedule"
+          >✎ Edit</button>
+          <button
+            onClick={() => setMatchToDelete(m)}
+            style={{ ...styles.tinyEnterBtn, background: '#c62828', flex: 1 }}
+            title="Delete this match"
+          >🗑 Delete</button>
+        </div>
+      )}
+    </div>
+  );
+};
     // ── Round-Robin derived data ──────────────────────────────────────────
     // KO phase matches are identified by match_code prefix ("KO_"), NOT by
     // round value — because the DB constraint requires round ∈ {QF,SF,F,...}.
@@ -901,7 +969,7 @@ const TournamentsPage = () => {
             </div>
           </div>
         )}
-
+  <div> Final knockout fixtures depend on the results of the round-robin phase </div>
         {/* ── Knockout Bracket (round-robin → KO phase) ───────────────── */}
         {isRoundRobin && hasKoPhase && (
           <div className="clay-card" style={{ ...styles.card }}>

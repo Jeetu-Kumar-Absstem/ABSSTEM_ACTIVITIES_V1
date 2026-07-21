@@ -477,43 +477,63 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const loadTournamentMatches = async () => {
+  // In AppContext.jsx, update the loadTournamentMatches function:
+
+const loadTournamentMatches = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('tournament_matches')
+      .select('*')
+      .order('tournament_id', { ascending: true })
+      .order('round', { ascending: true })
+      .order('match_number', { ascending: true });
+    if (error) throw error;
+
+    // Fetch team players from junction table and attach to each match.
+    let playersMap = {};
     try {
-      const { data, error } = await supabase
-        .from('tournament_matches')
-        .select('*')
-        .order('tournament_id', { ascending: true })
-        .order('round', { ascending: true })
-        .order('match_number', { ascending: true });
-      if (error) throw error;
+      const { data: players } = await supabase
+        .from('tournament_match_players')
+        .select('match_id, employee_id, team, position')
+        .order('position', { ascending: true });
+      if (players) {
+        players.forEach(p => {
+          if (!playersMap[p.match_id]) playersMap[p.match_id] = { A: [], B: [] };
+          playersMap[p.match_id][p.team].push({ employee_id: p.employee_id, position: p.position });
+        });
+      }
+    } catch (_) { /* table may not exist yet — degrade gracefully */ }
 
-      // Fetch team players from junction table and attach to each match.
-      let playersMap = {};
-      try {
-        const { data: players } = await supabase
-          .from('tournament_match_players')
-          .select('match_id, employee_id, team, position')
-          .order('position', { ascending: true });
-        if (players) {
-          players.forEach(p => {
-            if (!playersMap[p.match_id]) playersMap[p.match_id] = { A: [], B: [] };
-            playersMap[p.match_id][p.team].push({ employee_id: p.employee_id, position: p.position });
-          });
-        }
-      } catch (_) { /* table may not exist yet — degrade gracefully */ }
-
-      const enriched = (data || []).map(m => ({
+    // CRITICAL FIX: We need to restore the _feeds_from_a and _feeds_from_b
+    // metadata from the match_code relationships. This can be derived from
+    // the next_match_winner_id pointer chain.
+    const enriched = (data || []).map(m => {
+      // Find which previous matches feed into this one
+      const feedsFrom = (data || []).filter(
+        prev => prev.next_match_winner_id === m.id
+      );
+      
+      // Sort by match_number to maintain order
+      feedsFrom.sort((a, b) => (a.match_number || 0) - (b.match_number || 0));
+      
+      const feedsFromA = feedsFrom[0]?.match_code || null;
+      const feedsFromB = feedsFrom[1]?.match_code || null;
+      
+      return {
         ...m,
         team_a_players: playersMap[m.id]?.A || [],
         team_b_players: playersMap[m.id]?.B || [],
-      }));
-      setTournamentMatches(enriched);
-    } catch (err) {
-      console.error('Error loading tournament matches:', err);
-      setTournamentMatches([]);
-    }
-  };
-
+        // Restore the feed metadata
+        _feeds_from_a: feedsFromA,
+        _feeds_from_b: feedsFromB,
+      };
+    });
+    setTournamentMatches(enriched);
+  } catch (err) {
+    console.error('Error loading tournament matches:', err);
+    setTournamentMatches([]);
+  }
+};
   const loadFinalResults = async () => {
     try {
       const { data, error } = await supabase
