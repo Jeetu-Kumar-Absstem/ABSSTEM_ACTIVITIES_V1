@@ -895,6 +895,56 @@ const renderMatch = (m) => {
     return (
       <div style={{ display: 'grid', gap: '1rem' }}>
 
+        {/* ── Top tournament selector bar (shown for RR / league / swiss so
+             users can switch without scrolling down to the buried dropdown) ── */}
+        {(isRoundRobin || activeTournamentFormat === 'league' || activeTournamentFormat === 'swiss') && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.75rem',
+            flexWrap: 'wrap',
+            background: 'white',
+            border: '1px solid #d8e2ef',
+            borderRadius: 10,
+            padding: '0.6rem 1rem',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+          }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#555', whiteSpace: 'nowrap' }}>
+              📋 Tournament
+            </span>
+            <select
+              value={activeTournament || ''}
+              onChange={(e) => setActiveTournament(e.target.value)}
+              style={{
+                ...styles.formInput,
+                flex: 1, minWidth: 220, maxWidth: 400,
+                fontWeight: 600, color: '#1a3c6e',
+                borderColor: '#1a3c6e', borderRadius: 6,
+              }}
+            >
+              {tournaments.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.game} · {STATUS_BADGE[t.status]?.label || t.status}
+                </option>
+              ))}
+            </select>
+            {activeTournamentRecord && (
+              <span style={{
+                ...styles.tinyChip,
+                background: FORMAT_BADGE[activeTournamentRecord.format]?.bg || '#f5f5f5',
+                color: FORMAT_BADGE[activeTournamentRecord.format]?.color || '#444',
+                fontSize: '0.68rem', whiteSpace: 'nowrap',
+              }}>
+                {FORMAT_BADGE[activeTournamentRecord.format]?.label || activeTournamentRecord.format}
+              </span>
+            )}
+            {activeTournamentRecord && (
+              <span style={{ fontSize: '0.68rem', color: '#888', whiteSpace: 'nowrap' }}>
+                {formatDate(activeTournamentRecord.start_date)}
+                {activeTournamentRecord.end_date ? ` → ${formatDate(activeTournamentRecord.end_date)}` : ''}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* ── Round-Robin Standings Table ─────────────────────────────── */}
         {isRoundRobin && rrMatches.length > 0 && (
           <div className="clay-card" style={{ ...styles.card, background: '#e8f4fd' }}>
