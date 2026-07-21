@@ -26,6 +26,7 @@ const DashboardPage = () => {
     tournamentMatches,
     tournaments,
     currentUser,
+    setActiveTab,
   } = useApp();
 
   const [showGameDropdown, setShowGameDropdown] = useState(false);
@@ -313,7 +314,6 @@ const DashboardPage = () => {
           color: '#1a1a2e',
           position: 'relative',
           zIndex: 1,
-          fontWeight: 800,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -988,39 +988,24 @@ const DashboardPage = () => {
               Quick Actions
             </div>
             <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
-              Admin Tools
+              Quick Actions
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <QuickActionButton 
                 icon="📅" 
                 label="Create Slot Booking" 
-                onClick={() => console.log('Create Slot Booking')}
+                onClick={() => setActiveTab('booking')}
               />
               <QuickActionButton 
                 icon="📋" 
                 label="Create Event" 
-                onClick={() => console.log('Create Event')}
+                onClick={() => setActiveTab('eventsCalendar')}
               />
               <QuickActionButton 
                 icon="🏆" 
                 label="Create Tournament" 
-                onClick={() => console.log('Create Tournament')}
-              />
-              <QuickActionButton 
-                icon="📜" 
-                label="Add Rule" 
-                onClick={() => console.log('Add Rule')}
-              />
-              <QuickActionButton 
-                icon="🚫" 
-                label="Manage Bans" 
-                onClick={() => console.log('Manage Bans')}
-              />
-              <QuickActionButton 
-                icon="📊" 
-                label="Export Report" 
-                onClick={() => console.log('Export Report')}
+                onClick={() => setActiveTab('tournaments')}
               />
             </div>
           </section>
