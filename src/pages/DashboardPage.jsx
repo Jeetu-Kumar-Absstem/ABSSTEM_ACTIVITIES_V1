@@ -313,6 +313,7 @@ const DashboardPage = () => {
           color: '#1a1a2e',
           position: 'relative',
           zIndex: 1,
+          fontWeight: 800,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>

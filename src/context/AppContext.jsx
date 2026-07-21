@@ -63,7 +63,7 @@ export const AppProvider = ({ children }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gamesLoaded, setGamesLoaded] = useState(false); // track if Supabase games have loaded
   const [selectedGame, setSelectedGame] = useState('carrom');
-  const [activeTab, setActiveTab] = useState('booking');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
 
   // Check if current user is admin using the utils
