@@ -369,6 +369,8 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
       score_b:               isBye ? 0 : null,
       // Internal — used by AppContext pointer-wiring
       _bye_winner:           winnerId,
+      // Filled in after the next round is built (see below)
+      _feeds_into:           null,
     });
 
     r0EffectiveSlots.push(
@@ -392,7 +394,14 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
   //   both empty            → skip, mark next slot as empty
   //   one real + one empty  → the real slot advances for free (no new match)
   //   both real             → create a match; pre-fill any known bye winners
+  //
+  // We also back-fill `_feeds_into` on every feeder match so AppContext can
+  // wire next_match_winner_id and auto-advance byes using a reliable
+  // code→code map instead of fragile Math.floor(index/2) arithmetic.
   let prevEffective = r0EffectiveSlots;
+
+  // Flat map of matchCode → match object across ALL rounds built so far
+  const matchByCode = new Map(r0Matches.map((m) => [m.match_code, m]));
 
   const numRounds = Math.log2(size); // total rounds in the bracket
 
@@ -418,7 +427,8 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
         continue;
       }
 
-      // One empty → the non-empty winner advances without a new shell match
+      // One empty → the real slot advances without a new shell match.
+      // Propagate unchanged so it can feed a real match in a later round.
       if (slotA.type === 'empty' || slotB.type === 'empty') {
         const real = slotA.type !== 'empty' ? slotA : slotB;
         nextEffective.push(real);
@@ -436,7 +446,15 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
       const isBye = slotA.type === 'bye' && slotB.type === 'bye';
       const winnerId = isBye ? playerAId : null;
 
-      roundMatches.push({
+      // Back-fill _feeds_into on both feeder matches so AppContext can use it
+      for (const slot of [slotA, slotB]) {
+        if (slot.matchCode) {
+          const feeder = matchByCode.get(slot.matchCode);
+          if (feeder) feeder._feeds_into = matchCode;
+        }
+      }
+
+      const newMatch = {
         round:                 roundCode,
         match_number:          matchNum,
         match_code:            matchCode,
@@ -453,11 +471,15 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
         _feeds_from_a:         slotA.type === 'match' ? slotA.matchCode : null,
         _feeds_from_b:         slotB.type === 'match' ? slotB.matchCode : null,
         _bye_winner:           winnerId,
-      });
+        _feeds_into:           null, // filled when the next round is built
+      };
+
+      roundMatches.push(newMatch);
+      matchByCode.set(matchCode, newMatch);
 
       nextEffective.push(
         isBye
-          ? { type: 'bye', playerId: winnerId }
+          ? { type: 'bye', playerId: winnerId, matchCode }
           : { type: 'match', matchCode }
       );
     }

@@ -1247,38 +1247,36 @@ export const AppProvider = ({ children }) => {
         const byCode = new Map((inserted || []).map((row) => [row.match_code, row]));
 
         // ── Step 1: wire next_match_winner_id pointers ─────────────────
+        // Use _feeds_into from the fixture plan — this is correct even when
+        // phantom/bye collapsing causes rounds to have fewer matches than
+        // index-based Math.floor(matchIndex/2) arithmetic would assume.
         const pointerUpdates = [];
-        for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
-          const currentRound = roundPlan.rounds[roundIndex];
-          const nextRound    = roundPlan.rounds[roundIndex + 1];
-          currentRound.matches.forEach((match, matchIndex) => {
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            if (!match._feeds_into) continue;
             const currentRow = byCode.get(match.match_code);
-            const nextRow    = byCode.get(nextRound.matches[Math.floor(matchIndex / 2)]?.match_code);
-            if (!currentRow || !nextRow) return;
+            const nextRow    = byCode.get(match._feeds_into);
+            if (!currentRow || !nextRow) continue;
             pointerUpdates.push(
               supabase
                 .from('tournament_matches')
                 .update({ next_match_winner_id: nextRow.id })
                 .match({ id: currentRow.id })
             );
-          });
+          }
         }
         await Promise.all(pointerUpdates);
 
         // ── Step 2: auto-advance bye winners across ALL rounds ──────────
-        for (let roundIndex = 0; roundIndex < roundPlan.rounds.length - 1; roundIndex += 1) {
-          const currentRound = roundPlan.rounds[roundIndex];
-          const nextRound    = roundPlan.rounds[roundIndex + 1];
-
-          for (let matchIndex = 0; matchIndex < currentRound.matches.length; matchIndex += 1) {
-            const match = currentRound.matches[matchIndex];
+        // Iterate in round order (earliest first) so winners propagate in the
+        // correct sequence when multiple byes chain into the same next match.
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
             if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
+            if (!match._feeds_into) continue;
 
-            const sourceRow = byCode.get(match.match_code);
-            const nextMatchPlan = nextRound.matches[Math.floor(matchIndex / 2)];
-            if (!nextMatchPlan) continue;
-            const targetRow = byCode.get(nextMatchPlan.match_code);
-            if (!sourceRow || !targetRow) continue;
+            const targetRow = byCode.get(match._feeds_into);
+            if (!targetRow) continue;
 
             const { data: freshTarget } = await supabase
               .from('tournament_matches')

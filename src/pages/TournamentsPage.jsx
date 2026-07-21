@@ -238,7 +238,7 @@ const TournamentsPage = () => {
   const [matchToDelete, setMatchToDelete] = useState(null);
   // editTournamentId: tournament being edited by admin (status / registration / date)
   const [editTournamentId, setEditTournamentId] = useState(null);
-  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '' });
+  const [tEditForm, setTEditForm] = useState({ status: 'registration_open', registration_open: true, start_date: '', end_date: '', max_participants: 8 });
 
   // Auto-pick the first tournament if the user hasn't picked one yet, or
   // if the previously selected one no longer exists (e.g. it was deleted,
@@ -468,6 +468,8 @@ const TournamentsPage = () => {
                               status: t.status || 'registration_open',
                               registration_open: t.registration_open !== false,
                               start_date: t.start_date || '',
+                              end_date: t.end_date || '',
+                              max_participants: t.max_participants || 8,
                             });
                             setEditTournamentId(t.id);
                           }}
@@ -1790,6 +1792,8 @@ const TournamentsPage = () => {
       status: tEditForm.status,
       registration_open: tEditForm.registration_open,
       start_date: tEditForm.start_date,
+      end_date: tEditForm.end_date || null,
+      max_participants: parseInt(tEditForm.max_participants, 10) || 8,
     });
     if (result.success) {
       showToast('Tournament updated');
@@ -1878,6 +1882,26 @@ const TournamentsPage = () => {
                     style={styles.formInput}
                     value={tEditForm.start_date}
                     onChange={(e) => setTEditForm(f => ({ ...f, start_date: e.target.value }))}
+                  />
+                </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>End Date</label>
+                  <input
+                    type="date"
+                    style={styles.formInput}
+                    value={tEditForm.end_date}
+                    onChange={(e) => setTEditForm(f => ({ ...f, end_date: e.target.value }))}
+                  />
+                </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Max Participants</label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="256"
+                    style={styles.formInput}
+                    value={tEditForm.max_participants}
+                    onChange={(e) => setTEditForm(f => ({ ...f, max_participants: e.target.value }))}
                   />
                 </div>
                 <div style={{
