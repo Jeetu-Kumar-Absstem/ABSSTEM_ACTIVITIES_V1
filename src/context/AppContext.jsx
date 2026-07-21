@@ -1267,16 +1267,16 @@ export const AppProvider = ({ children }) => {
         await Promise.all(pointerUpdates);
 
         // ── Step 2: auto-advance bye winners across ALL rounds ──────────
-        // Group all bye winners by target match to avoid the race condition
-        // where two byes feed the same match (e.g. both SFs are byes → Final)
-        // and sequential reads both see player_a as null, writing the same
-        // player into both slots ("Jeetu kr vs Jeetu kr").
+        // Group all bye winners by their target match first, then write each
+        // target in ONE update.  Without this, when two byes both feed the
+        // same match (e.g. both SFs are byes → Final), the sequential reads
+        // both see player_a as null and both write player_a, producing
+        // "Jeetu kr vs Jeetu kr" in the Final instead of "TBD vs TBD".
         const byeAdvances = new Map(); // targetMatchCode → [winnerId, ...]
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
-            if (!match._feeds_into) continue;
-            if (!byCode.has(match._feeds_into)) continue;
+            if (!match._feeds_into || !byCode.has(match._feeds_into)) continue;
             if (!byeAdvances.has(match._feeds_into)) byeAdvances.set(match._feeds_into, []);
             byeAdvances.get(match._feeds_into).push(match.winner_employee_id);
           }
@@ -2058,15 +2058,15 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // ── Knockout refresh (admin) ───────────────────────────────────────────
+  // ── Knockout Refresh (admin) ────────────────────────────────────────────
   // Deletes ALL existing matches for the tournament and regenerates the full
-  // bracket from scratch using the current participant list.  This fixes any
-  // corrupted state (e.g. "same player vs same player" in the Final) without
-  // requiring manual Supabase edits.
+  // bracket from scratch using the current participant list.
+  // This fixes any corrupted bracket state (e.g. duplicate players in Final)
+  // without requiring manual Supabase edits.
   const refreshKnockoutFixtures = async (tournamentId) => {
     if (!isAdmin()) return { success: false, error: 'Admins only' };
     try {
-      // ── Step 1: fetch fresh data from Supabase ──────────────────────────
+      // ── Step 1: fetch fresh data directly from Supabase ─────────────────
       const [{ data: freshParticipants, error: pErr }, { data: freshMatches, error: mErr }] =
         await Promise.all([
           supabase.from('tournament_participants').select('*').eq('tournament_id', tournamentId),
@@ -2089,7 +2089,7 @@ export const AppProvider = ({ children }) => {
         return { success: false, error: 'At least 2 registered participants are required' };
       }
 
-      // ── Step 2: delete ALL existing matches for this tournament ─────────
+      // ── Step 2: delete ALL existing matches for this tournament ──────────
       const existingIds = (freshMatches || []).map((m) => m.id);
       if (existingIds.length > 0) {
         const { error: delErr } = await supabase
@@ -2099,7 +2099,7 @@ export const AppProvider = ({ children }) => {
         if (delErr) throw delErr;
       }
 
-      // ── Step 3: build a fresh fixture plan ─────────────────────────────
+      // ── Step 3: build a brand-new fixture plan ───────────────────────────
       const fixtureOpts = {
         playersPerTeam:      tournament.players_per_team ?? 1,
         tournamentStartDate: tournament.start_date       ?? null,
@@ -2109,11 +2109,11 @@ export const AppProvider = ({ children }) => {
       };
       const roundPlan = buildKnockoutFixturePlan(approvedParticipants, fixtureOpts);
 
-      // ── Step 4: build insert payloads (same logic as generateTournamentFixtures) ─
+      // ── Step 4: build insert payloads ────────────────────────────────────
       const payloads = [];
       for (const round of roundPlan.rounds) {
         for (const match of round.matches) {
-          // Skip truly unreachable phantom matches (no players, no feeds)
+          // Skip truly unreachable phantom matches (no players, no feeds at all)
           const isPhantom = !match.player_a_employee_id && !match.player_b_employee_id &&
                             !match._preplace_a && !match._preplace_b;
           if (isPhantom && !match._feeds_from_a && !match._feeds_from_b) continue;
@@ -2139,14 +2139,14 @@ export const AppProvider = ({ children }) => {
         return { success: false, error: 'No fixtures could be generated' };
       }
 
-      // ── Step 5: insert matches ──────────────────────────────────────────
+      // ── Step 5: insert all matches ───────────────────────────────────────
       const { data: inserted, error: insErr } = await insertMatchesWithTeams(
         payloads,
         roundPlan.rounds
       );
       if (insErr) throw insErr;
 
-      // ── Step 6: wire next_match_winner_id pointers ──────────────────────
+      // ── Step 6: wire next_match_winner_id pointers ───────────────────────
       if (roundPlan.rounds.length > 1) {
         const byCode = new Map((inserted || []).map((r) => [r.match_code, r]));
 
@@ -2168,17 +2168,15 @@ export const AppProvider = ({ children }) => {
         }
         await Promise.all(pointerUpdates);
 
-        // ── Step 7: auto-advance bye winners ───────────────────────────────
-        // Group all bye winners by target match to avoid the race condition
-        // where two byes feed the same match (e.g. both SFs are byes → Final)
-        // and sequential reads both see player_a as null, writing the same
-        // player into both slots ("Jeetu kr vs Jeetu kr").
+        // ── Step 7: advance bye winners — batched per target to avoid the
+        //    race condition where two byes both feed the same next match
+        //    (e.g. SF1-bye + SF2-bye → Final) and sequential reads both see
+        //    player_a as null, writing the same player into both slots.
         const byeAdvances = new Map(); // targetMatchCode → [winnerId, ...]
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
-            if (!match._feeds_into) continue;
-            if (!byCode.has(match._feeds_into)) continue;
+            if (!match._feeds_into || !byCode.has(match._feeds_into)) continue;
             if (!byeAdvances.has(match._feeds_into)) byeAdvances.set(match._feeds_into, []);
             byeAdvances.get(match._feeds_into).push(match.winner_employee_id);
           }

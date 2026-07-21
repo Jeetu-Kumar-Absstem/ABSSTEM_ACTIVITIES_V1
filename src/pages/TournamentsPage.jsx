@@ -901,7 +901,6 @@ const TournamentsPage = () => {
             </div>
           </div>
         )}
-        <div>Final fixtures of the knockout depends upon the results of the round-robin phase.</div>
 
         {/* ── Knockout Bracket (round-robin → KO phase) ───────────────── */}
         {isRoundRobin && hasKoPhase && (
@@ -1023,7 +1022,15 @@ const TournamentsPage = () => {
 
           <div style={{ overflowX: 'auto' }}>
             {/* For RR tournaments, only show the RR fixture grid (KO shown above) */}
-            <div style={{ ...styles.bracketGrid, minWidth: Math.max(4, (isRoundRobin ? rrMatchGroups : roundGroups).length) * 240 }}>
+            <div style={{
+              ...styles.bracketGrid,
+              // RR fixture grid: single full-width column, no horizontal scroll needed.
+              // KO bracket: one column per round, min 240px each.
+              ...(isRoundRobin
+                ? { gridTemplateColumns: '1fr', minWidth: 'unset' }
+                : { minWidth: Math.max(3, roundGroups.length) * 260 }
+              ),
+            }}>
               {(isRoundRobin ? rrMatchGroups : roundGroups).length === 0 ? (
                 <div style={{ ...styles.bracketColBody, gridColumn: '1 / -1' }}>
                   <div style={styles.emptyCol}>
@@ -1031,19 +1038,39 @@ const TournamentsPage = () => {
                   </div>
                 </div>
               ) : (
-                (isRoundRobin ? rrMatchGroups : roundGroups).map((group, index) => (
-                  <div key={group.round} style={styles.bracketCol}>
-                    <div style={{
-                      ...styles.bracketColHeader,
-                      background: ['#c81c1c', '#618ff4', '#fbdd65', '#59f0a5', '#8e24aa', '#26a69a'][index % 6],
-                    }}>{group.label}</div>
-                    <div style={styles.bracketColBody}>
-                      {group.matches.length === 0
-                        ? <div style={styles.emptyCol}>No matches yet</div>
-                        : group.matches.map(renderMatch)}
+                (isRoundRobin ? rrMatchGroups : roundGroups).map((group, index) => {
+                  // For RR rounds with many matches, display 3 cards per row.
+                  // For KO rounds (QF/SF/F) keep the classic single-column bracket look.
+                  const isRrRound = String(group.round || '').toUpperCase().startsWith('RR');
+                  const useGrid   = isRrRound && group.matches.length > 2;
+                  return (
+                    <div
+                      key={group.round}
+                      style={{
+                        ...styles.bracketCol,
+                        // RR grid column spans full width; KO columns share the grid
+                        ...(useGrid ? { gridColumn: '1 / -1' } : {}),
+                      }}
+                    >
+                      <div style={{
+                        ...styles.bracketColHeader,
+                        background: ['#c81c1c', '#618ff4', '#fbdd65', '#59f0a5', '#8e24aa', '#26a69a'][index % 6],
+                      }}>{group.label}</div>
+                      <div style={styles.bracketColBody}>
+                        {group.matches.length === 0
+                          ? <div style={styles.emptyCol}>No matches yet</div>
+                          : useGrid
+                            ? (
+                              <div style={styles.matchesGrid}>
+                                {group.matches.map(renderMatch)}
+                              </div>
+                            )
+                            : group.matches.map(renderMatch)
+                        }
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -2954,6 +2981,7 @@ const styles = {
   bracketCol: { display: 'flex', flexDirection: 'column' },
   bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
   bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100 },
+  matchesGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' },
   emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic' },
   matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem' },
   matchLabel: { textAlign: 'center', fontSize: '0.62rem', color: '#888', marginBottom: '0.25rem' },
