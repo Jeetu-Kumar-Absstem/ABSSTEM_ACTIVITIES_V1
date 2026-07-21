@@ -1,368 +1,644 @@
 // src/components/layout/Sidebar.jsx
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { LogOut } from 'lucide-react';
 
-const TAB_COLORS = {
-  booking:    { bg: '#080b5c', shadow: 'rgba(34,197,94,0.35)',   waves: ['#7e79cf', '#4d29df', '#36097d'] },
-  master:     { bg: '#d68b09', shadow: 'rgba(245,158,11,0.35)',  waves: ['#fde68a', '#fbbf24', '#f59e0b'] },
-  slots:      { bg: '#da1d1d', shadow: 'rgba(239,68,68,0.35)',   waves: ['#fca5a5', '#f87171', '#ef4444'] },
-  rules:      { bg: '#cf2379', shadow: 'rgba(236,72,153,0.35)',  waves: ['#f9a8d4', '#f472b6', '#ec4899'] },
-  bans:       { bg: '#551ed4', shadow: 'rgba(139,92,246,0.35)',  waves: ['#c4b5fd', '#a78bfa', '#8b5cf6'] },
-  reports:    { bg: '#0f96ad', shadow: 'rgba(6,182,212,0.35)',   waves: ['#67e8f9', '#22d3ee', '#06b6d4'] },
-  // Events subsection
-  eventsCalendar: { bg: '#0f3a7a', shadow: 'rgba(26,60,110,0.35)', waves: ['#93b4e0', '#4a7bbf', '#1a3c6e'] },
-  tournaments:    { bg: '#b8860b', shadow: 'rgba(184,134,11,0.35)', waves: ['#fde68a', '#fbbf24', '#b8860b'] },
-  leaderboard:    { bg: '#6a1b9a', shadow: 'rgba(106,27,154,0.35)', waves: ['#c4b5fd', '#a78bfa', '#6a1b9a'] },
-  // SidebarItem headers
-  dashboard:  { bg: '#0f3a7a', shadow: 'rgba(26,60,110,0.35)',   waves: ['#93b4e0', '#4a7bbf', '#1a3c6e'] },
-  activities: { bg: '#055952', shadow: 'rgba(15,118,110,0.35)',  waves: ['#5eead4', '#2dd4bf', '#0f766e'] },
-  events:     { bg: '#7c2d12', shadow: 'rgba(124,45,18,0.35)',   waves: ['#fed7aa', '#fb923c', '#7c2d12'] },
+// 👇 Replace with your actual logo path
+import absstemLogo from '/public/absstem_logo_with_name.png';
+
+const BLUE_COLOR = {
+  bg: '#080b5c',
+  hoverBg: '#e8edf5',
+  activeBg: '#080b5c',
+  activeText: '#ffffff',
+  text: '#1a1a2e',
+  border: '#e8edf5',
 };
 
-const TAB_ICONS = {
-  booking: '🎯',
-  master:  '🎮',
-  slots:   '⏰',
-  rules:   '📜',
-  bans:    '🚫',
-  eventsCalendar: '📅',
-  tournaments:    '🏆',
-  leaderboard:    '🥇',
-};
-
-function easeInOutCubic(t) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function buildPath(progress, waveAmp, phaseOffset) {
-  const p     = easeInOutCubic(Math.min(1, Math.max(0, progress)));
-  const baseY = 100 - p * 100;
-  const amp   = waveAmp * Math.sin(p * Math.PI);
-  const cp1Y  = baseY - amp + phaseOffset;
-  const cp2Y  = baseY + amp * 0.5 + phaseOffset;
-  return `M 0 100 C 25 ${cp1Y} 75 ${cp2Y} 100 ${baseY} V 100 H 0`;
-}
-
-const WAVE_AMP   = [24, 20, 16];
-const WAVE_PHASE = [0, -6, 6];
-const DURATION   = 520;
-const STAGGER    = 90;
-
-// ── Shared fluid animation hook ──────────────────────────────────
-function usePillAnim({ active, onFilled, onIdle }) {
-  const [phase, setPhase] = useState(active ? 'filled' : 'idle');
-  const rafRef      = useRef(null);
-  const pathRefs    = useRef([null, null, null]);
-  const prevActive  = useRef(active);
-
-  const runLoop = useCallback((dir, onDone) => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    const step = (ts) => {
-      if (!step.start) step.start = ts;
-      const elapsed = ts - step.start;
-      let allDone = true;
-      pathRefs.current.forEach((el, i) => {
-        if (!el) return;
-        const t        = Math.min(1, Math.max(0, elapsed - i * STAGGER) / DURATION);
-        const progress = dir === 'in' ? t : 1 - t;
-        el.setAttribute('d', buildPath(progress, WAVE_AMP[i], WAVE_PHASE[i]));
-        if (t < 1) allDone = false;
-      });
-      if (!allDone) { rafRef.current = requestAnimationFrame(step); }
-      else          { rafRef.current = null; onDone && onDone(); }
-    };
-    rafRef.current = requestAnimationFrame(step);
-  }, []);
-
-  useEffect(() => {
-    if (phase === 'animating-in') {
-      pathRefs.current.forEach((el, i) => {
-        if (el) el.setAttribute('d', buildPath(0, WAVE_AMP[i], WAVE_PHASE[i]));
-      });
-      runLoop('in', () => { setPhase('filled'); onFilled && onFilled(); });
-    }
-    if (phase === 'animating-out') {
-      pathRefs.current.forEach((el, i) => {
-        if (el) el.setAttribute('d', buildPath(1, WAVE_AMP[i], WAVE_PHASE[i]));
-      });
-      runLoop('out', () => { setPhase('idle'); onIdle && onIdle(); });
-    }
-  }, [phase]);
-
-  useEffect(() => {
-    const was = prevActive.current;
-    prevActive.current = active;
-    if (!was && active)  { if (rafRef.current) cancelAnimationFrame(rafRef.current); setPhase('filled'); }
-    if (was  && !active) { if (rafRef.current) cancelAnimationFrame(rafRef.current); setPhase('animating-out'); }
-  }, [active]);
-
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
-
-  const handleMouseEnter = (isActive) => {
-    if (isActive) return;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    setPhase('animating-in');
-  };
-  const handleMouseLeave = (isActive) => {
-    if (isActive) return;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    setPhase('animating-out');
-  };
-
-  return { phase, pathRefs, handleMouseEnter, handleMouseLeave };
-}
-
-// ── Reusable pill wave renderer ──────────────────────────────────
-const PillWaveSVG = ({ waves, pathRefs }) => (
-  <svg
-    viewBox="0 0 100 100"
-    preserveAspectRatio="none"
-    style={{
-      position: 'absolute', top: 0, left: 0,
-      width: '100%', height: '100%',
-      zIndex: 0, pointerEvents: 'none',
-    }}
-  >
-    {waves.map((fill, i) => (
-      <path
-        key={i}
-        ref={el => { pathRefs.current[i] = el; }}
-        fill={fill}
-        d={buildPath(0, WAVE_AMP[i], WAVE_PHASE[i])}
-      />
-    ))}
-  </svg>
-);
-
-// ── Tab pill buttons (sub-items) ─────────────────────────────────
-const PillButton = ({ tabId, label, active, onClick, collapsed }) => {
-  const { bg, shadow, waves } = TAB_COLORS[tabId] || {
-    bg: '#888', shadow: 'rgba(136,136,136,0.3)', waves: ['#aaa', '#888', '#666'],
-  };
-  const { phase, pathRefs, handleMouseEnter, handleMouseLeave } = usePillAnim({ active });
-
-  const showSVG   = phase === 'animating-in' || phase === 'animating-out';
-  const solidFill = phase === 'filled';
-  const isHL      = phase !== 'idle';
-
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => handleMouseEnter(active)}
-      onMouseLeave={() => handleMouseLeave(active)}
-      title={collapsed ? label : undefined}
-      aria-label={label}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative', overflow: 'hidden',
-        padding: collapsed ? '9px 6px' : '9px 16px',
-        margin: '4px 6px', width: 'calc(100% - 12px)',
-        backgroundColor: solidFill ? bg : 'transparent',
-        border: `2px solid ${isHL ? bg : 'rgba(200,210,230,0.5)'}`,
-        borderRadius: '100px', cursor: 'pointer',
-        boxShadow: active
-          ? `0 4px 14px ${shadow}, 0 1px 3px rgba(0,0,0,0.08)`
-          : isHL ? `0 2px 10px ${shadow}` : '0 1px 3px rgba(0,0,0,0.06)',
-        transition: 'border-color 0.15s ease, box-shadow 0.2s ease, padding 0.2s ease',
-      }}
-    >
-      {showSVG && <PillWaveSVG waves={waves} pathRefs={pathRefs} />}
-      <span style={{
-        display: 'block', position: 'relative', zIndex: 1,
-        color: solidFill ? '#fff' : isHL ? '#000' : '#555',
-        fontFamily: '"Aeonik Pro", Arial, sans-serif',
-        fontWeight: 700, fontSize: 'clamp(11px, 0.72vw, 13px)',
-        lineHeight: '120%', textAlign: 'center', letterSpacing: '0.01em',
-        transition: 'color 0.1s ease, opacity 0.2s ease',
-        whiteSpace: 'nowrap', userSelect: 'none',
-        opacity: collapsed ? 0 : 1,
-        width: collapsed ? 0 : 'auto',
-        overflow: 'hidden',
-      }}>
-        {label}
-      </span>
-      {collapsed && (
-        <span style={{
-          position: 'relative', zIndex: 1,
-          color: solidFill ? '#fff' : isHL ? '#000' : '#555',
-          fontSize: '1.05rem',
-          opacity: collapsed ? 1 : 0,
-          transition: 'opacity 0.2s ease',
-        }} aria-hidden>
-          {TAB_ICONS[tabId] || '•'}
-        </span>
-      )}
-    </div>
-  );
-};
-
-// ── SidebarItem — now also a pill wave button for the header ─────
-const SidebarItem = ({ colorId, icon, label, children, defaultOpen = false, active, onClick, collapsed }) => {
+const SidebarItem = ({ 
+  icon, 
+  label, 
+  active = false, 
+  onClick, 
+  children, 
+  defaultOpen = false,
+  indent = false,
+  collapsed = false
+}) => {
   const [open, setOpen] = useState(defaultOpen);
-  const { bg, shadow, waves } = TAB_COLORS[colorId] || TAB_COLORS.dashboard;
-
-  const { phase, pathRefs, handleMouseEnter, handleMouseLeave } = usePillAnim({ active: active || false });
-
-  const showSVG   = phase === 'animating-in' || phase === 'animating-out';
-  const solidFill = phase === 'filled';
-  const isHL      = phase !== 'idle';
 
   const handleClick = () => {
+    if (children && !collapsed) {
+      setOpen(!open);
+    }
     onClick && onClick();
-    if (children && !collapsed) setOpen(o => !o);
   };
 
-  return (
-    <div style={{ marginBottom: '4px' }}>
-      {/* Header pill */}
+  if (collapsed) {
+    return (
       <div
         onClick={handleClick}
-        onMouseEnter={() => handleMouseEnter(active || false)}
-        onMouseLeave={() => handleMouseLeave(active || false)}
-        title={collapsed ? label : undefined}
-        aria-label={label}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between',
-          position: 'relative', overflow: 'hidden',
-          padding: collapsed ? '10px 6px' : '10px 16px',
-          margin: '0 6px',
-          backgroundColor: solidFill ? bg : 'transparent',
-          border: `2px solid ${isHL ? bg : 'rgba(200,210,230,0.5)'}`,
-          borderRadius: '100px', cursor: 'pointer',
-          boxShadow: solidFill
-            ? `0 4px 14px ${shadow}, 0 1px 3px rgba(0,0,0,0.08)`
-            : isHL ? `0 2px 10px ${shadow}` : '0 1px 3px rgba(0,0,0,0.06)',
-          transition: 'border-color 0.15s ease, box-shadow 0.2s ease, padding 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '10px',
+          margin: '2px 0',
+          borderRadius: '12px',
+          cursor: 'pointer',
+          color: active ? BLUE_COLOR.activeText : BLUE_COLOR.text,
+          backgroundColor: active ? BLUE_COLOR.activeBg : 'transparent',
+          transition: 'all 0.2s ease',
+          position: 'relative',
+          width: '100%',
+        }}
+        onMouseEnter={(e) => {
+          if (!active) {
+            e.currentTarget.style.backgroundColor = BLUE_COLOR.hoverBg;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }
+        }}
+        title={label}
+      >
+        {icon && <span style={{ fontSize: '20px' }}>{icon}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="sidebar-item-wrapper">
+      <div
+        onClick={handleClick}
+        className={`sidebar-item ${active ? 'active' : ''} ${indent ? 'indent' : ''}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '10px 16px',
+          margin: '2px 8px',
+          borderRadius: '12px',
+          cursor: 'pointer',
+          color: active ? BLUE_COLOR.activeText : BLUE_COLOR.text,
+          backgroundColor: active ? BLUE_COLOR.activeBg : 'transparent',
+          transition: 'all 0.2s ease',
+          fontSize: '14px',
+          fontWeight: active ? 600 : 500,
+          position: 'relative',
+        }}
+        onMouseEnter={(e) => {
+          if (!active) {
+            e.currentTarget.style.backgroundColor = BLUE_COLOR.hoverBg;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }
         }}
       >
-        {showSVG && <PillWaveSVG waves={waves} pathRefs={pathRefs} />}
-        <span style={{
-          position: 'relative', zIndex: 1,
-          fontSize: '0.75rem', fontWeight: 700,
-          fontFamily: '"Aeonik Pro", Arial, sans-serif',
-          color: solidFill ? '#fff' : isHL ? '#000' : '#444466',
-          transition: 'color 0.1s ease, opacity 0.2s ease', userSelect: 'none',
-          display: 'flex', alignItems: 'center', gap: '6px',
-          opacity: collapsed ? 0 : 1,
-          width: collapsed ? 0 : 'auto',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-        }}>
-          {icon} {label}
-        </span>
-        {children && !collapsed && (
+        {icon && <span style={{ fontSize: '18px', width: '24px', flexShrink: 0 }}>{icon}</span>}
+        <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{label}</span>
+        {children && (
           <span style={{
-            position: 'relative', zIndex: 1,
-            fontSize: '0.6rem',
-            color: solidFill ? '#fff' : isHL ? '#000' : '#888',
             transform: open ? 'rotate(90deg)' : 'none',
-            transition: 'transform 0.2s ease, color 0.1s ease',
-            userSelect: 'none',
+            transition: 'transform 0.2s ease',
+            fontSize: '12px',
+            color: active ? BLUE_COLOR.activeText : BLUE_COLOR.text,
+            opacity: 0.6,
           }}>▶</span>
         )}
       </div>
-
-      {/* Children sub-items */}
       {children && open && !collapsed && (
-        <div style={{ paddingLeft: '4px', paddingBottom: '4px', marginTop: '2px' }}>
-          {children}
+        <div style={{ paddingLeft: '8px' }}>
+          {React.Children.map(children, child => 
+            React.cloneElement(child, { collapsed: false })
+          )}
         </div>
       )}
     </div>
   );
 };
 
-// ── Sidebar ──────────────────────────────────────────────────────
-const Sidebar = ({ defaultCollapsed = false }) => {
-  const { activeTab, setActiveTab } = useApp();
+const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle }) => {
+  const { activeTab, setActiveTab, isAdmin, currentUser } = useApp();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   const tabs = [
     { id: 'booking', label: 'Book Slots' },
-    { id: 'master',  label: 'Game Master'  },
-    { id: 'slots',   label: 'Slot Master'  },
-    { id: 'rules',   label: 'Rules'        },
-    { id: 'bans',    label: 'Ban Management' },
-    // { id: 'reports', label: 'Reports'      },
+    { id: 'master', label: 'Game Master' },
+    { id: 'slots', label: 'Slot Master' },
+    { id: 'rules', label: 'Rules' },
+    { id: 'bans', label: 'Ban Management' },
   ];
 
   const eventTabs = [
     { id: 'eventsCalendar', label: 'Events Calendar' },
-    { id: 'tournaments',    label: 'Tournaments'     },
-    { id: 'leaderboard',    label: 'Leaderboard'     },
+    { id: 'tournaments', label: 'Tournaments' },
+    { id: 'leaderboard', label: 'Leaderboard' },
   ];
+
+  // Get user data from props or context
+  const user = propUser || currentUser;
+  
+  // Get user details from user metadata
+  const getUserName = () => {
+    if (!user) return 'User';
+    return user.user_metadata?.name || 
+           user.name || 
+           user.email?.split('@')[0] || 
+           'User';
+  };
+
+  const getUserEmail = () => {
+    if (!user) return 'user@absstem.com';
+    return user.email || 'user@absstem.com';
+  };
+
+  const getUserId = () => {
+    if (!user) return 'N/A';
+    return user.user_metadata?.emp_id || 
+           user.user_metadata?.employee_code || 
+           user.user_metadata?.empId || 
+           user.id?.slice(0, 8) || 
+           'N/A';
+  };
+
+  const getUserInitials = () => {
+    const name = getUserName();
+    if (!name || name === 'User') return 'U';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const userName = getUserName();
+  const userEmail = getUserEmail();
+  const userId = getUserId();
+  const userInitials = getUserInitials();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Notify parent when collapsed state changes
+  const handleToggle = (newState) => {
+    setCollapsed(newState);
+    if (onToggle) {
+      onToggle(newState);
+    }
+  };
+
+  // Handle profile click - toggle dropdown
+  const handleProfileClick = () => {
+    setShowDropdown(!showDropdown);
+  };
+
+  // Handle navigation items
+  const handleMyProfile = () => {
+    setShowDropdown(false);
+    setActiveTab('profile');
+  };
+
+  const handleAdmin = () => {
+    setShowDropdown(false);
+    setActiveTab('admin');
+  };
+
+  const handleSettings = () => {
+    setShowDropdown(false);
+    // Show toast or navigate to settings
+    console.log('Settings clicked');
+  };
 
   return (
     <div
-      className="clay sidebar-clay"
+      className={collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}
       style={{
-        width: collapsed ? 64 : 200,
-        flexShrink: 0, padding: '12px 8px',
-        borderRadius: '32px', minHeight: 'calc(100vh - 120px)', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: '4px',
-        transition: 'width 0.25s cubic-bezier(.2,.8,.2,1)',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        height: '100vh',
+        width: collapsed ? '72px' : '280px',
+        backgroundColor: '#ffffff',
+        zIndex: 9999,
+        padding: collapsed ? '16px 8px' : '20px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '2px 0 20px rgba(0,0,0,0.08)',
+        borderRight: '1px solid #e8edf5',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      {/* Collapse toggle */}
-      <button
-        type="button"
-        className="sidebar-collapse-btn"
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-expanded={!collapsed}
-        onClick={() => setCollapsed((c) => !c)}
+      {/* Logo Section */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          padding: collapsed ? '0 0 16px 0' : '0 8px 20px 8px',
+          borderBottom: '1px solid #e8edf5',
+          marginBottom: '16px',
+          transition: 'all 0.3s ease',
+        }}
       >
-        <span style={{
-          display: 'inline-block',
-          transform: collapsed ? 'rotate(180deg)' : 'none',
-          transition: 'transform 0.2s ease',
-        }}>›</span>
-        {!collapsed && <span style={{ marginLeft: 8, fontSize: '0.7rem' }}>Collapse</span>}
-      </button>
+        {!collapsed ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img
+                src={absstemLogo}
+                alt="Absstem Arena"
+                style={{
+                  height: '40px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                }}
+              />
+              <span style={{
+                color: BLUE_COLOR.bg,
+                fontSize: '18px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+              }}>
+                ARENA
+              </span>
+            </div>
+            <button
+              onClick={() => handleToggle(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: BLUE_COLOR.bg,
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                opacity: 0.6,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+            >
+              ◀
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => handleToggle(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: BLUE_COLOR.bg,
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '4px',
+              opacity: 0.6,
+              transition: 'opacity 0.2s',
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+          >
+            ▶
+          </button>
+        )}
+      </div>
 
-      <SidebarItem
-        colorId="dashboard"
-        icon="📊"
-        label="Dashboard"
-        active={activeTab === 'dashboard'}
-        onClick={() => setActiveTab('dashboard')}
-        collapsed={collapsed}
-      />
-      <SidebarItem
-        colorId="activities"
-        icon="🎮"
-        label="Activities"
-        defaultOpen={true}
-        collapsed={collapsed}
+      {/* Navigation Items */}
+      <div style={{ flex: 1 }}>
+        <SidebarItem
+          icon="📊"
+          label="Dashboard"
+          active={activeTab === 'dashboard'}
+          onClick={() => setActiveTab('dashboard')}
+          collapsed={collapsed}
+        />
+
+        <SidebarItem
+          icon="🎮"
+          label="Activities"
+          defaultOpen={true}
+          collapsed={collapsed}
+        >
+          {tabs.map(tab => (
+            <SidebarItem
+              key={tab.id}
+              label={tab.label}
+              indent={true}
+              active={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              collapsed={collapsed}
+            />
+          ))}
+        </SidebarItem>
+
+        <SidebarItem
+          icon="🎉"
+          label="Events"
+          defaultOpen={true}
+          collapsed={collapsed}
+        >
+          {eventTabs.map(tab => (
+            <SidebarItem
+              key={tab.id}
+              label={tab.label}
+              indent={true}
+              active={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              collapsed={collapsed}
+            />
+          ))}
+        </SidebarItem>
+
+        {/* <SidebarItem
+          icon="📜"
+          label="Rules"
+          active={activeTab === 'rules'}
+          onClick={() => setActiveTab('rules')}
+          collapsed={collapsed}
+        />
+
+        <SidebarItem
+          icon="🚫"
+          label="Ban Management"
+          active={activeTab === 'bans'}
+          onClick={() => setActiveTab('bans')}
+          collapsed={collapsed}
+        /> */}
+      </div>
+
+      {/* Profile Section - With Dropdown */}
+      <div
+        style={{
+          borderTop: '1px solid #e8edf5',
+          paddingTop: '16px',
+          marginTop: 'auto',
+          transition: 'all 0.3s ease',
+          position: 'relative',
+        }}
+        ref={dropdownRef}
       >
-        {tabs.map(tab => (
-          <PillButton
-            key={tab.id}
-            tabId={tab.id}
-            label={tab.label}
-            active={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            collapsed={collapsed}
-          />
-        ))}
-      </SidebarItem>
-      <SidebarItem
-        colorId="events"
-        icon="🎉"
-        label="Events"
-        defaultOpen={true}
-        collapsed={collapsed}
-      >
-        {eventTabs.map(tab => (
-          <PillButton
-            key={tab.id}
-            tabId={tab.id}
-            label={tab.label}
-            active={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            collapsed={collapsed}
-          />
-        ))}
-      </SidebarItem>
+        {!collapsed ? (
+          <>
+            <div
+              onClick={handleProfileClick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                borderRadius: '12px',
+                backgroundColor: '#f8f9fc',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#e8edf5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#f8f9fc';
+              }}
+            >
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: BLUE_COLOR.bg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                {userInitials}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ 
+                  color: BLUE_COLOR.text, 
+                  fontSize: '13px', 
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>
+                  {userName}
+                </div>
+                <div style={{ 
+                  color: '#8a8aa8', 
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>
+                  {userEmail}
+                </div>
+              </div>
+              <span style={{ 
+                fontSize: '12px', 
+                color: '#8a8aa8',
+                transition: 'transform 0.2s ease',
+                transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}>
+                ▼
+              </span>
+            </div>
+
+            {/* Dropdown Menu */}
+            {showDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 8px)',
+                  left: 0,
+                  right: 0,
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                  padding: '8px 0',
+                  border: '1px solid #e8edf5',
+                  zIndex: 10000,
+                  animation: 'slideUp 0.2s ease',
+                }}
+              >
+                {/* User Info */}
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: '1px solid #e8edf5',
+                    marginBottom: '4px',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      color: '#1a1a2e',
+                      marginBottom: '2px',
+                    }}
+                  >
+                    {userName}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#8a8aa8',
+                    }}
+                  >
+                    {userEmail}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: '#8a8aa8',
+                      fontWeight: 500,
+                      marginTop: '2px',
+                    }}
+                  >
+                    ID: {userId}
+                  </div>
+                </div>
+
+                {/* Menu Items */}
+                <div style={{ padding: '4px 0' }}>
+                  {isAdmin && isAdmin() && (
+                    <div
+                      onClick={handleAdmin}
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '0.8rem',
+                        color: '#444466',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(26,60,110,0.05)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      🛡️ Admin
+                    </div>
+                  )}
+                  <div
+                    onClick={handleMyProfile}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '0.8rem',
+                      color: '#444466',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(26,60,110,0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    👤 My Profile
+                  </div>
+                  <div
+                    onClick={handleSettings}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '0.8rem',
+                      color: '#444466',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(26,60,110,0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    ⚙ Settings
+                  </div>
+                </div>
+
+                {/* Logout */}
+                <div style={{ borderTop: '1px solid rgba(200,210,230,0.3)', padding: '4px 0', marginTop: '4px' }}>
+                  <div
+                    onClick={onLogout}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '0.8rem',
+                      color: '#e53935',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(229,57,53,0.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <LogOut size={16} strokeWidth={2} />
+                    <span>Logout</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div
+            onClick={handleProfileClick}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 0',
+              cursor: 'pointer',
+              borderRadius: '12px',
+              transition: 'all 0.2s ease',
+              position: 'relative',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = BLUE_COLOR.hoverBg;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: BLUE_COLOR.bg,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+              title={userName}
+            >
+              {userInitials}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

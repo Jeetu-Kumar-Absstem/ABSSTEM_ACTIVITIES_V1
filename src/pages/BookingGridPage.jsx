@@ -117,7 +117,7 @@ const BookingGridPage = () => {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 className="booking-page-title" style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1e1e2f' }}>Activity Planner</h1>
+        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 700, color: '#0f0fb2' }}>Book Your Slot</h1>
       </div>
 
       <StatsRow />

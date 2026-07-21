@@ -2,9 +2,6 @@
 import React from 'react';
 import ProfileIcon from '../common/ProfileIcon';
 
-// 👇 Replace this with your actual logo path
-import absstem_logo_with_name from '/public/absstem_logo_with_name.png';
-
 const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
   return (
     <div
@@ -14,12 +11,12 @@ const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
         display: 'flex',
         alignItems: 'center',
         gap: '16px',
-        marginBottom: '20px',
-        borderRadius: '60px',
+        margin: '20px 24px 0 24px',
+        borderRadius: '16px',
         position: 'relative',
         zIndex: 1000,
         background: 'linear-gradient(135deg, rgba(31, 212, 191, 0.98), rgba(187, 246, 198, 0.92),rgba(229, 119, 205, 0.92))',
-        boxShadow: '0 18px 50px rgba(26,60,110,0.08)',
+        boxShadow: '0 4px 20px rgba(26,60,110,0.08)',
       }}
     >
       {showHamburger && (
@@ -28,26 +25,21 @@ const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
           aria-label="Open navigation"
           className="hamburger-btn"
           onClick={onOpenDrawer}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+          }}
         >
-          <span className="hamburger-bar" />
-          <span className="hamburger-bar" />
-          <span className="hamburger-bar" />
+          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: '#1a1a2e', borderRadius: '2px' }} />
+          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: '#1a1a2e', borderRadius: '2px' }} />
+          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: '#1a1a2e', borderRadius: '2px' }} />
         </button>
       )}
-
-      {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <img
-          src={absstem_logo_with_name}
-          alt="Absstem"
-          style={{
-            height: '75px',       // ← adjust height here
-            width: 'auto',        // keeps aspect ratio
-            objectFit: 'contain',
-            display: 'block',
-          }}
-        />
-      </div>
 
       <div style={{
         marginLeft: 'auto',

@@ -35,25 +35,113 @@ const CapacitySummary = () => {
 
   const currentDay = getDayName(currentDate);
 
+  // Get color based on capacity percentage
+  const getSlotColor = (pct) => {
+    if (pct === 0) return '#4CAF50'; // Green - Empty
+    if (pct <= 25) return '#8BC34A'; // Light Green - Low
+    if (pct <= 50) return '#FFC107'; // Yellow - Medium
+    if (pct <= 75) return '#FF9800'; // Orange - High
+    return '#F44336'; // Red - Full
+  };
+
   return (
     <div className="clay-card" style={{ marginTop: '12px' }}>
-      <div style={{ fontWeight: 600, fontSize: '0.7rem', color: '#013a0a', marginBottom: '10px' }}>
-        Slot Capacity Overview — {game?.name || 'All Games'} (Max {maxPerSlot} players per slot) - {currentDay}
+      <div style={{ 
+        fontWeight: 600, 
+        fontSize: '0.7rem', 
+        color: '#013a0a', 
+        marginBottom: '10px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px',
+      }}>
+        <span>Slot Capacity Overview — {game?.name || 'All Games'} (Max {maxPerSlot} players per slot) - {currentDay}</span>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '0.6rem', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#4CAF50', display: 'inline-block' }}></span>
+            0%
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#FFC107', display: 'inline-block' }}></span>
+            50%
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F44336', display: 'inline-block' }}></span>
+            100%
+          </span>
+        </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '8px' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', 
+        gap: '8px' 
+      }}>
         {slotData.map(slot => (
-          <div key={slot.id} className="clay-soft" style={{ padding: '8px 6px', textAlign: 'center', borderRadius: '16px' }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 600, color: '#080c12' }}>{slot.label}</div>
-            <div style={{ fontSize: '0.5rem', color: '#6045c5' }}>{slot.time}</div>
-            <div style={{ width: '100%', height: '4px', background: '#e0e4ec', borderRadius: '4px', margin: '4px 0' }}>
-              <div style={{ 
-                width: `${slot.pct}%`, 
-                height: '100%', 
-                borderRadius: '4px', 
-                background: slot.isFull ? '#f9a825' : slot.pct > 75 ? '#e53935' : '#00897b' 
-              }}></div>
+          <div 
+            key={slot.id} 
+            className="clay-soft" 
+            style={{ 
+              padding: '10px 6px', 
+              textAlign: 'center', 
+              borderRadius: '16px',
+              backgroundColor: '#f8f9fc',
+              border: '1px solid #e8edf5',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <div style={{ fontSize: '0.55rem', fontWeight: 600, color: '#080c12', marginBottom: '4px' }}>
+              {slot.label}
             </div>
-            <div style={{ fontSize: '0.65rem', fontWeight: 600, color: slot.isFull ? '#f9a825' : '#00897b' }}>
+            <div style={{ fontSize: '0.45rem', color: '#8a8aa8', marginBottom: '6px' }}>
+              {slot.time}
+            </div>
+            
+            {/* Circle Indicator with Percentage */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              marginBottom: '4px',
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: `conic-gradient(
+                  ${getSlotColor(slot.pct)} ${slot.pct}%, 
+                  #e8edf5 ${slot.pct}% 100%
+                )`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+              }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  color: slot.isFull ? '#F44336' : '#080c12',
+                }}>
+                  {slot.pct}%
+                </div>
+              </div>
+            </div>
+            
+            {/* Show filled slots out of total */}
+            <div style={{ 
+              fontSize: '0.55rem', 
+              fontWeight: 600, 
+              color: '#080c12',
+              marginTop: '2px',
+            }}>
               {slot.total}/{slot.maxPerSlot}
             </div>
           </div>
