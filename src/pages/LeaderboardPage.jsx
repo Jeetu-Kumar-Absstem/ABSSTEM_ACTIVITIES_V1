@@ -173,7 +173,7 @@ const LeaderboardPage = () => {
             🏆 Champions of the Floor
           </h1>
           <div style={{ fontSize: '0.8rem', opacity: 0.88 }}>
-            Points: Win = 5 · Tournament Win = 20 · Runner-up = 15 · 3rd = 10 · Participation = 2 · Violation = −5 · No-show = −3
+            Points: Win = 5 · Tournament Win = 20 · Runner-up = 15 · 3rd = 10  · Violation = −5 · No-show = −3
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -118,8 +118,18 @@ export const AppProvider = ({ children }) => {
 
   const advanceWinnerToNextMatch = async (sourceMatch, winnerEmployeeId) => {
     if (!sourceMatch?.next_match_winner_id || !winnerEmployeeId) return { success: true };
-    const nextMatch = tournamentMatches.find((m) => m.id === sourceMatch.next_match_winner_id);
-    if (!nextMatch) return { success: true };
+
+    // ── Always fetch FRESH data from DB, never stale React state ──────────
+    // If two matches (e.g. SF1 and SF2) both feed the same Final match, the
+    // second call would otherwise read the React state that was current when
+    // this closure was created — before the first call's DB write was reflected
+    // — and incorrectly put the same player into both player_a and player_b.
+    const { data: nextMatch, error: fetchErr } = await supabase
+      .from('tournament_matches')
+      .select('id, player_a_employee_id, player_b_employee_id')
+      .eq('id', sourceMatch.next_match_winner_id)
+      .single();
+    if (fetchErr || !nextMatch) return { success: true };
 
     if (String(nextMatch.player_a_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
       return { success: true };
@@ -1871,7 +1881,13 @@ export const AppProvider = ({ children }) => {
       if (wasAdvanceable && NON_FINISHING.has(status) && match.next_match_winner_id) {
         const prevWinner = match.winner_employee_id; // value before this update
         if (prevWinner) {
-          const nextMatch = tournamentMatches.find((m) => m.id === match.next_match_winner_id);
+          // Fetch fresh from DB — same reason as advanceWinnerToNextMatch:
+          // stale React state may not reflect recent writes to the next match.
+          const { data: nextMatch } = await supabase
+            .from('tournament_matches')
+            .select('id, player_a_employee_id, player_b_employee_id')
+            .eq('id', match.next_match_winner_id)
+            .single();
           if (nextMatch) {
             const revertPayload = {};
             const aMatch = String(nextMatch.player_a_employee_id || '').toUpperCase() === String(prevWinner).toUpperCase();

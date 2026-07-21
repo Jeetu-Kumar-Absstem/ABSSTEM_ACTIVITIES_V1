@@ -1736,8 +1736,8 @@ const TournamentsPage = () => {
     const isNonFinishing = NON_FINISHING_TYPES.includes(rForm.result_type);
     const result = await recordMatchResult(resultMatchId, {
       result_type: rForm.result_type,
-      score_a: isNonFinishing ? null : (parseInt(rForm.score_a, 10) || 0),
-      score_b: isNonFinishing ? null : (parseInt(rForm.score_b, 10) || 0),
+      score_a: isNonFinishing ? null : (rForm.score_a === '' ? 0 : Number(rForm.score_a)),
+      score_b: isNonFinishing ? null : (rForm.score_b === '' ? 0 : Number(rForm.score_b)),
       winner_employee_id: isNonFinishing ? null : rForm.winner,
       duration_seconds: parseInt(rForm.duration, 10) || null,
       absent_participant_employee_id: rForm.absent_participant_employee_id,
@@ -2255,11 +2255,17 @@ const TournamentsPage = () => {
                       <select
                         style={styles.formInput}
                         value={rForm.result_type}
-                        onChange={(e) => setRForm(f => ({
-                          ...f,
-                          result_type: e.target.value,
-                          winner: e.target.value === 'draw' ? '' : f.winner,
-                        }))}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          setRForm(f => ({
+                            ...f,
+                            result_type: newType,
+                            winner: newType === 'draw' ? '' : f.winner,
+                            // Auto-set draw scores to 1/1; clear scores on non-finishing types
+                            score_a: newType === 'draw' ? 1 : ['rescheduled','cancelled','disputed'].includes(newType) ? '' : f.score_a,
+                            score_b: newType === 'draw' ? 1 : ['rescheduled','cancelled','disputed'].includes(newType) ? '' : f.score_b,
+                          }));
+                        }}
                       >
                         <option value="completed">Completed</option>
                         <option value="draw">Draw</option>
@@ -2271,26 +2277,20 @@ const TournamentsPage = () => {
                       </select>
                     </div>
 
-                    {showScoreFields && (
-                      <>
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)}</label>
-                          <input style={styles.formInput} type="number" min="0" value={rForm.score_a}
-                                 onChange={(e) => setRForm(f => ({ ...f, score_a: e.target.value }))} />
-                        </div>
-                        <div style={styles.formRow}>
-                          <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)}</label>
-                          <input style={styles.formInput} type="number" min="0" value={rForm.score_b}
-                                 onChange={(e) => setRForm(f => ({ ...f, score_b: e.target.value }))} />
-                        </div>
-                      </>
-                    )}
-
                     {showWinnerField && (
                       <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                         <label style={styles.formLabel}>Winner</label>
-                        <select style={styles.formInput} value={rForm.winner}
-                                onChange={(e) => setRForm(f => ({ ...f, winner: e.target.value }))}>
+                        <select
+                          style={styles.formInput}
+                          value={rForm.winner}
+                          onChange={(e) => {
+                            const picked = e.target.value;
+                            // Auto-assign 5 pts to winner, 0 to loser
+                            const newScoreA = picked === teamAOption ? 5 : picked === teamBOption ? 0 : '';
+                            const newScoreB = picked === teamBOption ? 5 : picked === teamAOption ? 0 : '';
+                            setRForm(f => ({ ...f, winner: picked, score_a: newScoreA, score_b: newScoreB }));
+                          }}
+                        >
                           <option value="">— select —</option>
                           <option value={teamAOption}>
                             {(() => {
@@ -2306,6 +2306,31 @@ const TournamentsPage = () => {
                           </option>
                         </select>
                       </div>
+                    )}
+
+                    {showScoreFields && (
+                      <>
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)} Score</label>
+                          <input
+                            style={styles.formInput}
+                            type="number"
+                            min="0"
+                            value={rForm.score_a}
+                            onChange={(e) => setRForm(f => ({ ...f, score_a: e.target.value }))}
+                          />
+                        </div>
+                        <div style={styles.formRow}>
+                          <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)} Score</label>
+                          <input
+                            style={styles.formInput}
+                            type="number"
+                            min="0"
+                            value={rForm.score_b}
+                            onChange={(e) => setRForm(f => ({ ...f, score_b: e.target.value }))}
+                          />
+                        </div>
+                      </>
                     )}
 
                     {rForm.result_type === 'no_show' && (
