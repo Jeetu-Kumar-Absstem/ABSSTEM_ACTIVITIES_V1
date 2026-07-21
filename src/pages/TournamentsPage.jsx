@@ -901,6 +901,7 @@ const TournamentsPage = () => {
             </div>
           </div>
         )}
+        <div>Final fixtures of the knockout depends upon the results of the round-robin phase.</div>
 
         {/* ── Knockout Bracket (round-robin → KO phase) ───────────────── */}
         {isRoundRobin && hasKoPhase && (
