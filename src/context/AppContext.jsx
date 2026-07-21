@@ -1247,9 +1247,8 @@ export const AppProvider = ({ children }) => {
         const byCode = new Map((inserted || []).map((row) => [row.match_code, row]));
 
         // ── Step 1: wire next_match_winner_id pointers ─────────────────
-        // Use _feeds_into from the fixture plan — this is correct even when
-        // phantom/bye collapsing causes rounds to have fewer matches than
-        // index-based Math.floor(matchIndex/2) arithmetic would assume.
+        // Use _feeds_into from the plan — correct even when phantom/bye
+        // collapsing makes rounds have fewer matches than index math expects.
         const pointerUpdates = [];
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
@@ -1268,37 +1267,32 @@ export const AppProvider = ({ children }) => {
         await Promise.all(pointerUpdates);
 
         // ── Step 2: auto-advance bye winners across ALL rounds ──────────
-        // Iterate in round order (earliest first) so winners propagate in the
-        // correct sequence when multiple byes chain into the same next match.
+        // Group all bye winners by target match to avoid the race condition
+        // where two byes feed the same match (e.g. both SFs are byes → Final)
+        // and sequential reads both see player_a as null, writing the same
+        // player into both slots ("Jeetu kr vs Jeetu kr").
+        const byeAdvances = new Map(); // targetMatchCode → [winnerId, ...]
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
             if (!match._feeds_into) continue;
-
-            const targetRow = byCode.get(match._feeds_into);
-            if (!targetRow) continue;
-
-            const { data: freshTarget } = await supabase
+            if (!byCode.has(match._feeds_into)) continue;
+            if (!byeAdvances.has(match._feeds_into)) byeAdvances.set(match._feeds_into, []);
+            byeAdvances.get(match._feeds_into).push(match.winner_employee_id);
+          }
+        }
+        for (const [targetCode, winners] of byeAdvances) {
+          const targetRow = byCode.get(targetCode);
+          if (!targetRow) continue;
+          const update = {};
+          const [winnerA, winnerB] = winners;
+          if (winnerA) update.player_a_employee_id = winnerA;
+          if (winnerB && winnerB !== winnerA) update.player_b_employee_id = winnerB;
+          if (Object.keys(update).length > 0) {
+            await supabase
               .from('tournament_matches')
-              .select('player_a_employee_id, player_b_employee_id')
-              .eq('id', targetRow.id)
-              .single();
-
-            if (!freshTarget) continue;
-            const update = {};
-            if (!freshTarget.player_a_employee_id) {
-              update.player_a_employee_id = match.winner_employee_id;
-            } else if (!freshTarget.player_b_employee_id &&
-                       freshTarget.player_a_employee_id !== match.winner_employee_id) {
-              update.player_b_employee_id = match.winner_employee_id;
-            }
-
-            if (Object.keys(update).length > 0) {
-              await supabase
-                .from('tournament_matches')
-                .update(update)
-                .match({ id: targetRow.id });
-            }
+              .update(update)
+              .match({ id: targetRow.id });
           }
         }
       }
@@ -2064,18 +2058,25 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // ── Smart knockout refresh (admin) ─────────────────────────────────────
-  // Reloads participants and matches from Supabase, keeps completed/bye
-  // matches intact, deletes only pending matches, and regenerates the
-  // remaining rounds with phantom prevention and bye auto-completion.
+  // ── Knockout refresh (admin) ───────────────────────────────────────────
+  // Deletes ALL existing matches for the tournament and regenerates the full
+  // bracket from scratch using the current participant list.  This fixes any
+  // corrupted state (e.g. "same player vs same player" in the Final) without
+  // requiring manual Supabase edits.
   const refreshKnockoutFixtures = async (tournamentId) => {
     if (!isAdmin()) return { success: false, error: 'Admins only' };
     try {
-      // Fetch fresh data directly from Supabase (not stale React state)
-      const [{ data: freshParticipants }, { data: freshMatches }] = await Promise.all([
-        supabase.from('tournament_participants').select('*').eq('tournament_id', tournamentId),
-        supabase.from('tournament_matches').select('*').eq('tournament_id', tournamentId),
-      ]);
+      // ── Step 1: fetch fresh data from Supabase ──────────────────────────
+      const [{ data: freshParticipants, error: pErr }, { data: freshMatches, error: mErr }] =
+        await Promise.all([
+          supabase.from('tournament_participants').select('*').eq('tournament_id', tournamentId),
+          supabase.from('tournament_matches').select('*').eq('tournament_id', tournamentId),
+        ]);
+      if (pErr) throw pErr;
+      if (mErr) throw mErr;
+
+      const tournament = tournaments.find((t) => t.id === tournamentId);
+      if (!tournament) return { success: false, error: 'Tournament not found' };
 
       const APPROVED = new Set([
         'registered', 'active', 'semi_finalist', 'finalist',
@@ -2084,29 +2085,39 @@ export const AppProvider = ({ children }) => {
       const approvedParticipants = (freshParticipants || []).filter(
         (p) => APPROVED.has(String(p.status || '').toLowerCase())
       );
-
-      const plan = refreshKnockoutPlan(freshMatches || [], approvedParticipants);
-
-      if (plan.status === 'up_to_date') {
-        await Promise.all([loadTournamentMatches(), loadTournamentParticipants()]);
-        return { success: true, message: plan.message };
+      if (approvedParticipants.length < 2) {
+        return { success: false, error: 'At least 2 registered participants are required' };
       }
 
-      // Delete pending matches
-      if (plan.matchesToDelete.length > 0) {
+      // ── Step 2: delete ALL existing matches for this tournament ─────────
+      const existingIds = (freshMatches || []).map((m) => m.id);
+      if (existingIds.length > 0) {
         const { error: delErr } = await supabase
           .from('tournament_matches')
           .delete()
-          .in('id', plan.matchesToDelete);
+          .in('id', existingIds);
         if (delErr) throw delErr;
       }
 
-      // Insert new rounds
+      // ── Step 3: build a fresh fixture plan ─────────────────────────────
+      const fixtureOpts = {
+        playersPerTeam:      tournament.players_per_team ?? 1,
+        tournamentStartDate: tournament.start_date       ?? null,
+        startHour:           10,
+        intervalMinutes:     30,
+        timezone:            'Asia/Kolkata',
+      };
+      const roundPlan = buildKnockoutFixturePlan(approvedParticipants, fixtureOpts);
+
+      // ── Step 4: build insert payloads (same logic as generateTournamentFixtures) ─
       const payloads = [];
-      for (const round of plan.newRounds) {
+      for (const round of roundPlan.rounds) {
         for (const match of round.matches) {
-          if (!match.player_a_employee_id && !match.player_b_employee_id &&
-              !match._preplace_a && !match._preplace_b) continue;
+          // Skip truly unreachable phantom matches (no players, no feeds)
+          const isPhantom = !match.player_a_employee_id && !match.player_b_employee_id &&
+                            !match._preplace_a && !match._preplace_b;
+          if (isPhantom && !match._feeds_from_a && !match._feeds_from_b) continue;
+
           payloads.push({
             tournament_id:         tournamentId,
             match_code:            match.match_code,
@@ -2124,73 +2135,75 @@ export const AppProvider = ({ children }) => {
         }
       }
 
-      if (payloads.length > 0) {
-        const { data: inserted, error: insErr } = await insertMatchesWithTeams(
-          payloads,
-          plan.newRounds
-        );
-        if (insErr) throw insErr;
+      if (payloads.length === 0) {
+        return { success: false, error: 'No fixtures could be generated' };
+      }
 
-        // Re-wire next_match_winner_id pointers
+      // ── Step 5: insert matches ──────────────────────────────────────────
+      const { data: inserted, error: insErr } = await insertMatchesWithTeams(
+        payloads,
+        roundPlan.rounds
+      );
+      if (insErr) throw insErr;
+
+      // ── Step 6: wire next_match_winner_id pointers ──────────────────────
+      if (roundPlan.rounds.length > 1) {
         const byCode = new Map((inserted || []).map((r) => [r.match_code, r]));
-        const ptrs   = [];
-        for (let ri = 0; ri < plan.newRounds.length - 1; ri++) {
-          const cur  = plan.newRounds[ri];
-          const next = plan.newRounds[ri + 1];
-          cur.matches.forEach((m, mi) => {
-            const curRow  = byCode.get(m.match_code);
-            const nextRow = byCode.get(next.matches[Math.floor(mi / 2)]?.match_code);
+
+        const pointerUpdates = [];
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
+            if (!match._feeds_into) continue;
+            const curRow  = byCode.get(match.match_code);
+            const nextRow = byCode.get(match._feeds_into);
             if (curRow && nextRow) {
-              ptrs.push(
+              pointerUpdates.push(
                 supabase
                   .from('tournament_matches')
                   .update({ next_match_winner_id: nextRow.id })
                   .match({ id: curRow.id })
               );
             }
-          });
+          }
         }
-        await Promise.all(ptrs);
+        await Promise.all(pointerUpdates);
 
-        // Auto-advance bye winners into next-round slots
-        for (let ri = 0; ri < plan.newRounds.length - 1; ri++) {
-          const cur  = plan.newRounds[ri];
-          const next = plan.newRounds[ri + 1];
-          for (let mi = 0; mi < cur.matches.length; mi++) {
-            const match = cur.matches[mi];
+        // ── Step 7: auto-advance bye winners ───────────────────────────────
+        // Group all bye winners by target match to avoid the race condition
+        // where two byes feed the same match (e.g. both SFs are byes → Final)
+        // and sequential reads both see player_a as null, writing the same
+        // player into both slots ("Jeetu kr vs Jeetu kr").
+        const byeAdvances = new Map(); // targetMatchCode → [winnerId, ...]
+        for (const round of roundPlan.rounds) {
+          for (const match of round.matches) {
             if (String(match.status || '').toLowerCase() !== 'bye' || !match.winner_employee_id) continue;
-            const sourceRow = byCode.get(match.match_code);
-            const nextMatch = next.matches[Math.floor(mi / 2)];
-            if (!nextMatch) continue;
-            const targetRow = byCode.get(nextMatch.match_code);
-            if (!sourceRow || !targetRow) continue;
-
-            const { data: freshTarget } = await supabase
+            if (!match._feeds_into) continue;
+            if (!byCode.has(match._feeds_into)) continue;
+            if (!byeAdvances.has(match._feeds_into)) byeAdvances.set(match._feeds_into, []);
+            byeAdvances.get(match._feeds_into).push(match.winner_employee_id);
+          }
+        }
+        for (const [targetCode, winners] of byeAdvances) {
+          const targetRow = byCode.get(targetCode);
+          if (!targetRow) continue;
+          const update = {};
+          const [winnerA, winnerB] = winners;
+          if (winnerA) update.player_a_employee_id = winnerA;
+          if (winnerB && winnerB !== winnerA) update.player_b_employee_id = winnerB;
+          if (Object.keys(update).length > 0) {
+            await supabase
               .from('tournament_matches')
-              .select('player_a_employee_id, player_b_employee_id')
-              .eq('id', targetRow.id)
-              .single();
-            if (!freshTarget) continue;
-
-            const update = {};
-            if (!freshTarget.player_a_employee_id) {
-              update.player_a_employee_id = match.winner_employee_id;
-            } else if (!freshTarget.player_b_employee_id &&
-                       freshTarget.player_a_employee_id !== match.winner_employee_id) {
-              update.player_b_employee_id = match.winner_employee_id;
-            }
-            if (Object.keys(update).length > 0) {
-              await supabase
-                .from('tournament_matches')
-                .update(update)
-                .match({ id: targetRow.id });
-            }
+              .update(update)
+              .match({ id: targetRow.id });
           }
         }
       }
 
       await Promise.all([loadTournamentMatches(), loadTournamentParticipants()]);
-      return { success: true, message: plan.message };
+      return {
+        success: true,
+        message: `Fixtures refreshed — deleted ${existingIds.length} old match${existingIds.length !== 1 ? 'es' : ''} and generated ${payloads.length} new match${payloads.length !== 1 ? 'es' : ''}.`,
+      };
     } catch (err) {
       return { success: false, error: err.message };
     }
