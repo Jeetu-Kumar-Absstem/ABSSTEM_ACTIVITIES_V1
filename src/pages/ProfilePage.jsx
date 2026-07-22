@@ -56,7 +56,7 @@ const ProfilePage = () => {
   const totalDecisions = stats.wins + stats.losses + stats.draws;
   const winPercent = totalDecisions ? Math.round((stats.wins / totalDecisions) * 100) : 0;
   const lossPercent = totalDecisions ? Math.round((stats.losses / totalDecisions) * 100) : 0;
-  const drawPercent = Math.max(0, 100 - winPercent - lossPercent);
+  const drawPercent = totalDecisions ? Math.max(0, 100 - winPercent - lossPercent) : 0;
   const selectedGameRecord = visibleGames.find((game) => game.id === activeGameId);
   const pieGradient = totalDecisions
     ? `conic-gradient(#1b5e20 0 ${winPercent}%, #c62828 ${winPercent}% ${winPercent + lossPercent}%, #f9a825 ${winPercent + lossPercent}% 100%)`
