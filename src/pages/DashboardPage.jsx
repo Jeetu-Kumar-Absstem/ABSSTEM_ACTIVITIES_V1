@@ -139,6 +139,27 @@ const DashboardPage = () => {
 
   const currentEmpId = getCurrentEmpId();
 
+  // Helper function to get user display name
+  const getUserDisplayName = () => {
+    // Try to get from user metadata first
+    if (currentUser?.user_metadata?.name) {
+      return currentUser.user_metadata.name;
+    }
+    
+    // Try to find in employees list by email or employee code
+    const userEmail = currentUser?.email;
+    if (userEmail) {
+      const emp = employees.find(e => 
+        e.email?.toLowerCase() === userEmail.toLowerCase() ||
+        e.employee_code?.toLowerCase() === userEmail.split('@')[0].toLowerCase()
+      );
+      if (emp?.name) return emp.name;
+    }
+    
+    // Fallback to email username
+    return currentUser?.email?.split('@')[0] || 'User';
+  };
+
   // --- UPCOMING MATCHES - DEFINED HERE ---
   const upcomingMatches = useMemo(() => {
     const now = new Date();
@@ -355,12 +376,30 @@ const DashboardPage = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
+            {/* Welcome message */}
+            <div style={{ 
+              fontSize: '2rem', 
+              color: '#000000', 
+              fontWeight: 600,
+              marginBottom: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+   
+              Welcome back, <span style={{ color: '#080b5c', fontWeight: 700 }}>
+                {getUserDisplayName()}
+
+                <span style={{ fontSize: '1.75rem' }}> 👋</span>
+              </span>
+            </div>
+            
             {/* <div style={{ fontSize: '0.75rem', color: '#6a6a8a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>
               PLANNING DASHBOARD
             </div> */}
-            <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
+            {/* <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
               Employee activity at a glance
-            </h1>
+            </h1> */}
             <div style={{ fontSize: '0.8rem', color: '#8888aa' }}>
               {formatDate(currentDate)} • Week: {weekLabel}
             </div>
