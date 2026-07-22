@@ -167,7 +167,7 @@ const GameSelector = () => {
           onClick={handleRefresh}
           disabled={refreshing}
           style={{ opacity: refreshing ? 0.7 : 1, cursor: refreshing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-            backgroundColor:'#ecf9be'
+            backgroundColor:'#0d207e',color:'#ffffff'
            }}
         >
           <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>🔄</span>

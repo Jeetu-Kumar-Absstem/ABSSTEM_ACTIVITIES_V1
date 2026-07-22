@@ -355,9 +355,9 @@ const DashboardPage = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
-            <div style={{ fontSize: '0.75rem', color: '#6a6a8a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>
+            {/* <div style={{ fontSize: '0.75rem', color: '#6a6a8a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>
               PLANNING DASHBOARD
-            </div>
+            </div> */}
             <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
               Employee activity at a glance
             </h1>

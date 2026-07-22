@@ -1,13 +1,42 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
-import ActivityPlanner from './pages/ActivityPlanner';
-import LoginPage from './pages/LoginPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
 import Toast from './components/common/Toast';
 import { supabase } from './utils/supabase';
+
+// Lazy Loaded Pages
+const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+
+// Loading Component
+const PageLoader = () => (
+  <div
+    style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#eef0f4',
+    }}
+  >
+    <div
+      className="clay"
+      style={{
+        padding: '40px',
+        textAlign: 'center',
+      }}
+    >
+      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⏳</div>
+      <div style={{ fontSize: '0.9rem', color: '#444466' }}>
+        Loading...
+      </div>
+    </div>
+  </div>
+);
 
 function App() {
   const [user, setUser] = useState(null);
@@ -15,8 +44,8 @@ function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      // If we landed on /reset-password, never resolve a session here —
-      // ResetPasswordPage owns session detection on that route.
+      // If we landed on /reset-password,
+      // let ResetPasswordPage handle the session.
       if (window.location.pathname === '/reset-password') {
         setLoading(false);
         return;
@@ -28,23 +57,29 @@ function App() {
       } else {
         setUser(session?.user || null);
       }
+
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // Let ResetPasswordPage handle it — do NOT set user
         return;
       }
 
-      if (event === 'SIGNED_IN' && window.location.pathname === '/reset-password') {
-        // Supabase sometimes fires SIGNED_IN instead of PASSWORD_RECOVERY on custom domains.
-        // While on the reset route, never treat this as a normal login.
+      if (
+        event === 'SIGNED_IN' &&
+        window.location.pathname === '/reset-password'
+      ) {
         return;
       }
 
-      if (event === 'SIGNED_IN' && session?.user && !session.user.email_confirmed_at) {
-        // Keep unconfirmed registrations off the main app
+      if (
+        event === 'SIGNED_IN' &&
+        session?.user &&
+        !session.user.email_confirmed_at
+      ) {
         supabase.auth.signOut();
         setUser(null);
         return;
@@ -59,41 +94,46 @@ function App() {
   const handleLogin = (userData) => setUser(userData);
   const handleLogout = () => setUser(null);
 
+  // Initial authentication loading
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: '#eef0f4',
-      }}>
-        <div className="clay" style={{ padding: '40px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⏳</div>
-          <div style={{ fontSize: '0.9rem', color: '#444466' }}>Loading...</div>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
     <BrowserRouter>
       <AppProvider key={user?.id || 'guest'}>
         <ToastProvider>
-          <Routes>
-            {/* Password reset route - always accessible (Supabase redirects here) */}
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Password Reset */}
+              <Route
+                path="/reset-password"
+                element={<ResetPasswordPage />}
+              />
 
-            {/* Main app route */}
-            <Route
-              path="/"
-              element={
-                user
-                  ? <ActivityPlanner user={user} onLogout={handleLogout} />
-                  : <LoginPage onLogin={handleLogin} />
-              }
-            />
+              {/* Main App */}
+              <Route
+                path="/"
+                element={
+                  user ? (
+                    <ActivityPlanner
+                      user={user}
+                      onLogout={handleLogout}
+                    />
+                  ) : (
+                    <LoginPage onLogin={handleLogin} />
+                  )
+                }
+              />
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Catch All */}
+              <Route
+                path="*"
+                element={<Navigate to="/" replace />}
+              />
+            </Routes>
+          </Suspense>
+
           <Toast />
         </ToastProvider>
       </AppProvider>
