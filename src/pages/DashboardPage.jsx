@@ -1,5 +1,5 @@
 // src/pages/DashboardPage.jsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { GAMES, SLOTS } from '../utils/constants';
 import {
@@ -33,13 +33,26 @@ const DashboardPage = () => {
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
   const [flipDirection, setFlipDirection] = useState('next');
-  const dropdownRef = React.useRef(null);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const autoPlayRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
-  React.useEffect(() => {
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowGameDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Resume auto-play when user clicks away
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsAutoPlaying(true);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -52,7 +65,6 @@ const DashboardPage = () => {
 
   const weekBookings = useMemo(() => filterBookingsToWeek(bookings, currentDate), [bookings, currentDate]);
 
-  // Filter matchResults to only the selected game so leaderboard & top players are game-scoped
   const gameFilteredMatchResults = useMemo(() => {
     const gameName = selectedGameRecord?.name?.toLowerCase();
     const gameId = String(selectedGameRecord?.id || '');
@@ -76,7 +88,6 @@ const DashboardPage = () => {
 
   const dayBookings = weekBookings[currentDayName] || {};
   
-  // Calculate today's bookings - count each player in each slot
   const selectedGameBookings = SLOTS.flatMap((slot) =>
     (dayBookings[slot.id] || []).filter((booking) =>
       String(booking.game) === String(selectedGameRecord.id) ||
@@ -85,7 +96,6 @@ const DashboardPage = () => {
     )
   );
 
-  // Calculate available slots - a slot is available if it's NOT full
   const maxPerSlot = selectedGameRecord?.maxPlayers || 4;
   let availableSlotsCount = 0;
   let totalSlots = SLOTS.length;
@@ -108,28 +118,16 @@ const DashboardPage = () => {
       (String(ban.game) === String(selectedGameRecord.id) || ban.game === selectedGameRecord.name || String(ban.game).toLowerCase() === String(selectedGameRecord.name || '').toLowerCase() || ban.game === 'All Games')
   ).length;
 
-  // Get upcoming events
   const upcomingEvents = useMemo(() => getUpcomingEvents(), [getUpcomingEvents, events]);
 
-  // Helper to format event date
   const formatEventDate = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Get top 5 leaderboard entries
   const topLeaderboard = leaderboard.slice(0, 5);
 
-  // Get all slots with booking info
-  const allSlotsWithBookings = SLOTS.map((slot) => ({
-    slot,
-    players: (dayBookings[slot.id] || []).filter(
-      (booking) => String(booking.game) === String(selectedGameRecord.id) || booking.game === selectedGameRecord.name
-    ),
-  }));
-
-  // Get user's employee ID
   const getCurrentEmpId = () => {
     return String(
       currentUser?.user_metadata?.emp_id ||
@@ -141,7 +139,7 @@ const DashboardPage = () => {
 
   const currentEmpId = getCurrentEmpId();
 
-  // Get upcoming matches from tournaments AND slot bookings
+  // --- UPCOMING MATCHES - DEFINED HERE ---
   const upcomingMatches = useMemo(() => {
     const now = new Date();
     const allMatches = [];
@@ -160,7 +158,6 @@ const DashboardPage = () => {
             return emp?.name || empId;
           };
           
-          // Check if current user is in this match
           const isUserInMatch = 
             String(match.player_a_employee_id || '').toUpperCase() === userEmpId ||
             String(match.player_b_employee_id || '').toUpperCase() === userEmpId;
@@ -182,64 +179,73 @@ const DashboardPage = () => {
     });
 
     // 2. Get slot bookings for today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const weekBookingsData = filterBookingsToWeek(bookings, currentDate);
+    const todayDayName = getDayName(currentDate);
+    const todayBookingsData = weekBookingsData[todayDayName] || {};
     
-    // Get today's bookings from all slots
-    const todayBookings = bookings[currentDayName] || {};
-    Object.keys(todayBookings).forEach(slotId => {
-      const players = todayBookings[slotId] || [];
-      players.forEach(booking => {
-        // Check if the booking belongs to the current user
-        const isUserBooking = String(booking.employee_id || '').toUpperCase() === userEmpId;
-        
-        // Find slot info
-        const slot = SLOTS.find(s => s.id === slotId);
-        if (slot && (isUserBooking || true)) { // Show all slot bookings, but highlight user's
-          // Parse time from slot
+    Object.keys(todayBookingsData).forEach(slotId => {
+      const players = todayBookingsData[slotId] || [];
+      if (!players || players.length === 0) return;
+      
+      let slot = SLOTS.find(s => String(s.id) === String(slotId));
+      if (!slot) {
+        const slotNumber = parseInt(slotId);
+        if (!isNaN(slotNumber)) {
+          slot = SLOTS.find(s => s.id === slotNumber || String(s.id) === String(slotNumber));
+        }
+      }
+      
+      if (slot) {
+        players.forEach(booking => {
+          const isUserBooking = String(booking.employee_id || '').toUpperCase() === userEmpId;
+          
           const [startTime, endTime] = slot.time.split(' - ');
           const [startHour, startMin] = startTime.split(':');
           
           const matchDate = new Date(currentDate);
           matchDate.setHours(parseInt(startHour), parseInt(startMin), 0);
           
-          // Only show upcoming slots (not past)
-          if (matchDate >= now) {
-            const gameName = String(booking.game || '');
-            const gameRecord = games.find(g => String(g.id) === gameName || g.name === gameName);
-            
-            allMatches.push({
-              id: `${slotId}-${booking.user_id}`,
-              type: 'slot',
-              title: `${booking.name}`,
-              tournamentName: 'Slot Booking',
-              game: gameRecord?.name || gameName || 'Unknown Game',
-              scheduled_at: matchDate.toISOString(),
-              playerAName: booking.name,
-              playerBName: 'Available',
-              status: 'scheduled',
-              slotLabel: slot.label,
-              slotTime: slot.time,
-              isUserBooking: isUserBooking,
-              gameIcon: gameRecord?.icon || '🎯',
-            });
+          const gameName = String(booking.game || '');
+          const gameRecord = games.find(g => String(g.id) === gameName || g.name === gameName);
+          
+          let playerName = booking.name;
+          if (booking.employee_id) {
+            const emp = employees.find(e => e.employee_code?.toUpperCase() === String(booking.employee_id).toUpperCase());
+            if (emp) {
+              playerName = emp.name;
+            }
           }
-        }
-      });
+          
+          allMatches.push({
+            id: `${slotId}-${booking.user_id || booking.booking_id || Date.now()}`,
+            type: 'slot',
+            title: `${playerName} - ${slot.label}`,
+            tournamentName: 'Slot Booking',
+            game: gameRecord?.name || gameName || 'Unknown Game',
+            scheduled_at: matchDate.toISOString(),
+            playerAName: playerName,
+            playerBName: 'Available',
+            status: 'scheduled',
+            slotLabel: slot.label,
+            slotTime: slot.time,
+            isUserBooking: isUserBooking,
+            gameIcon: gameRecord?.icon || '🎯',
+            bookingId: booking.booking_id,
+            employeeId: booking.employee_id,
+          });
+        });
+      }
     });
     
-    // Sort by scheduled time (earliest first)
     allMatches.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
     
-    // Prioritize user's matches (tournament matches where user is playing OR user's slot bookings)
     const userMatches = allMatches.filter(m => m.isUserInMatch || m.isUserBooking);
     const otherMatches = allMatches.filter(m => !m.isUserInMatch && !m.isUserBooking);
     
-    // Combine: user's matches first, then others
     return [...userMatches, ...otherMatches].slice(0, 10);
-  }, [tournamentMatches, tournaments, employees, bookings, currentDate, currentDayName, games, currentEmpId]);
+  }, [tournamentMatches, tournaments, employees, bookings, currentDate, games, currentEmpId]);
 
-  // Handle navigation with flip animation
+  // --- NAVIGATE MATCH - DEFINED HERE ---
   const navigateMatch = (direction) => {
     if (isFlipping || upcomingMatches.length === 0) return;
     
@@ -254,6 +260,37 @@ const DashboardPage = () => {
       }
       setIsFlipping(false);
     }, 300);
+  };
+
+  // --- AUTO-FLIP useEffect - MUST BE AFTER upcomingMatches AND navigateMatch ---
+  useEffect(() => {
+    if (autoPlayRef.current) {
+      clearInterval(autoPlayRef.current);
+    }
+
+    if (upcomingMatches.length > 1 && isAutoPlaying && !isFlipping) {
+      autoPlayRef.current = setInterval(() => {
+        navigateMatch('next');
+      }, 3000);
+    }
+
+    return () => {
+      if (autoPlayRef.current) {
+        clearInterval(autoPlayRef.current);
+      }
+    };
+  }, [upcomingMatches.length, isAutoPlaying, isFlipping, navigateMatch]);
+
+  // Pause auto-play when user hovers over the carousel
+  const handleMouseEnter = () => {
+    setIsAutoPlaying(false);
+    if (autoPlayRef.current) {
+      clearInterval(autoPlayRef.current);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsAutoPlaying(true);
   };
 
   // Format time
@@ -330,19 +367,24 @@ const DashboardPage = () => {
           </div>
 
           {/* Up Next For You - Matches Carousel */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '12px',
-            background: 'rgba(255,255,255,0.7)',
-            borderRadius: '16px',
-            padding: '12px 16px',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.5)',
-            minWidth: '260px',
-            maxWidth: '360px',
-            position: 'relative',
-          }}>
+          <div 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: '12px',
+              background: 'rgba(255,255,255,0.7)',
+              borderRadius: '16px',
+              padding: '12px 16px',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.5)',
+              minWidth: '260px',
+              maxWidth: '360px',
+              position: 'relative',
+            }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            ref={dropdownRef}
+          >
             {/* Previous Button */}
             <button
               onClick={() => navigateMatch('prev')}
@@ -429,7 +471,7 @@ const DashboardPage = () => {
                       </div>
                     )}
 
-                    {/* Match Title - Game name or slot label */}
+                    {/* Match Title */}
                     <div style={{
                       fontSize: '0.8rem',
                       fontWeight: 700,
@@ -532,6 +574,32 @@ const DashboardPage = () => {
                 right: '14px',
               }}>
                 {currentMatchIndex + 1} / {upcomingMatches.length}
+              </div>
+            )}
+
+            {/* Auto-play indicator dots */}
+            {upcomingMatches.length > 1 && (
+              <div style={{
+                position: 'absolute',
+                bottom: '2px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                gap: '4px',
+                alignItems: 'center',
+              }}>
+                {upcomingMatches.map((_, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      width: index === currentMatchIndex ? '12px' : '6px',
+                      height: '3px',
+                      borderRadius: '2px',
+                      background: index === currentMatchIndex ? '#1a3c6e' : '#d0d5e0',
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -671,90 +739,91 @@ const DashboardPage = () => {
             {selectedGameRecord.name} on {currentDayName}
           </h2>
 
-          {allSlotsWithBookings.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
-              {allSlotsWithBookings.map(({ slot, players }) => {
-                const isFull = players.length >= maxPerSlot;
-                return (
-                  <div 
-                    key={slot.id} 
-                    style={{ 
-                      padding: '10px 12px', 
-                      borderRadius: '16px', 
-                      background: isFull 
-                        ? 'rgba(198,40,40,0.06)' 
-                        : players.length > 0 
-                          ? 'rgba(26,60,110,0.04)' 
-                          : '#f8f9fc',
-                      border: isFull 
-                        ? '1px solid rgba(198,40,40,0.3)' 
-                        : players.length > 0 
-                          ? '1px solid rgba(26,60,110,0.1)' 
-                          : '1px solid #e8edf5',
-                      minHeight: '80px',
-                      opacity: isFull ? 0.85 : 1,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ 
-                          fontSize: '0.7rem', 
-                          fontWeight: 700, 
-                          color: isFull ? '#c62828' : '#1e1e2f',
-                        }}>
-                          {slot.label}
-                        </div>
-                        <div style={{ fontSize: '0.55rem', color: '#8888aa' }}>{slot.time}</div>
-                      </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+            {SLOTS.map((slot) => {
+              const players = (dayBookings[slot.id] || []).filter((booking) =>
+                String(booking.game) === String(selectedGameRecord.id) ||
+                booking.game === selectedGameRecord.name ||
+                String(booking.game).toLowerCase() === String(selectedGameRecord.name || '').toLowerCase()
+              );
+              const isFull = players.length >= maxPerSlot;
+              const hasBooking = players.length > 0;
+              
+              return (
+                <div 
+                  key={slot.id} 
+                  style={{ 
+                    padding: '10px 12px', 
+                    borderRadius: '16px', 
+                    background: isFull 
+                      ? 'rgba(198,40,40,0.06)' 
+                      : hasBooking 
+                        ? 'rgba(26,60,110,0.04)' 
+                        : '#f8f9fc',
+                    border: isFull 
+                      ? '1px solid rgba(198,40,40,0.3)' 
+                      : hasBooking 
+                        ? '1px solid rgba(26,60,110,0.1)' 
+                        : '1px solid #e8edf5',
+                    minHeight: '80px',
+                    opacity: isFull ? 0.85 : 1,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', alignItems: 'flex-start' }}>
+                    <div>
                       <div style={{ 
                         fontSize: '0.7rem', 
                         fontWeight: 700, 
-                        color: isFull ? '#c62828' : players.length > 0 ? '#1a3c6e' : '#8888aa',
-                        background: isFull ? 'rgba(198,40,40,0.1)' : players.length > 0 ? 'rgba(26,60,110,0.08)' : 'transparent',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
+                        color: isFull ? '#c62828' : '#1e1e2f',
                       }}>
-                        {players.length}/{maxPerSlot}
+                        {slot.label}
                       </div>
+                      <div style={{ fontSize: '0.55rem', color: '#8888aa' }}>{slot.time}</div>
                     </div>
-                    {players.length > 0 && (
-                      <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {players.map((player) => (
-                          <span 
-                            key={`${slot.id}-${player.booking_id || player.user_id}-${player.name}`} 
-                            style={{
-                              fontSize: '0.55rem',
-                              background: isFull ? '#c62828' : '#1a3c6e',
-                              color: 'white',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {player.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {players.length === 0 && (
-                      <div style={{ 
-                        fontSize: '0.55rem', 
-                        color: '#b0b0b0', 
-                        marginTop: '6px',
-                        fontStyle: 'italic',
-                      }}>
-                        Empty
-                      </div>
-                    )}
+                    <div style={{ 
+                      fontSize: '0.7rem', 
+                      fontWeight: 700, 
+                      color: isFull ? '#c62828' : hasBooking ? '#1a3c6e' : '#8888aa',
+                      background: isFull ? 'rgba(198,40,40,0.1)' : hasBooking ? 'rgba(26,60,110,0.08)' : 'transparent',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                    }}>
+                      {players.length}/{maxPerSlot}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ padding: '18px', color: '#8888aa', fontSize: '0.8rem' }}>
-              No bookings for {selectedGameRecord.name} today.
-            </div>
-          )}
+                  {hasBooking && (
+                    <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {players.map((player) => (
+                        <span 
+                          key={`${slot.id}-${player.booking_id || player.user_id}-${player.name}`} 
+                          style={{
+                            fontSize: '0.55rem',
+                            background: isFull ? '#c62828' : '#1a3c6e',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {player.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {!hasBooking && (
+                    <div style={{ 
+                      fontSize: '0.55rem', 
+                      color: '#b0b0b0', 
+                      marginTop: '6px',
+                      fontStyle: 'italic',
+                    }}>
+                      Empty
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </section>
 
         {/* Upcoming Events - 20% */}
@@ -1067,7 +1136,6 @@ const MetricCard = ({ label, value, caption, accent }) => {
         overflow: 'hidden',
       }}
     >
-      {/* Top accent line - only visible when not hovered */}
       {!hovered && (
         <div style={{
           position: 'absolute',
