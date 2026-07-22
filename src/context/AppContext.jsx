@@ -2227,6 +2227,48 @@ const loadTournamentMatches = async () => {
     }
   };
 
+  // ── Certificate log ────────────────────────────────────────────────────
+  /**
+   * Call this immediately after a certificate PDF is successfully generated.
+   * Inserts a lightweight row into certificate_log — no PDF is stored.
+   */
+  const logCertificateIssuance = async ({ employeeId, tournamentId, position, issuedBy }) => {
+    try {
+      const { error } = await supabase.from('certificate_log').insert({
+        employee_id:   employeeId,
+        tournament_id: tournamentId,
+        position,
+        issued_by:     issuedBy,
+      });
+      if (error) console.error('certificate_log insert error:', error);
+    } catch (err) {
+      console.error('logCertificateIssuance error:', err);
+    }
+  };
+
+  /**
+   * Returns all certificate_log rows for a given employee_id,
+   * joined with tournament metadata for display.
+   * Falls back gracefully if the table doesn't exist yet.
+   */
+  const getCertificateLog = async (employeeId) => {
+    try {
+      const { data, error } = await supabase
+        .from('certificate_log')
+        .select('id, position, issued_at, issued_by, tournament_id, tournaments (id, name, game, start_date, end_date, status)')
+        .eq('employee_id', employeeId)
+        .order('issued_at', { ascending: false });
+      if (error) {
+        console.warn('getCertificateLog:', error.message);
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      console.error('getCertificateLog error:', err);
+      return [];
+    }
+  };
+
   // ── Final results (admin) ───────────────────────────────────────────────
   const declareFinalResults = async (tournamentId, results) => {
     if (!isAdmin()) {
@@ -2258,6 +2300,21 @@ const loadTournamentMatches = async () => {
       }
       const { error } = await supabase.from('final_results').insert(rows);
       if (error) throw error;
+
+      // ── Auto-issue certificates for every declared participant ──────────
+      // Wipe previous certificate_log rows for this tournament (mirrors the
+      // final_results delete above so re-declarations stay in sync), then
+      // insert one row per participant. Employees see the certificate in
+      // their profile immediately — no download required to trigger the record.
+      await supabase.from('certificate_log').delete().eq('tournament_id', tournamentId);
+      const certRows = rows.map(r => ({
+        employee_id:   r.employee_id,
+        tournament_id: tournamentId,
+        position:      r.position,
+        issued_by:     submitter,
+      }));
+      const { error: certErr } = await supabase.from('certificate_log').insert(certRows);
+      if (certErr) console.error('certificate_log insert error:', certErr);
 
       // Update champion / runner-up / 3rd on the tournament itself.
       const champion    = rows.find(r => r.position === 1);
@@ -2610,6 +2667,8 @@ const loadTournamentMatches = async () => {
     getResultsByTournament,
     getPlayerLeaderboardEntry,
     getEmployeeName,
+    getCertificateLog,
+    logCertificateIssuance,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

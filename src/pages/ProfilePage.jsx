@@ -1,6 +1,8 @@
 // src/pages/ProfilePage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useCertificate } from '../hooks/useCertificate';
+import { useToast } from '../context/ToastContext';
 import { GAMES } from '../utils/constants';
 
 const StatCard = ({ title, value, caption, accent = '#1a3c6e' }) => (
@@ -27,11 +29,25 @@ const StatCard = ({ title, value, caption, accent = '#1a3c6e' }) => (
 );
 
 const ProfilePage = () => {
-  const { currentUser, setActiveTab, getPlayerGameStats } = useApp();
+  const { currentUser, setActiveTab, getPlayerGameStats, getCertificateLog, getEmployeeName } = useApp();
+  const { generateCertificate } = useCertificate();
+  const { showToast } = useToast();
   const [selectedGame, setSelectedGame] = useState('carrom');
+  const [certLog, setCertLog] = useState([]);
+  const [certLoading, setCertLoading] = useState(true);
+  const [certPrinting, setCertPrinting] = useState(null);
 
   const userName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User';
   const empId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.user_metadata?.empId || '';
+
+  useEffect(() => {
+    if (!empId) { setCertLoading(false); return; }
+    setCertLoading(true);
+    getCertificateLog(empId).then(rows => {
+      setCertLog(rows);
+      setCertLoading(false);
+    });
+  }, [empId]);
   const department = currentUser?.user_metadata?.department || 'General';
   const visibleGames = GAMES.filter((game) => ['carrom', 'chess'].includes(String(game.id)));
   const activeGameId = visibleGames.some((game) => game.id === selectedGame) ? selectedGame : (visibleGames[0]?.id || 'carrom');
@@ -238,6 +254,117 @@ const ProfilePage = () => {
           </table>
         </div>
       </div>
+
+      {/* ─── Issued Certificates ─── */}
+      <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e1e2f' }}>
+            🏅 Issued Certificates
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#8888aa' }}>
+            {certLoading ? 'Loading…' : `${certLog.length} certificate${certLog.length !== 1 ? 's' : ''} issued`}
+          </div>
+        </div>
+
+        {certLoading ? (
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: '#aaa', fontSize: '0.78rem' }}>
+            Loading certificates…
+          </div>
+        ) : certLog.length === 0 ? (
+          <div style={{
+            padding: '1.8rem',
+            textAlign: 'center',
+            color: '#aaa',
+            fontSize: '0.78rem',
+            background: 'rgba(26,60,110,0.02)',
+            borderRadius: 16,
+            border: '1px dashed #d0d0d0',
+          }}>
+            No certificates issued yet.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+              <thead>
+                <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
+                  {['Tournament', 'Game', 'Position', 'Period', 'Issued On', 'Issued By', 'Download'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {certLog.map((c) => {
+                  const t = c.tournaments;
+                  const posLabel = POSITION_LABEL[c.position] || `${c.position}th`;
+                  const posAccent = POSITION_ACCENT[c.position] || '#666';
+                  return (
+                    <tr key={c.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
+                      <td style={tdStyle}><strong>{t?.name || '—'}</strong></td>
+                      <td style={tdStyle}>{t?.game || '—'}</td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: 4,
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: `${posAccent}18`,
+                          color: posAccent,
+                          whiteSpace: 'nowrap',
+                        }}>{posLabel}</span>
+                      </td>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: '#555' }}>
+                        {formatDateShort(t?.start_date)}
+                        {t?.end_date ? ` → ${formatDateShort(t.end_date)}` : ''}
+                      </td>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: '#555' }}>
+                        {formatDateShort(c.issued_at)}
+                      </td>
+                      <td style={tdStyle}>{c.issued_by || '—'}</td>
+                      <td style={tdStyle}>
+                        <button
+                          disabled={certPrinting === c.id}
+                          onClick={async () => {
+                            setCertPrinting(c.id);
+                            const result = await generateCertificate({
+                              employeeName:   getEmployeeName(empId),
+                              employeeId:     empId,
+                              tournamentId:   c.tournament_id,
+                              tournamentName: t?.name || '',
+                              position:       c.position,
+                              issuedBy:       empId,
+                            });
+                            setCertPrinting(null);
+                            if (result.success) {
+                              showToast('Certificate downloaded!');
+                            } else {
+                              showToast(result.error || 'Failed to generate certificate', 'error');
+                            }
+                          }}
+                          style={{
+                            background: certPrinting === c.id ? '#888' : '#1a3c6e',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 4,
+                            padding: '0.28rem 0.75rem',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            cursor: certPrinting === c.id ? 'wait' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: certPrinting === c.id ? 0.7 : 1,
+                            minWidth: 80,
+                          }}
+                        >
+                          {certPrinting === c.id ? '⏳ Generating…' : '🏅 Download'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -277,6 +404,16 @@ const thStyle = {
 
 const tdStyle = {
   padding: '8px 10px',
+};
+
+const POSITION_LABEL = { 1: '🥇 Champion', 2: '🥈 Runner-up', 3: '🥉 3rd Place' };
+const POSITION_ACCENT = { 1: '#f9a825', 2: '#78909c', 3: '#d84315' };
+
+const formatDateShort = (d) => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export default ProfilePage;
