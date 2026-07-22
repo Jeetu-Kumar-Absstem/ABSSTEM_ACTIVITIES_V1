@@ -25,9 +25,9 @@ const GameMasterPage = () => {
       >
         <h2
           style={{
-            fontSize: "1rem",
+            fontSize: "2rem",
             fontWeight: 600,
-            color: "#1e1e2f",
+            color: "#000000",
           }}
         >
           Game Master — All Activities

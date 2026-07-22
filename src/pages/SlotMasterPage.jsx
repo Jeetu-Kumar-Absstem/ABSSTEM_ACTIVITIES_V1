@@ -182,7 +182,7 @@ const SlotMasterPage = () => {
   return (
     <div className="clay-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>
+        <h2 style={{ fontSize: '2rem', fontWeight: 600, color: '#000000' }}>
           Slot Master — Time Slot Configuration
         </h2>
         {canManageSlots ? (
