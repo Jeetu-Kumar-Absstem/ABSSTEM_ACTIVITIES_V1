@@ -1370,8 +1370,19 @@ const renderMatch = (m) => {
       <div style={{ display: 'grid', gap: '1rem' }}>
         <div className="clay-card" style={styles.card}>
           <div style={styles.cardHeader}>
-            <div style={styles.cardHeaderTitle}>
-              🏅 Final Results — {tournament.name} ({STATUS_BADGE[tournament.status]?.label || tournament.status})
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div style={styles.cardHeaderTitle}>🏅 Final Results</div>
+              <select
+                value={activeTournament || ''}
+                onChange={(e) => setActiveTournament(e.target.value)}
+                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' }}
+              >
+                {tournaments.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} · {t.game} · {STATUS_BADGE[t.status]?.label || t.status}
+                  </option>
+                ))}
+              </select>
             </div>
             {isAdmin() && (
               <button
