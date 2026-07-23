@@ -221,7 +221,7 @@ const ProfilePage = () => {
 
       <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
-          Game Summary
+         All Games Summary
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
