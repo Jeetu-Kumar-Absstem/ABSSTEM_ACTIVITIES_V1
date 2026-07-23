@@ -12,12 +12,30 @@ import {
   normalizeTournamentFormat,
 } from '../utils/tournamentFixtures';
 
+
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
 // Confirm-delete modal (admin action on a tournament).
 const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
   <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
     <div style={{ ...styles.modalCard, maxWidth: 420 }}>
       <div style={{ ...styles.modalHeader, background: '#c62828' }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Delete Tournament</h3>
+        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Delete Tournament</h3>
         <button onClick={onCancel} style={styles.modalClose}>✕</button>
       </div>
       <div style={{ padding: '1rem', fontSize: '0.78rem', color: '#333' }}>
@@ -64,7 +82,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
     <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
       <div style={{ ...styles.modalCard, maxWidth: 560 }}>
         <div style={styles.modalHeader}>
-          <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>🏆 Register for Tournaments</h3>
+          <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>🏆 Register for Tournaments</h3>
           <button onClick={onCancel} style={styles.modalClose}>✕</button>
         </div>
         <div style={{ padding: '1rem' }}>
@@ -98,7 +116,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
                       style={{ cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, color: '#1e1e2f' }}>{t.name}</div>
+                      <div style={{ fontWeight: 700, color: '#1e1e2f' , fontFamily: "'Lufga', sans-serif" }}>{t.name}</div>
                       <div style={{ fontSize: '0.66rem', color: '#666' }}>
                         {t.code} · {t.game} · {t.format.replace('_', ' ')} · {formatDate(t.start_date)}
                       </div>
@@ -525,7 +543,7 @@ const canEditMatch = (m) => {
                 const t = tournaments.find(x => x.id === r.tournament_id);
                 return (
                   <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #ffe082', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 600, minWidth: 120 }}>{getEmployeeName(r.employee_id)}</span>
+                    <span style={{ fontWeight: 600, minWidth: 120 , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(r.employee_id)}</span>
                     <span style={{ color: '#888', fontSize: '0.78rem' }}>→ {t?.name || `Tournament #${r.tournament_id}`}</span>
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
                       <button
@@ -558,7 +576,7 @@ const canEditMatch = (m) => {
               const t = tournaments.find(x => x.id === p.tournament_id);
               return (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #f48fb1', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 600, minWidth: 120 }}>{getEmployeeName(p.employee_id)}</span>
+                  <span style={{ fontWeight: 600, minWidth: 120 , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(p.employee_id)}</span>
                   <span style={{ color: '#888', fontSize: '0.78rem' }}>wants to leave <strong>{t?.name || `Tournament #${p.tournament_id}`}</strong></span>
                   <span style={{ ...styles.tinyChip, background: '#fff3e0', color: '#e65100', fontSize: '0.68rem' }}>⚠ Tournament is live</span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
@@ -724,7 +742,7 @@ const renderMatch = (m) => {
           color: '#1a3c6e', background: '#e8eef7',
           borderRadius: 3, padding: '0.12rem 0.4rem',
           marginBottom: '0.28rem', display: 'inline-block',
-        }}>
+          fontFamily: "'Lufga', sans-serif" }}>
           🕐 {matchTime}
         </div>
       )}
@@ -907,7 +925,7 @@ const renderMatch = (m) => {
             padding: '0.6rem 1rem',
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#555', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#555', whiteSpace: 'nowrap' , fontFamily: "'Lufga', sans-serif" }}>
               📋 Tournament
             </span>
             <select
@@ -918,7 +936,7 @@ const renderMatch = (m) => {
                 flex: 1, minWidth: 220, maxWidth: 400,
                 fontWeight: 600, color: '#1a3c6e',
                 borderColor: '#1a3c6e', borderRadius: 6,
-              }}
+                fontFamily: "'Lufga', sans-serif" }}
             >
               {tournaments.map(t => (
                 <option key={t.id} value={t.id}>
@@ -989,15 +1007,15 @@ const renderMatch = (m) => {
                           opacity: qualifies ? 1 : 0.55,
                         }}
                       >
-                        <td style={{ ...styles.td, fontWeight: 700, color: i === 0 ? '#f9a825' : i === 1 ? '#9e9e9e' : i === 2 ? '#d84315' : '#444' }}>
+                        <td style={{ ...styles.td, fontWeight: 700, color: i === 0 ? '#f9a825' : i === 1 ? '#9e9e9e' : i === 2 ? '#d84315' : '#444' , fontFamily: "'Lufga', sans-serif" }}>
                           {i + 1}
                         </td>
-                        <td style={{ ...styles.td, fontWeight: 600 }}>{getEmployeeName(row.employee_id)}</td>
+                        <td style={{ ...styles.td, fontWeight: 600 , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(row.employee_id)}</td>
                         <td style={styles.td}>{row.played}</td>
-                        <td style={{ ...styles.td, color: '#2e7d32', fontWeight: 600 }}>{row.won}</td>
+                        <td style={{ ...styles.td, color: '#2e7d32', fontWeight: 600 , fontFamily: "'Lufga', sans-serif" }}>{row.won}</td>
                         <td style={styles.td}>{row.drawn}</td>
                         <td style={{ ...styles.td, color: '#c62828' }}>{row.lost}</td>
-                        <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{row.points}</td>
+                        <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{row.points}</td>
                         <td style={styles.td}>
                           {qualifies ? (
                             <span style={{
@@ -1059,7 +1077,7 @@ const renderMatch = (m) => {
               <select
                 value={activeTournament || ''}
                 onChange={(e) => setActiveTournament(e.target.value)}
-                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' }}
+                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}
               >
                 {tournaments.map(t => (
                   <option key={t.id} value={t.id}>
@@ -1300,8 +1318,8 @@ const renderMatch = (m) => {
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_a_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_a_employee_id ? 700 : 500 }}>
                     {m.player_a_employee_id ? [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{m.score_a ?? '—'}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{m.score_b ?? '—'}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{m.score_a ?? '—'}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{m.score_b ?? '—'}</td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_b_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_b_employee_id ? 700 : 500 }}>
                     {m.player_b_employee_id ? [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
@@ -1375,7 +1393,7 @@ const renderMatch = (m) => {
               <select
                 value={activeTournament || ''}
                 onChange={(e) => setActiveTournament(e.target.value)}
-                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' }}
+                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}
               >
                 {tournaments.map(t => (
                   <option key={t.id} value={t.id}>
@@ -1548,7 +1566,7 @@ const renderMatch = (m) => {
                     <td style={styles.td}>{r.matches_played}</td>
                     <td style={styles.td}>{r.wins}</td>
                     <td style={styles.td}>{r.losses}</td>
-                    <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' }}>{r.points}</td>
+                    <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{r.points}</td>
                     <td style={styles.td}>{r.prize_description || '—'}</td>
                     <td style={styles.td}>
                       {/* Admin: can download certificate for ANY participant.
@@ -1961,7 +1979,8 @@ const renderMatch = (m) => {
   };
 
   return (
-    <div style={{ fontFamily: "'Roboto', Arial, sans-serif", fontSize: 13, color: '#212121' }}>
+    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: '#212121' }}>
+      <style>{lufgaFontStyle}</style>
       <EventsTopBar active="tournaments" />
 
       {/* Sub-tab bar */}
@@ -2001,7 +2020,7 @@ const renderMatch = (m) => {
           >
             <div style={{ ...styles.modalCard, maxWidth: 420 }}>
               <div style={styles.modalHeader}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>
                   ⚙️ Edit Tournament — {t?.name}
                 </h3>
                 <button onClick={() => setEditTournamentId(null)} style={styles.modalClose}>✕</button>
@@ -2084,7 +2103,7 @@ const renderMatch = (m) => {
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowNewTournamentModal(false); }} style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>New Tournament</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>New Tournament</h3>
               <button onClick={() => setShowNewTournamentModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -2164,7 +2183,7 @@ const renderMatch = (m) => {
         <div onClick={(e) => { if (e.target === e.currentTarget) setShowNewMatchModal(false); }} style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Add Match</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Add Match</h3>
               <button onClick={() => setShowNewMatchModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -2213,7 +2232,7 @@ const renderMatch = (m) => {
                     {/* Team A */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🔵 Team A
                           <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
@@ -2242,7 +2261,7 @@ const renderMatch = (m) => {
                     {/* Team B */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🟠 Team B
                           <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
@@ -2290,7 +2309,7 @@ const renderMatch = (m) => {
         <div onClick={(e) => { if (e.target === e.currentTarget) setEditMatchId(null); }} style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>✎ Edit Match</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>✎ Edit Match</h3>
               <button onClick={() => setEditMatchId(null)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -2337,7 +2356,7 @@ const renderMatch = (m) => {
                     {/* Team A */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🔵 Team A
                           <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
@@ -2366,7 +2385,7 @@ const renderMatch = (m) => {
                     {/* Team B */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🟠 Team B
                           <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
@@ -2414,7 +2433,7 @@ const renderMatch = (m) => {
         <div onClick={(e) => { if (e.target === e.currentTarget) setResultMatchId(null); }} style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Enter Match Result</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Enter Match Result</h3>
               <button onClick={() => setResultMatchId(null)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -2591,7 +2610,7 @@ const renderMatch = (m) => {
         <div onClick={(e) => { if (e.target === e.currentTarget) setFinalForm([]); }} style={styles.modalBackdrop}>
           <div style={{ ...styles.modalCard, maxWidth: 700 }}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>📣 Declare Final Results</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>📣 Declare Final Results</h3>
               <button onClick={() => setFinalForm([])} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem', maxHeight: '62vh', overflowY: 'auto' }}>
@@ -2624,7 +2643,7 @@ const renderMatch = (m) => {
                           {/* Header row: medal + position label + remove btn */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                             <span style={{ fontSize: '1.25rem' }}>{medal}</span>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1e2f' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1e2f' , fontFamily: "'Lufga', sans-serif" }}>
                               {pos === 1 ? '1st Place' : pos === 2 ? '2nd Place' : pos === 3 ? '3rd Place' : `${pos}th Place`}
                             </span>
                             {isManual && (
@@ -2641,7 +2660,7 @@ const renderMatch = (m) => {
                             {isManual ? (
                               /* Manual 3rd: dropdown to pick player */
                               <select
-                                style={{ ...styles.formInput, fontWeight: 600 }}
+                                style={{ ...styles.formInput, fontWeight: 600 , fontFamily: "'Lufga', sans-serif" }}
                                 value={firstMember?.employee_id || ''}
                                 onChange={(e) => {
                                   const empId = e.target.value;
@@ -2682,7 +2701,7 @@ const renderMatch = (m) => {
                                 <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.3rem 0' }}>
                                   {/* Name + dept */}
                                   <div style={{ minWidth: 130, flex: 1 }}>
-                                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e1e2f' }}>{getEmployeeName(member.employee_id)}</div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e1e2f' , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(member.employee_id)}</div>
                                     <div style={{ fontSize: '0.65rem', color: '#777' }}>{member.department}</div>
                                   </div>
                                   {/* Per-player stats */}
@@ -2695,7 +2714,7 @@ const renderMatch = (m) => {
                                     ].map(({ label, val }) => (
                                       <div key={label} style={{ textAlign: 'center', minWidth: 36 }}>
                                         <div style={{ fontSize: '0.58rem', color: '#999', textTransform: 'uppercase' }}>{label}</div>
-                                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1a3c6e' }}>{val ?? 0}</div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{val ?? 0}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -2779,7 +2798,7 @@ const renderMatch = (m) => {
         >
           <div style={{ ...styles.modalCard, maxWidth: 420 }}>
             <div style={{ ...styles.modalHeader, background: '#c62828' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Delete Match</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Delete Match</h3>
               <button onClick={() => setMatchToDelete(null)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem', fontSize: '0.78rem', color: '#333' }}>
@@ -2953,7 +2972,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
           {linkedMatch && (
             <div style={{ marginTop: '0.75rem', background: 'rgba(255,255,255,0.1)', borderRadius: 6, padding: '0.55rem 0.7rem', border: '1px solid rgba(255,255,255,0.2)' }}>
               <div style={{ fontSize: '0.62rem', opacity: 0.6, marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Linked Match</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>{linkedMatch.match_code || `M${linkedMatch.match_number}`} · {linkedMatch.round}</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700 , fontFamily: "'Lufga', sans-serif" }}>{linkedMatch.match_code || `M${linkedMatch.match_number}`} · {linkedMatch.round}</div>
               <div style={{ fontSize: '0.7rem', opacity: 0.85, marginTop: '0.15rem' }}>
                 {linkedMatch.player_a_employee_id
                   ? linkedMatch.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
@@ -2997,7 +3016,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
           </select>
           {linkedMatch ? (
             <div style={{ background: '#e8f5e9', borderRadius: 6, padding: '0.6rem 0.75rem', border: '1px solid #a5d6a7' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2e7d32', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2e7d32', marginBottom: '0.25rem' , fontFamily: "'Lufga', sans-serif" }}>
                 ✓ Linked — {linkedMatch.round} · {linkedMatch.match_code || `M${linkedMatch.match_number}`}
               </div>
               <div style={{ fontSize: '0.68rem', color: '#388e3c' }}>
@@ -3057,7 +3076,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
               <div style={{ padding: '1rem', textAlign: 'center', color: '#888', fontSize: '0.78rem' }}>No upcoming matches.</div>
             ) : todaySchedule.map(m => (
               <div key={m.id} style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid #eee', fontSize: '0.74rem' }}>
-                <div style={{ fontWeight: 700, color: '#1a3c6e' }}>
+                <div style={{ fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>
                   {m.scheduled_at ? new Date(m.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : 'TBD'} — {m.match_code || `Match ${m.match_number}`}
                 </div>
                 <div style={{ color: '#666' }}>
@@ -3078,6 +3097,9 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
   );
 };
 
+const LUFGA_REGULAR = "'Lufga', sans-serif";
+const LUFGA_BOLD    = "'Lufga', sans-serif"; // bold weight applied via fontWeight: 700
+
 const styles = {
   subTabBar: {
     background: 'white', borderRadius: 32, padding: '4px 8px',
@@ -3086,56 +3108,62 @@ const styles = {
   },
   subTabBtn: {
     background: 'transparent', border: 'none',
-    padding: '10px 18px', fontSize: '0.78rem', fontFamily: 'inherit',
+    padding: '10px 18px', fontSize: '0.78rem', fontFamily: LUFGA_REGULAR,
+    fontWeight: 400,
     cursor: 'pointer', borderBottom: '3px solid transparent', marginBottom: '-1px',
     transition: 'color 0.2s ease, border-color 0.2s ease',
   },
-  card: { background: 'white', borderRadius: 16, padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid rgba(200,210,230,0.5)' },
+  card: { background: 'white', borderRadius: 16, padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid rgba(200,210,230,0.5)', fontFamily: LUFGA_REGULAR },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' },
-  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 700, color: '#1e1e2f' },
-  recordCount: { fontSize: '0.7rem', color: '#666' },
-  navyBtn: { background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
-  outlineBtn: { background: 'white', color: '#1a3c6e', border: '1px solid #d0d0d0', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
-  dangerBtn: { background: '#c62828', color: 'white', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
-  tinyIconBtn: { background: 'transparent', border: '1px solid #d0d0d0', borderRadius: 4, padding: '0.18rem 0.4rem', margin: '0 2px', cursor: 'pointer', fontSize: '0.7rem' },
-  tinyEnterBtn: { background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4, padding: '0.2rem 0.55rem', fontSize: '0.66rem', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 },
-  tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 500, display: 'inline-block' },
+  // Headings → Lufga Bold (weight 700)
+  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 700, color: '#1e1e2f', fontFamily: LUFGA_BOLD },
+  recordCount: { fontSize: '0.7rem', color: '#666', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
+  navyBtn: { background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  outlineBtn: { background: 'white', color: '#1a3c6e', border: '1px solid #d0d0d0', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  dangerBtn: { background: '#c62828', color: 'white', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  tinyIconBtn: { background: 'transparent', border: '1px solid #d0d0d0', borderRadius: 4, padding: '0.18rem 0.4rem', margin: '0 2px', cursor: 'pointer', fontSize: '0.7rem', fontFamily: LUFGA_REGULAR },
+  tinyEnterBtn: { background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4, padding: '0.2rem 0.55rem', fontSize: '0.66rem', cursor: 'pointer', fontFamily: LUFGA_BOLD, fontWeight: 700 },
+  tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block', fontFamily: LUFGA_REGULAR },
 
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', fontFamily: LUFGA_REGULAR },
   theadRow: { background: 'rgba(26,60,110,0.05)' },
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700, color: '#444', textTransform: 'uppercase', fontSize: '0.62rem', letterSpacing: '0.04em' },
-  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle' },
+  // Table headings → Lufga Bold
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700, color: '#444', textTransform: 'uppercase', fontSize: '0.62rem', letterSpacing: '0.04em', fontFamily: LUFGA_BOLD },
+  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
 
   bracketGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', alignItems: 'stretch' },
   bracketCol: { display: 'flex', flexDirection: 'column' },
-  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none' },
-  bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100 },
+  // Bracket column headers → Lufga Bold
+  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none', fontFamily: LUFGA_BOLD },
+  bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100, fontFamily: LUFGA_REGULAR },
   matchesGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' },
-  emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic' },
-  matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem' },
-  matchLabel: { textAlign: 'center', fontSize: '0.62rem', color: '#888', marginBottom: '0.25rem' },
-  matchPlayer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.28rem 0.4rem', borderRadius: 3 },
-  matchMeta: { textAlign: 'center', fontSize: '0.6rem', color: '#888', marginTop: '0.25rem' },
+  emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic', fontFamily: LUFGA_REGULAR },
+  matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem', fontFamily: LUFGA_REGULAR },
+  matchLabel: { textAlign: 'center', fontSize: '0.62rem', color: '#888', marginBottom: '0.25rem', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
+  matchPlayer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.28rem 0.4rem', borderRadius: 3, fontFamily: LUFGA_REGULAR },
+  matchMeta: { textAlign: 'center', fontSize: '0.6rem', color: '#888', marginTop: '0.25rem', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
 
   podium: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.7rem', alignItems: 'end', marginBottom: '1.2rem', padding: '0.6rem 0' },
-  podiumGold:   { background: 'linear-gradient(180deg, #fff8e1, #ffecb3)', borderRadius: 8, padding: '1.2rem 0.5rem', textAlign: 'center', border: '2px solid #f9a825', order: 2 },
-  podiumSilver: { background: 'linear-gradient(180deg, #fafafa, #eceff1)', borderRadius: 8, padding: '0.9rem 0.5rem', textAlign: 'center', border: '2px solid #b0bec5', order: 1 },
-  podiumBronze: { background: 'linear-gradient(180deg, #fff3e0, #ffe0b2)', borderRadius: 8, padding: '0.7rem 0.5rem', textAlign: 'center', border: '2px solid #d84315', order: 3 },
-  podiumName:   { fontSize: '0.9rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '0.2rem' },
-  podiumRank:   { fontSize: '0.7rem', fontWeight: 600, color: '#666', marginBottom: '0.3rem' },
-  podiumPrize:  { fontSize: '0.7rem', color: '#1a3c6e', fontWeight: 600 },
+  podiumGold:   { background: 'linear-gradient(180deg, #fff8e1, #ffecb3)', borderRadius: 8, padding: '1.2rem 0.5rem', textAlign: 'center', border: '2px solid #f9a825', order: 2, fontFamily: LUFGA_REGULAR },
+  podiumSilver: { background: 'linear-gradient(180deg, #fafafa, #eceff1)', borderRadius: 8, padding: '0.9rem 0.5rem', textAlign: 'center', border: '2px solid #b0bec5', order: 1, fontFamily: LUFGA_REGULAR },
+  podiumBronze: { background: 'linear-gradient(180deg, #fff3e0, #ffe0b2)', borderRadius: 8, padding: '0.7rem 0.5rem', textAlign: 'center', border: '2px solid #d84315', order: 3, fontFamily: LUFGA_REGULAR },
+  // Podium names are headings → Lufga Bold
+  podiumName:   { fontSize: '0.9rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '0.2rem', fontFamily: LUFGA_BOLD },
+  podiumRank:   { fontSize: '0.7rem', fontWeight: 400, color: '#666', marginBottom: '0.3rem', fontFamily: LUFGA_REGULAR },
+  podiumPrize:  { fontSize: '0.7rem', color: '#1a3c6e', fontWeight: 400, fontFamily: LUFGA_REGULAR },
 
-  swBtn: { width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' },
+  swBtn: { width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: LUFGA_REGULAR },
 
   modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 120 },
-  modalCard: { background: 'white', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.22)' },
-  modalHeader: { background: '#1a3c6e', color: 'white', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0' },
-  modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer' },
-  modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid #d0d0d0', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: '#fafafa', borderRadius: '0 0 8px 8px' },
+  modalCard: { background: 'white', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.22)', fontFamily: LUFGA_REGULAR },
+  // Modal header is a heading → Lufga Bold
+  modalHeader: { background: '#1a3c6e', color: 'white', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0', fontFamily: LUFGA_BOLD },
+  modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid #d0d0d0', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: '#fafafa', borderRadius: '0 0 8px 8px', fontFamily: LUFGA_REGULAR },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  formLabel: { fontSize: '0.7rem', fontWeight: 500, color: '#555' },
-  formInput: { padding: '0.32rem 0.55rem', border: '1px solid #d0d0d0', borderRadius: 4, fontSize: '0.75rem', fontFamily: 'inherit', color: '#212121', width: '100%' },
+  formLabel: { fontSize: '0.7rem', fontWeight: 400, color: '#555', fontFamily: LUFGA_REGULAR },
+  formInput: { padding: '0.32rem 0.55rem', border: '1px solid #d0d0d0', borderRadius: 4, fontSize: '0.75rem', fontFamily: LUFGA_REGULAR, fontWeight: 400, color: '#212121', width: '100%' },
 };
 
 export default TournamentsPage;

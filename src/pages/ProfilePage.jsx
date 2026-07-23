@@ -5,6 +5,33 @@ import { useCertificate } from '../hooks/useCertificate';
 import { useToast } from '../context/ToastContext';
 import { GAMES } from '../utils/constants';
 
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
+if (typeof document !== 'undefined') {
+  const styleId = 'lufga-font-styles';
+  if (!document.getElementById(styleId)) {
+    const styleTag = document.createElement('style');
+    styleTag.id = styleId;
+    styleTag.innerHTML = lufgaFontStyle;
+    document.head.appendChild(styleTag);
+  }
+}
+
 const StatCard = ({ title, value, caption, accent = '#1a3c6e' }) => (
   <div
     className="clay-card"
@@ -16,13 +43,13 @@ const StatCard = ({ title, value, caption, accent = '#1a3c6e' }) => (
       boxShadow: '0 12px 35px rgba(26,60,110,0.08)',
     }}
   >
-    <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+    <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       {title}
     </div>
-    <div style={{ fontSize: '2rem', fontWeight: 800, color: accent, marginTop: '6px', lineHeight: 1 }}>
+    <div style={{ fontSize: '2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: accent, marginTop: '6px', lineHeight: 1 }}>
       {value}
     </div>
-    <div style={{ fontSize: '0.72rem', color: '#666', marginTop: '8px' }}>
+    <div style={{ fontSize: '0.72rem', color: '#666', marginTop: '8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       {caption}
     </div>
   </div>
@@ -83,8 +110,8 @@ const ProfilePage = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#000000', marginBottom: '4px' }}>My Profile</div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e1e2f', margin: 0 }}>{userName}</h1>
+            <div style={{ fontSize: '0.78rem', color: '#000000', marginBottom: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>My Profile</div>
+            <h1 style={{ fontSize: '1.8rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f', margin: 0 }}>{userName}</h1>
             <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', color: '#667' }}>
               <span className="clay-badge clay-badge-navy">{empId || 'N/A'}</span>
               <span className="clay-badge clay-badge-green">{department}</span>
@@ -100,8 +127,8 @@ const ProfilePage = () => {
       <div className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#8888aa' }}>Select Game</div>
-            <div style={{ fontSize: '0.95rem', color: '#444466', marginTop: '4px' }}>
+            <div style={{ fontSize: '0.78rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Select Game</div>
+            <div style={{ fontSize: '0.95rem', color: '#444466', marginTop: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Choose Carrom or Chess to view that game&apos;s results.
             </div>
           </div>
@@ -149,7 +176,7 @@ const ProfilePage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: '16px', alignItems: 'stretch' }}>
         <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
+          <div style={{ fontSize: '0.85rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
             Outcome Split
           </div>
           <div style={{ display: 'grid', placeItems: 'center', gap: '12px' }}>
@@ -179,10 +206,10 @@ const ProfilePage = () => {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1e1e2f', lineHeight: 1 }}>
+                  <div style={{ fontSize: '1.6rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f', lineHeight: 1 }}>
                     {stats.points}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: '#777' }}>Points</div>
+                  <div style={{ fontSize: '0.7rem', color: '#777', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Points</div>
                 </div>
               </div>
             </div>
@@ -196,7 +223,7 @@ const ProfilePage = () => {
         </div>
 
         <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
+          <div style={{ fontSize: '0.85rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
             Match Summary
           </div>
 
@@ -208,11 +235,11 @@ const ProfilePage = () => {
           </div>
 
           <div style={{ marginTop: '18px', padding: '14px 16px', borderRadius: '20px', background: 'rgba(26,60,110,0.04)', color: '#445' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '6px' }}>
+            <div style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1a3c6e', marginBottom: '6px' }}>
               Current selection
             </div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e1e2f' }}>{selectedGameRecord?.name || 'Game'}</div>
-            <div style={{ fontSize: '0.74rem', marginTop: '4px' }}>
+            <div style={{ fontSize: '0.9rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f' }}>{selectedGameRecord?.name || 'Game'}</div>
+            <div style={{ fontSize: '0.74rem', marginTop: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Points are calculated from saved match results only. Winning team members receive 4 points each, losing team members receive 1 point each, and both teams get 2 points for a draw.
             </div>
           </div>
@@ -220,7 +247,7 @@ const ProfilePage = () => {
       </div>
 
       <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
-        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
+        <div style={{ fontSize: '0.85rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f', marginBottom: '14px' }}>
          All Games Summary
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -258,16 +285,16 @@ const ProfilePage = () => {
       {/* ─── Issued Certificates ─── */}
       <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e1e2f' }}>
+          <div style={{ fontSize: '0.85rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f' }}>
             🏅 Issued Certificates
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#8888aa' }}>
+          <div style={{ fontSize: '0.72rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             {certLoading ? 'Loading…' : `${certLog.length} certificate${certLog.length !== 1 ? 's' : ''} issued`}
           </div>
         </div>
 
         {certLoading ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: '#aaa', fontSize: '0.78rem' }}>
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: '#aaa', fontSize: '0.78rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Loading certificates…
           </div>
         ) : certLog.length === 0 ? (
@@ -276,6 +303,8 @@ const ProfilePage = () => {
             textAlign: 'center',
             color: '#aaa',
             fontSize: '0.78rem',
+            fontFamily: "'Lufga', sans-serif",
+            fontWeight: 400,
             background: 'rgba(26,60,110,0.02)',
             borderRadius: 16,
             border: '1px dashed #d0d0d0',
@@ -306,6 +335,7 @@ const ProfilePage = () => {
                           padding: '0.15rem 0.55rem',
                           borderRadius: 4,
                           fontSize: '0.68rem',
+                          fontFamily: "'Lufga', sans-serif",
                           fontWeight: 700,
                           background: `${posAccent}18`,
                           color: posAccent,
@@ -347,9 +377,9 @@ const ProfilePage = () => {
                             borderRadius: 4,
                             padding: '0.28rem 0.75rem',
                             fontSize: '0.68rem',
-                            fontWeight: 600,
+                            fontFamily: "'Lufga', sans-serif",
+                            fontWeight: 700,
                             cursor: certPrinting === c.id ? 'wait' : 'pointer',
-                            fontFamily: 'inherit',
                             opacity: certPrinting === c.id ? 0.7 : 1,
                             minWidth: 80,
                           }}
@@ -373,9 +403,9 @@ const LegendRow = ({ label, value, color }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block' }} />
-      <span style={{ fontSize: '0.75rem', color: '#445' }}>{label}</span>
+      <span style={{ fontSize: '0.75rem', color: '#445', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</span>
     </div>
-    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e1e2f' }}>{value}</span>
+    <span style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f' }}>{value}</span>
   </div>
 );
 
@@ -388,22 +418,25 @@ const MiniStat = ({ label, value, color }) => (
       borderTop: `3px solid ${color}`,
     }}
   >
-    <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+    <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       {label}
     </div>
-    <div style={{ fontSize: '1.6rem', fontWeight: 800, color, marginTop: '4px', lineHeight: 1 }}>{value}</div>
+    <div style={{ fontSize: '1.6rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color, marginTop: '4px', lineHeight: 1 }}>{value}</div>
   </div>
 );
 
 const thStyle = {
   padding: '8px 10px',
   textAlign: 'left',
-  fontWeight: 600,
+  fontFamily: "'Lufga', sans-serif",
+  fontWeight: 700,
   color: '#444466',
 };
 
 const tdStyle = {
   padding: '8px 10px',
+  fontFamily: "'Lufga', sans-serif",
+  fontWeight: 400,
 };
 
 const POSITION_LABEL = { 1: '🥇 Champion', 2: '🥈 Runner-up', 3: '🥉 3rd Place' };

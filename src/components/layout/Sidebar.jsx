@@ -14,6 +14,40 @@ const BLUE_COLOR = {
   text: '#1a1a2e',
   border: '#e8edf5',
 };
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
+// Inject font styles once into document head
+if (typeof document !== 'undefined') {
+  const styleId = 'lufga-font-styles';
+  if (!document.getElementById(styleId)) {
+    const styleTag = document.createElement('style');
+    styleTag.id = styleId;
+    styleTag.innerHTML = lufgaFontStyle;
+    document.head.appendChild(styleTag);
+  }
+}
 
 const SidebarItem = ({ 
   icon, 
@@ -86,7 +120,8 @@ const SidebarItem = ({
           backgroundColor: active ? BLUE_COLOR.activeBg : 'transparent',
           transition: 'all 0.2s ease',
           fontSize: '14px',
-          fontWeight: active ? 600 : 500,
+          fontFamily: "'Lufga', sans-serif",
+          fontWeight: active ? 700 : 400,
           position: 'relative',
         }}
         onMouseEnter={(e) => {
@@ -270,6 +305,7 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
               <span style={{
                 color: BLUE_COLOR.bg,
                 fontSize: '18px',
+                fontFamily: "'Lufga', sans-serif",
                 fontWeight: 700,
                 letterSpacing: '0.5px',
               }}>
@@ -364,21 +400,6 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
           ))}
         </SidebarItem>
 
-        {/* <SidebarItem
-          icon="📜"
-          label="Rules"
-          active={activeTab === 'rules'}
-          onClick={() => setActiveTab('rules')}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          icon="🚫"
-          label="Ban Management"
-          active={activeTab === 'bans'}
-          onClick={() => setActiveTab('bans')}
-          collapsed={collapsed}
-        /> */}
       </div>
 
       {/* Profile Section - With Dropdown */}
@@ -424,7 +445,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                   justifyContent: 'center',
                   color: '#ffffff',
                   fontSize: '14px',
-                  fontWeight: 600,
+                  fontFamily: "'Lufga', sans-serif",
+                  fontWeight: 700,
                   flexShrink: 0,
                 }}
               >
@@ -433,8 +455,9 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ 
                   color: BLUE_COLOR.text, 
-                  fontSize: '13px', 
-                  fontWeight: 500,
+                  fontSize: '13px',
+                  fontFamily: "'Lufga', sans-serif",
+                  fontWeight: 400,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -444,6 +467,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                 <div style={{ 
                   color: '#8a8aa8', 
                   fontSize: '11px',
+                  fontFamily: "'Lufga', sans-serif",
+                  fontWeight: 400,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -488,7 +513,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                 >
                   <div
                     style={{
-                      fontWeight: 600,
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 700,
                       fontSize: '14px',
                       color: '#1a1a2e',
                       marginBottom: '2px',
@@ -499,6 +525,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                   <div
                     style={{
                       fontSize: '12px',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                       color: '#8a8aa8',
                     }}
                   >
@@ -508,7 +536,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                     style={{
                       fontSize: '11px',
                       color: '#8a8aa8',
-                      fontWeight: 500,
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                       marginTop: '2px',
                     }}
                   >
@@ -524,6 +553,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                       style={{
                         padding: '8px 16px',
                         fontSize: '0.8rem',
+                        fontFamily: "'Lufga', sans-serif",
+                        fontWeight: 400,
                         color: '#444466',
                         cursor: 'pointer',
                         display: 'flex',
@@ -542,6 +573,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                     style={{
                       padding: '8px 16px',
                       fontSize: '0.8rem',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                       color: '#444466',
                       cursor: 'pointer',
                       display: 'flex',
@@ -559,6 +592,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                     style={{
                       padding: '8px 16px',
                       fontSize: '0.8rem',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                       color: '#444466',
                       cursor: 'pointer',
                       display: 'flex',
@@ -580,6 +615,8 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                     style={{
                       padding: '8px 16px',
                       fontSize: '0.8rem',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                       color: '#e53935',
                       cursor: 'pointer',
                       display: 'flex',

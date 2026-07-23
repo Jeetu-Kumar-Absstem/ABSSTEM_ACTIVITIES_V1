@@ -24,6 +24,26 @@ const getDefaultMaxPlayers = (gameId, games) => {
   return game?.maxPlayers || 4;
 };
 
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
+const LUFGA_REGULAR = "'Lufga', sans-serif";
+const LUFGA_BOLD    = "'Lufga', sans-serif";
+
 const SlotMasterPage = () => {
   const [slots, setSlots] = useState(SLOTS);
   const [games, setGames] = useState(GAMES);
@@ -180,9 +200,10 @@ const SlotMasterPage = () => {
   };
 
   return (
-    <div className="clay-card">
+    <div className="clay-card" style={{ fontFamily: LUFGA_REGULAR, fontWeight: 400 }}>
+      <style>{lufgaFontStyle}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 600, color: '#000000' }}>
+        <h2 style={{ fontSize: '2rem', fontWeight: 700, color: '#000000', fontFamily: LUFGA_BOLD }}>
           Slot Master — Time Slot Configuration
         </h2>
         {canManageSlots ? (
@@ -196,7 +217,7 @@ const SlotMasterPage = () => {
             + Add Slot
           </button>
         ) : (
-          <span style={{ fontSize: '0.72rem', color: '#8888aa', fontStyle: 'italic' }}>
+          <span style={{ fontSize: '0.72rem', color: '#8888aa', fontStyle: 'italic', fontFamily: LUFGA_REGULAR }}>
             View only
           </span>
         )}
@@ -204,7 +225,7 @@ const SlotMasterPage = () => {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
-        <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: LUFGA_REGULAR }}>
           Game:
           <select 
             className="clay-select" 
@@ -219,7 +240,7 @@ const SlotMasterPage = () => {
           </select>
         </label>
         
-        <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: LUFGA_REGULAR }}>
           Day:
           <select 
             className="clay-select" 
@@ -262,6 +283,7 @@ const SlotMasterPage = () => {
         fontSize: '0.7rem', 
         marginBottom: '12px',
         color: '#444466',
+        fontFamily: LUFGA_REGULAR,
       }}>
         Total Record(s) Found: {filteredSlots.length} slots
         {selectedGame !== 'all' && ` · Game: ${getGameName(selectedGame)}`}
@@ -269,63 +291,63 @@ const SlotMasterPage = () => {
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem', fontFamily: LUFGA_REGULAR }}>
           <thead>
             <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>S.No</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Slot Code</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Slot Name</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Time</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Duration</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Applies To</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 500, color: '#444466' }}>Max</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Active</th>
-              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, color: '#444466' }}>Action</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>S.No</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Slot Code</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Slot Name</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Time</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Duration</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Applies To</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Max</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Active</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#444466', fontFamily: LUFGA_BOLD }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: '20px', color: '#8888aa' }}>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '20px', color: '#8888aa', fontFamily: LUFGA_REGULAR }}>
                   ⏳ Loading slots...
                 </td>
               </tr>
             ) : filteredSlots.length === 0 ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: '20px', color: '#8888aa' }}>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '20px', color: '#8888aa', fontFamily: LUFGA_REGULAR }}>
                   No slots found. Click "Add Slot" to create one.
                 </td>
               </tr>
             ) : (
               filteredSlots.map((slot, index) => (
                 <tr key={slot.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-                  <td style={{ padding: '8px 10px', color: '#444466' }}>{index + 1}</td>
-                  <td style={{ padding: '8px 10px', color: '#1a3c6e', fontWeight: 500 }}>
+                  <td style={{ padding: '8px 10px', color: '#444466', fontFamily: LUFGA_REGULAR }}>{index + 1}</td>
+                  <td style={{ padding: '8px 10px', color: '#1a3c6e', fontWeight: 700, fontFamily: LUFGA_BOLD }}>
                     SLT-{String(slot.id || index + 1).padStart(2, '0')}
                   </td>
-                  <td style={{ padding: '8px 10px', color: '#1e1e2f', fontWeight: 500 }}>
+                  <td style={{ padding: '8px 10px', color: '#1e1e2f', fontWeight: 700, fontFamily: LUFGA_BOLD }}>
                     {slot.label || `Slot ${index + 1}`}
                   </td>
-                  <td style={{ padding: '8px 10px', color: '#444466' }}>
+                  <td style={{ padding: '8px 10px', color: '#444466', fontFamily: LUFGA_REGULAR }}>
                     {slot.time || `${slot.start_time || '11:00'}–${slot.end_time || '11:30'}`}
                   </td>
-                  <td style={{ padding: '8px 10px', color: '#444466' }}>
+                  <td style={{ padding: '8px 10px', color: '#444466', fontFamily: LUFGA_REGULAR }}>
                     {slot.duration || '30 min'}
                   </td>
-                  <td style={{ padding: '8px 10px' }}>
+                  <td style={{ padding: '8px 10px', fontFamily: LUFGA_REGULAR }}>
                     <span className="clay-badge clay-badge-navy">
                       {slot.game ? getGameName(slot.game) : 'All Games'} · {slot.day ? slot.day : 'Mon–Fri'}
                     </span>
                   </td>
-                  <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#1e1e2f' }}>
+                  <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#1e1e2f', fontFamily: LUFGA_BOLD }}>
                     {selectedGameMaxPlayers || slot.max_players || 4}
                   </td>
-                  <td style={{ padding: '8px 10px' }}>
+                  <td style={{ padding: '8px 10px', fontFamily: LUFGA_REGULAR }}>
                     <span className={slot.active === false ? 'clay-badge clay-badge-red' : 'clay-badge clay-badge-green'}>
                       {slot.active === false ? '✕ Inactive' : '✓ Active'}
                     </span>
                   </td>
-                  <td style={{ padding: '8px 10px' }}>
+                  <td style={{ padding: '8px 10px', fontFamily: LUFGA_REGULAR }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       {canManageSlots ? (
                         <>
@@ -348,7 +370,7 @@ const SlotMasterPage = () => {
                           </button>
                         </>
                       ) : (
-                        <span style={{ fontSize: '0.65rem', color: '#8888aa' }}>Read only</span>
+                        <span style={{ fontSize: '0.65rem', color: '#8888aa', fontFamily: LUFGA_REGULAR }}>Read only</span>
                       )}
                     </div>
                   </td>
@@ -424,7 +446,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
         background: 'rgba(255,255,255,0.95)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e1e2f', fontFamily: LUFGA_BOLD }}>
             {slot ? '✏️ Edit Slot' : '➕ Add New Slot'}
           </h3>
           <button 
@@ -443,7 +465,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Slot Name <span style={{ color: '#e53935' }}>*</span>
             </label>
             <input
@@ -457,7 +479,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
                 Start Time <span style={{ color: '#e53935' }}>*</span>
               </label>
               <input
@@ -469,7 +491,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
                 End Time <span style={{ color: '#e53935' }}>*</span>
               </label>
               <input
@@ -483,7 +505,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Applies To Game
             </label>
             <select
@@ -506,7 +528,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Applies To Day
             </label>
             <select
@@ -525,7 +547,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
                 Max Players
               </label>
               <input
@@ -538,13 +560,13 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
                 disabled={String(formData.game).toLowerCase() === 'chess'}
               />
               {String(formData.game).toLowerCase() === 'chess' && (
-                <div style={{ marginTop: '4px', fontSize: '0.65rem', color: '#8888aa' }}>
+                <div style={{ marginTop: '4px', fontSize: '0.65rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif" }}>
                   Chess is fixed to 2 players.
                 </div>
               )}
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
                 Duration
               </label>
               <select
@@ -560,7 +582,7 @@ const AddEditSlotModal = ({ slot, games, onSave, onClose }) => {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 400, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Active
             </label>
             <select

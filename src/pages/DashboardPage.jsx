@@ -10,6 +10,33 @@ import {
   getWeekRange,
 } from '../utils/helpers';
 
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
+if (typeof document !== 'undefined') {
+  const styleId = 'lufga-font-styles';
+  if (!document.getElementById(styleId)) {
+    const styleTag = document.createElement('style');
+    styleTag.id = styleId;
+    styleTag.innerHTML = lufgaFontStyle;
+    document.head.appendChild(styleTag);
+  }
+}
+
 const DashboardPage = () => {
   const {
     selectedGame,
@@ -380,14 +407,15 @@ const DashboardPage = () => {
             <div style={{ 
               fontSize: '2rem', 
               color: '#000000', 
-              fontWeight: 600,
+              fontFamily: "'Lufga', sans-serif",
+              fontWeight: 400,
               marginBottom: '2px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
             }}>
    
-              Welcome back, <span style={{ color: '#080b5c', fontWeight: 700 }}>
+              Welcome back, <span style={{ color: '#080b5c', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
                 {getUserDisplayName()}
 
                 <span style={{ fontSize: '1.75rem' }}> 👋</span>
@@ -400,7 +428,7 @@ const DashboardPage = () => {
             {/* <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
               Employee activity at a glance
             </h1> */}
-            <div style={{ fontSize: '0.8rem', color: '#8888aa' }}>
+            <div style={{ fontSize: '0.8rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               {formatDate(currentDate)} • Week: {weekLabel}
             </div>
           </div>
@@ -487,6 +515,7 @@ const DashboardPage = () => {
                       <div style={{
                         fontSize: '0.5rem',
                         color: '#1a3c6e',
+                        fontFamily: "'Lufga', sans-serif",
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.08em',
@@ -501,7 +530,8 @@ const DashboardPage = () => {
                       <div style={{
                         fontSize: '0.5rem',
                         color: '#8888aa',
-                        fontWeight: 600,
+                        fontFamily: "'Lufga', sans-serif",
+                        fontWeight: 400,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
                         marginBottom: '2px',
@@ -513,6 +543,7 @@ const DashboardPage = () => {
                     {/* Match Title */}
                     <div style={{
                       fontSize: '0.8rem',
+                      fontFamily: "'Lufga', sans-serif",
                       fontWeight: 700,
                       color: currentMatch.isUserInMatch || currentMatch.isUserBooking ? '#1a3c6e' : '#1a1a2e',
                       marginBottom: '1px',
@@ -530,6 +561,8 @@ const DashboardPage = () => {
                     <div style={{
                       fontSize: '0.6rem',
                       color: '#8888aa',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
@@ -654,7 +687,8 @@ const DashboardPage = () => {
                 color: '#1a1a2e',
                 padding: '8px 18px',
                 borderRadius: '999px',
-                fontWeight: 500,
+                fontFamily: "'Lufga', sans-serif",
+                fontWeight: 400,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -709,7 +743,8 @@ const DashboardPage = () => {
                         fontSize: '13px',
                         color: isActive ? '#080b5c' : '#1a1a2e',
                         backgroundColor: isActive ? '#e8edf5' : 'transparent',
-                        fontWeight: isActive ? 600 : 400,
+                        fontFamily: "'Lufga', sans-serif",
+                        fontWeight: isActive ? 700 : 400,
                         transition: 'all 0.15s ease',
                         display: 'flex',
                         alignItems: 'center',
@@ -771,10 +806,10 @@ const DashboardPage = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
         {/* Today's Bookings - 80% with 5 slots per row */}
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Today&apos;s bookings
           </div>
-          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
             {selectedGameRecord.name} on {currentDayName}
           </h2>
 
@@ -811,16 +846,18 @@ const DashboardPage = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ 
-                        fontSize: '0.7rem', 
+                        fontSize: '0.7rem',
+                        fontFamily: "'Lufga', sans-serif",
                         fontWeight: 700, 
                         color: isFull ? '#c62828' : '#1e1e2f',
                       }}>
                         {slot.label}
                       </div>
-                      <div style={{ fontSize: '0.55rem', color: '#8888aa' }}>{slot.time}</div>
+                      <div style={{ fontSize: '0.55rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{slot.time}</div>
                     </div>
                     <div style={{ 
-                      fontSize: '0.7rem', 
+                      fontSize: '0.7rem',
+                      fontFamily: "'Lufga', sans-serif",
                       fontWeight: 700, 
                       color: isFull ? '#c62828' : hasBooking ? '#1a3c6e' : '#8888aa',
                       background: isFull ? 'rgba(198,40,40,0.1)' : hasBooking ? 'rgba(26,60,110,0.08)' : 'transparent',
@@ -841,7 +878,8 @@ const DashboardPage = () => {
                             color: 'white',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            fontWeight: 500,
+                            fontFamily: "'Lufga', sans-serif",
+                            fontWeight: 400,
                           }}
                         >
                           {player.name}
@@ -855,6 +893,8 @@ const DashboardPage = () => {
                       color: '#b0b0b0', 
                       marginTop: '6px',
                       fontStyle: 'italic',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 400,
                     }}>
                       Empty
                     </div>
@@ -867,10 +907,10 @@ const DashboardPage = () => {
 
         {/* Upcoming Events - 20% */}
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Upcoming Events
           </div>
-          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
             What's next
           </h2>
 
@@ -887,13 +927,13 @@ const DashboardPage = () => {
                     borderLeft: `3px solid #1a3c6e`,
                   }}
                 >
-                  <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '0.55rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1a3c6e', marginBottom: '2px' }}>
                     {eventDate}
                   </div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e1e2f' }}>
+                  <div style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f' }}>
                     {event.title}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8888aa', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400, marginTop: '2px' }}>
                     {event.event_type?.charAt(0).toUpperCase() + event.event_type?.slice(1) || 'Event'}
                   </div>
                 </div>
@@ -914,14 +954,14 @@ const DashboardPage = () => {
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
             <div>
-              <div style={{ fontSize: '0.72rem', color: '#01010f', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <div style={{ fontSize: '0.72rem', color: '#01010f', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
                 Leaderboard
               </div>
-              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: '#1e1e2f' }}>
+              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
                 Points and Ranking
               </h2>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#666' }}>
+            <div style={{ fontSize: '0.72rem', color: '#666', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Points: win = 4, draw = 2, loss = 1
             </div>
           </div>
@@ -1092,10 +1132,10 @@ const DashboardPage = () => {
         {/* Quick Actions - 20% (Admin Only) */}
         {isAdmin && isAdmin() ? (
           <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-            <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Quick Actions
             </div>
-            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f' }}>
+            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
               Quick Actions
             </h2>
 
@@ -1143,8 +1183,8 @@ const QuickActionButton = ({ icon, label, onClick }) => {
         width: '100%',
         fontSize: '0.7rem',
         color: '#1a1a2e',
-        fontWeight: 500,
-        fontFamily: 'inherit',
+        fontFamily: "'Lufga', sans-serif",
+        fontWeight: 400,
       }}
     >
       <span style={{ fontSize: '1rem' }}>{icon}</span>
@@ -1199,16 +1239,18 @@ const MetricCard = ({ label, value, caption, accent }) => {
           fontSize: '0.65rem', 
           color: hovered ? 'rgba(255,255,255,0.85)' : '#8888aa', 
           textTransform: 'uppercase', 
-          letterSpacing: '0.08em', 
-          fontWeight: 600,
+          letterSpacing: '0.08em',
+          fontFamily: "'Lufga', sans-serif",
+          fontWeight: 400,
         }}>
           {label}
         </div>
       </div>
 
       <div style={{ 
-        fontSize: '2.2rem', 
-        fontWeight: 800, 
+        fontSize: '2.2rem',
+        fontFamily: "'Lufga', sans-serif",
+        fontWeight: 700, 
         color: hovered ? '#ffffff' : accent, 
         lineHeight: 1,
         letterSpacing: '-0.02em',
@@ -1220,7 +1262,9 @@ const MetricCard = ({ label, value, caption, accent }) => {
       </div>
 
       <div style={{ 
-        fontSize: '0.68rem', 
+        fontSize: '0.68rem',
+        fontFamily: "'Lufga', sans-serif",
+        fontWeight: 400,
         color: hovered ? 'rgba(255,255,255,0.8)' : '#667',
         opacity: 0.8,
         position: 'relative',
@@ -1235,11 +1279,14 @@ const MetricCard = ({ label, value, caption, accent }) => {
 const thStyle = {
   padding: '8px 10px',
   textAlign: 'left',
+  fontFamily: "'Lufga', sans-serif",
   fontWeight: 700,
 };
 
 const tdStyle = {
   padding: '8px 10px',
+  fontFamily: "'Lufga', sans-serif",
+  fontWeight: 400,
 };
 
 export default DashboardPage;
