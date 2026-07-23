@@ -4,6 +4,24 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { GAMES } from '../utils/constants';
 
+
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
 const RulesPage = () => {
   const { rules, isAdmin, addRule, updateRule, deleteRule, loadRules } = useApp();
   const { showToast } = useToast();
@@ -17,6 +35,17 @@ const RulesPage = () => {
     created_by: 'Admin',
     game: 'General'
   });
+
+  // Inject Lufga font into document head
+  useEffect(() => {
+    const styleId = 'lufga-font-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = lufgaFontStyle;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchRules = async () => {
@@ -119,18 +148,18 @@ const RulesPage = () => {
 
   if (loading) {
     return (
-      <div className="clay-card" style={{ textAlign: 'center', padding: '40px' }}>
+      <div className="clay-card" style={{ textAlign: 'center', padding: '40px', fontFamily: "'Lufga', sans-serif" }}>
         <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⏳</div>
-        <div style={{ color: '#8888aa' }}>Loading rules...</div>
+        <div style={{ color: '#8888aa', fontWeight: 400 }}>Loading rules...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       <div className="clay-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
             Activity Rules ({rules.length})
           </h2>
           {isAdmin() ? (
@@ -220,10 +249,10 @@ const RulesPage = () => {
       {/* Right sidebar */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px' }}>📋 Recent Violations</h3>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>📋 Recent Violations</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="clay-soft" style={{ padding: '10px 14px', borderRadius: '16px', borderLeft: '3px solid #e53935' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600 }}>Anil Rawat</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Anil Rawat</div>
               <div style={{ fontSize: '0.65rem', color: '#8888aa' }}>Using mobile phone during game</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.6rem', color: '#8888aa' }}>
                 <span>25 Apr 2026 · Carrom</span>
@@ -239,7 +268,7 @@ const RulesPage = () => {
         </div>
 
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px' }}>⚙️ Auto-Ban Settings</h3>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>⚙️ Auto-Ban Settings</h3>
           <div style={{ fontSize: '0.7rem', color: '#444466', marginBottom: '8px' }}>Automatically ban an employee when they accumulate violations:</div>
           <div className="clay-soft" style={{ padding: '8px 12px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
             <span>Ban after <strong>3 violations</strong> (same game)</span>
@@ -273,9 +302,11 @@ const RulesPage = () => {
             maxHeight: '90vh',
             overflowY: 'auto',
             background: 'white',
+            fontFamily: "'Lufga', sans-serif",
+            fontWeight: 400,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
                 {editingRule ? '✏️ Edit Rule' : '📝 Add New Rule'}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#8888aa' }}>✕</button>

@@ -2,10 +2,27 @@
 // Activity Planner ▸ Events ▸ Events Calendar
 // Renders a top tab bar (Events Calendar / Tournaments / Leaderboard) plus
 // a full month calendar, an Upcoming Events list and a Past Events table.
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
+
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -89,6 +106,17 @@ const EventsCalendarPage = () => {
   });
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  // Inject Lufga font into document head
+  useEffect(() => {
+    const styleId = 'lufga-font-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = lufgaFontStyle;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
 
   // Initial load happens in AppProvider; this page just reads `events` from
   // context. After addEvent/deleteEvent, AppContext already refreshes the list.
@@ -219,7 +247,7 @@ const EventsCalendarPage = () => {
   };
 
   return (
-    <div style={{ fontFamily: "'Roboto', Arial, sans-serif", fontSize: 13, color: '#212121' }}>
+    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: '#212121' }}>
       <EventsTopBar active="eventsCalendar" />
 
       {/* Stats row */}
@@ -432,7 +460,7 @@ const EventsCalendarPage = () => {
                 return (
                   <tr key={ev.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={styles.td}>
-                      <div style={{ fontWeight: 600 }}>{ev.title}</div>
+                      <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{ev.title}</div>
                       {ev.organizer && <div style={{ fontSize: '0.6rem', color: '#888' }}>by {ev.organizer}</div>}
                     </td>
                     <td style={styles.td}>{formatDateRange(ev)}</td>
@@ -453,7 +481,7 @@ const EventsCalendarPage = () => {
              style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Add New Event</h3>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Add New Event</h3>
               <button onClick={() => setShowAddModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
@@ -538,7 +566,7 @@ const EventsCalendarPage = () => {
              style={styles.modalBackdrop}>
           <div style={{ ...styles.modalCard, maxWidth: 520 }}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>
                 {EVENT_TYPE_STYLE[selectedEvent.event_type] && (
                   <span style={{
                     ...EVENT_TYPE_STYLE[selectedEvent.event_type],
@@ -586,8 +614,8 @@ const EventsCalendarPage = () => {
 
 const DetailRow = ({ label, value }) => (
   <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.6rem', padding: '0.3rem 0', borderBottom: '1px solid #f0f0f0' }}>
-    <div style={{ color: '#888', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-    <div style={{ color: '#212121' }}>{value}</div>
+    <div style={{ color: '#888', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</div>
+    <div style={{ color: '#212121', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{value}</div>
   </div>
 );
 
@@ -605,9 +633,9 @@ const styles = {
     padding: '0.7rem 0.9rem',
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
-  statLabel: { fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' },
-  statVal:   { fontSize: '1.5rem', fontWeight: 700, lineHeight: 1 },
-  statSub:   { fontSize: '0.6rem', color: '#888', marginTop: '0.18rem' },
+  statLabel: { fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  statVal:   { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1, fontFamily: "'Lufga', sans-serif" },
+  statSub:   { fontSize: '0.6rem', color: '#888', marginTop: '0.18rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
 
   gridLayout: { display: 'grid', gridTemplateColumns: '1fr 320px', gap: '0.8rem' },
 
@@ -626,7 +654,7 @@ const styles = {
     borderBottom: '1px solid #d0d0d0',
     flexWrap: 'wrap',
   },
-  calendarTitle: { fontSize: '0.95rem', fontWeight: 600, color: '#1a3c6e', minWidth: 150, textAlign: 'center' },
+  calendarTitle: { fontSize: '0.95rem', fontWeight: 600, color: '#1a3c6e', minWidth: 150, textAlign: 'center', fontFamily: "'Lufga', sans-serif" },
   navBtn: {
     background: 'white',
     border: '1px solid #d0d0d0',
@@ -637,15 +665,15 @@ const styles = {
   },
   outlineBtn: {
     background: 'white', color: '#1a3c6e', border: '1px solid #d0d0d0', borderRadius: 4,
-    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 400, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
   },
   navyBtn: {
     background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4,
-    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
   },
   dangerBtn: {
     background: '#c62828', color: 'white', border: 'none', borderRadius: 4,
-    padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+    padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
   },
 
   weekHeader: {
@@ -653,8 +681,8 @@ const styles = {
     background: '#f5f5f5', borderBottom: '1px solid #d0d0d0',
   },
   weekHeaderCell: {
-    textAlign: 'center', fontSize: '0.62rem', fontWeight: 700, color: '#888',
-    padding: '0.4rem 0', textTransform: 'uppercase',
+    textAlign: 'center', fontSize: '0.62rem', fontWeight: 600, color: '#888',
+    padding: '0.4rem 0', textTransform: 'uppercase', fontFamily: "'Lufga', sans-serif",
   },
   calendarGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' },
   calendarCell: {
@@ -666,15 +694,15 @@ const styles = {
   todayBadge: {
     width: 22, height: 22, background: '#1a3c6e', color: 'white',
     borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '0.7rem', fontWeight: 700, marginBottom: '0.2rem',
+    fontSize: '0.7rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif",
   },
-  cellDay: { fontSize: '0.72rem', fontWeight: 600, marginBottom: '0.2rem' },
+  cellDay: { fontSize: '0.72rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
   eventChip: {
     fontSize: '0.6rem', padding: '0.08rem 0.3rem', borderRadius: 3,
     marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden',
-    textOverflow: 'ellipsis', cursor: 'pointer', fontWeight: 500,
+    textOverflow: 'ellipsis', cursor: 'pointer', fontWeight: 400, fontFamily: "'Lufga', sans-serif",
   },
-  moreChip: { fontSize: '0.58rem', color: '#888', padding: '0.05rem 0.25rem' },
+  moreChip: { fontSize: '0.58rem', color: '#888', padding: '0.05rem 0.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
 
   legend: { display: 'flex', gap: '1rem', padding: '0.6rem 0.2rem', flexWrap: 'wrap' },
   legendItem: { display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.66rem', color: '#666' },
@@ -686,18 +714,18 @@ const styles = {
   },
   sideHeader: {
     background: '#1a3c6e', color: 'white', padding: '0.5rem 0.85rem',
-    fontSize: '0.78rem', fontWeight: 600,
+    fontSize: '0.78rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif",
   },
-  sideEmpty: { padding: '0.8rem', fontSize: '0.75rem', color: '#888' },
-  sideItem: { borderBottom: '1px solid #eee', padding: '0.7rem 0.85rem', cursor: 'pointer', transition: 'background 0.15s' },
-  sideItemTitle: { fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem' },
-  sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: '#666', marginTop: '0.2rem' },
-  miniChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 500, textTransform: 'capitalize' },
-  statusChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 600 },
-  tableChip: { padding: '0.1rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 500, textTransform: 'capitalize' },
+  sideEmpty: { padding: '0.8rem', fontSize: '0.75rem', color: '#888', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  sideItem: { borderBottom: '1px solid #eee', padding: '0.7rem 0.85rem', cursor: 'pointer', transition: 'background 0.15s', fontFamily: "'Lufga', sans-serif" },
+  sideItemTitle: { fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
+  sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: '#666', marginTop: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  miniChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 400, textTransform: 'capitalize', fontFamily: "'Lufga', sans-serif" },
+  statusChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" },
+  tableChip: { padding: '0.1rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, textTransform: 'capitalize', fontFamily: "'Lufga', sans-serif" },
 
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.65rem', color: '#444', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  td: { padding: '0.5rem 0.6rem', verticalAlign: 'top' },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.65rem', color: '#444', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 600 },
+  td: { padding: '0.5rem 0.6rem', verticalAlign: 'top', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
 
   modalBackdrop: {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300,
@@ -710,19 +738,21 @@ const styles = {
   modalHeader: {
     background: '#1a3c6e', color: 'white', padding: '0.7rem 1rem',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0',
+    fontFamily: "'Lufga', sans-serif",
   },
-  modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer' },
+  modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
   modalFooter: {
     padding: '0.7rem 1rem', borderTop: '1px solid #d0d0d0', display: 'flex',
     justifyContent: 'flex-end', gap: '0.4rem', background: '#fafafa', borderRadius: '0 0 8px 8px',
+    fontFamily: "'Lufga', sans-serif",
   },
 
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  formLabel: { fontSize: '0.7rem', fontWeight: 500, color: '#555' },
+  formLabel: { fontSize: '0.7rem', fontWeight: 600, color: '#555', fontFamily: "'Lufga', sans-serif" },
   formInput: {
     padding: '0.32rem 0.55rem', border: '1px solid #d0d0d0', borderRadius: 4,
-    fontSize: '0.75rem', fontFamily: 'inherit', color: '#212121', width: '100%',
+    fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: '#212121', width: '100%',
   },
 };
 

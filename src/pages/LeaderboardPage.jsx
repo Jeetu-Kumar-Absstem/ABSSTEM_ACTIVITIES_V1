@@ -3,10 +3,27 @@
 // Full leaderboard of all players (no top-4 limit), with podium, filters and
 // a search box. Built to replace the dashboard's "Top 4 Board" so users can
 // see everyone's rank and the breakdown behind their points.
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
+
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
@@ -35,6 +52,17 @@ const LeaderboardPage = () => {
   const [deptFilter, setDeptFilter] = useState('all');
   const [sortBy, setSortBy] = useState('rank'); // rank | points | wins | participations | recent
   const [hoveredMetric, setHoveredMetric] = useState(null);
+
+  // Inject Lufga font into document head
+  useEffect(() => {
+    const styleId = 'lufga-font-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = lufgaFontStyle;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
 
   // Initial load happens in AppProvider; this page just reads `leaderboard` from
   // context. The Refresh button below calls loadLeaderboard() to re-fetch on demand.
@@ -154,7 +182,7 @@ const LeaderboardPage = () => {
   }, [filteredRows, showToast]);
 
   return (
-    <div style={{ fontFamily: "'Roboto', Arial, sans-serif", fontSize: 13, color: '#212121' }}>
+    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: '#212121' }}>
       <EventsTopBar active="leaderboard" />
 
       {/* Header strip */}
@@ -166,21 +194,21 @@ const LeaderboardPage = () => {
         boxShadow: '0 10px 28px rgba(26,60,110,0.22)',
       }}>
         <div>
-          <div style={{ fontSize: '0.72rem', opacity: 0.78, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '0.72rem', opacity: 0.78, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Activity Leaderboard
           </div>
-          <h1 style={{ margin: '6px 0 4px', fontSize: '1.6rem', lineHeight: 1.05 }}>
+          <h1 style={{ margin: '6px 0 4px', fontSize: '1.6rem', lineHeight: 1.05, fontFamily: "'Lufga', sans-serif", fontWeight: 600 }}>
             🏆 Champions of the Floor
           </h1>
-          <div style={{ fontSize: '0.8rem', opacity: 0.88 }}>
+          <div style={{ fontSize: '0.8rem', opacity: 0.88, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Points: Win = 5 · Tournament Win = 20 · Runner-up = 15 · 3rd = 10  · Violation = −5 · No-show = −3
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {myRow && (
             <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 14px', fontSize: '0.78rem' }}>
-              <div style={{ opacity: 0.7, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>You</div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>#{myRow.rank} · {myRow.total_points} pts</div>
+              <div style={{ opacity: 0.7, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>You</div>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem', fontFamily: "'Lufga', sans-serif" }}>#{myRow.rank} · {myRow.total_points} pts</div>
             </div>
           )}
           <button onClick={exportCsv} style={styles.outlineBtn}>📤 Export CSV</button>
@@ -282,15 +310,15 @@ const LeaderboardPage = () => {
                       background: isMe ? '#fff8e1' : 'transparent',
                     }}
                   >
-                    <td style={{ ...styles.td, fontWeight: 700, color: r.rank <= 3 ? '#1a3c6e' : '#444' }}>
+                    <td style={{ ...styles.td, fontWeight: 600, color: r.rank <= 3 ? '#1a3c6e' : '#444', fontFamily: "'Lufga', sans-serif" }}>
                       {rankBadge}
                     </td>
                     <td style={styles.td}>
-                      <div style={{ fontWeight: 700 }}>{r.employee_name || r.employee_id}</div>
-                      <div style={{ fontSize: '0.62rem', color: '#888' }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
+                      <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{r.employee_name || r.employee_id}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#888', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
                     </td>
                     <td style={styles.td}>{r.department || '—'}</td>
-                    <td style={{ ...styles.td, fontWeight: 800, color: '#1a3c6e' }}>{r.total_points}</td>
+                    <td style={{ ...styles.td, fontWeight: 600, color: '#1a3c6e', fontFamily: "'Lufga', sans-serif" }}>{r.total_points}</td>
                     <td style={styles.td}>
                       <div style={{ display: 'flex', gap: 4, fontSize: '0.7rem' }}>
                         <span title="Tournament wins">🥇 {r.tournament_wins || 0}</span>
@@ -347,18 +375,18 @@ const PodiumCard = ({ row, pos, tall }) => {
         cursor: 'default',
       }}>
       <div style={{ fontSize: tall ? '2rem' : '1.4rem' }}>{style.icon}</div>
-      <div style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+      <div style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
         {style.label}
       </div>
-      <div style={{ fontWeight: 800, fontSize: tall ? '1.05rem' : '0.95rem', color: '#1e1e2f', marginBottom: 6 }}>
+      <div style={{ fontWeight: 600, fontSize: tall ? '1.05rem' : '0.95rem', color: '#1e1e2f', marginBottom: 6, fontFamily: "'Lufga', sans-serif" }}>
         {row.employee_name || row.employee_id}
       </div>
-      <div style={{ fontSize: '0.6rem', color: '#666' }}>{row.department || '—'}</div>
-      <div style={{ fontWeight: 800, color: '#1a3c6e', fontSize: tall ? '1.6rem' : '1.3rem', marginTop: 4 }}>
+      <div style={{ fontSize: '0.6rem', color: '#666', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{row.department || '—'}</div>
+      <div style={{ fontWeight: 600, color: '#1a3c6e', fontSize: tall ? '1.6rem' : '1.3rem', marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>
         {row.total_points}
       </div>
-      <div style={{ fontSize: '0.6rem', color: '#888' }}>points</div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4, fontSize: '0.6rem' }}>
+      <div style={{ fontSize: '0.6rem', color: '#888', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>points</div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4, fontSize: '0.6rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
         <span>🥇{row.tournament_wins || 0}</span>
         <span>W{row.match_wins || 0}</span>
         <span>P{row.participations || 0}</span>
@@ -386,26 +414,26 @@ const MetricCard = ({ label, value, sub, accent, hovered, onMouseEnter, onMouseL
       cursor: 'default',
     }}
   >
-    <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: accent, lineHeight: 1.1, marginTop: 4 }}>{value}</div>
-    <div style={{ fontSize: '0.6rem', color: '#888', marginTop: 4 }}>{sub}</div>
+    <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</div>
+    <div style={{ fontSize: '1.5rem', fontWeight: 600, color: accent, lineHeight: 1.1, marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>{value}</div>
+    <div style={{ fontSize: '0.6rem', color: '#888', marginTop: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{sub}</div>
   </div>
 );
 
 const styles = {
   card: { background: 'white', borderRadius: 16, padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid rgba(200,210,230,0.5)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' },
-  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 700, color: '#1e1e2f' },
-  outlineBtn: { background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' },
+  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" },
+  outlineBtn: { background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.6rem', marginBottom: 14 },
   podium: { display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: '0.8rem', alignItems: 'end', padding: '0.4rem 0 0' },
   filterBar: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' },
-  filterInput: { padding: '0.32rem 0.6rem', border: '1px solid #d0d0d0', borderRadius: 4, fontSize: '0.75rem', fontFamily: 'inherit', color: '#212121', background: 'white', minWidth: 130, flex: 1 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' },
+  filterInput: { padding: '0.32rem 0.6rem', border: '1px solid #d0d0d0', borderRadius: 4, fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: '#212121', background: 'white', minWidth: 130, flex: 1 },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', fontFamily: "'Lufga', sans-serif" },
   theadRow: { background: 'rgba(26,60,110,0.05)' },
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700, color: '#444', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.04em' },
-  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle' },
-  tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 500, display: 'inline-block' },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 600, color: '#444', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif" },
+  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block', fontFamily: "'Lufga', sans-serif" },
 };
 
 export default LeaderboardPage;

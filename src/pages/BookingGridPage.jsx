@@ -14,6 +14,23 @@ import BookSlotModal from '../components/modals/BookSlotModal';
 import useViewport from '../hooks/useViewport';
 import { filterBookingsToWeek, getDayName } from '../utils/helpers';
 
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
 const BookingGridPage = () => {
   const {
     bookings,
@@ -32,6 +49,17 @@ const BookingGridPage = () => {
   const [selectedDay, setSelectedDay] = useState(DAYS[0]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
   const weekBookings = filterBookingsToWeek(bookings, currentDate);
+
+  // Inject Lufga font into document head
+  useEffect(() => {
+    const styleId = 'lufga-font-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = lufgaFontStyle;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
 
   // Refresh bookings when component mounts
   useEffect(() => {
@@ -115,9 +143,9 @@ const BookingGridPage = () => {
   };
 
   return (
-    <div>
+    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 700, color: '#0f0fb2' }}>Book Your Slot</h1>
+        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 600, color: '#0f0fb2', fontFamily: "'Lufga', sans-serif" }}>Book Your Slot</h1>
       </div>
 
       <StatsRow />
@@ -145,7 +173,8 @@ const BookingGridPage = () => {
                 borderCollapse: 'separate',
                 borderSpacing: '0',
                 fontSize: '0.7rem',
-                background: '#d0cece'
+                background: '#d0cece',
+                fontFamily: "'Lufga', sans-serif"
               }}>
               <thead>
                 <tr
@@ -153,13 +182,13 @@ const BookingGridPage = () => {
                     background: '#cacdd2'
                   }}>
                   <th style={{ padding: '14px', textAlign: 'center', fontWeight: 600, color: '#fff', position: 'sticky', left: 0, background: '#1e3a8a', zIndex: 2, minWidth: '120px',
-                        border: '1px solid #bfdbfe' }}>Day / Time</th>
+                        border: '1px solid #bfdbfe', fontFamily: "'Lufga', sans-serif" }}>Day / Time</th>
                   {SLOTS.map(s => (
-                    <th key={s.id} style={{ padding: '12px', textAlign: 'center', fontWeight: 700, fontSize: '0.6rem', color: '#1e3a8a', minWidth: '110px',
+                    <th key={s.id} style={{ padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '0.6rem', color: '#1e3a8a', minWidth: '110px',
                       background: '#c1f6bc',
-                      border: '1px solid #bfdbfe' }}>
+                      border: '1px solid #bfdbfe', fontFamily: "'Lufga', sans-serif" }}>
                       {s.label}
-                      <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.6 }}>{s.time}</span>
+                      <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.6, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{s.time}</span>
                     </th>
                   ))}
                 </tr>
@@ -174,13 +203,15 @@ const BookingGridPage = () => {
                     }}>
                       <td style={{
                         padding: '14px',
-                        fontWeight: 600,
+                        fontWeight: 400,
                         color: isToday ? '#1a3c6e' : '#1a3c6e',
                         position: 'sticky',
                         left: 0,
                         background: isToday ? '#f7ee86' : '#f8fbff',
                         zIndex: 4,
-                        border: '1px solid #bfdbfe'
+                        border: '1px solid #bfdbfe',
+                        fontFamily: "'Lufga', sans-serif",
+                        fontWeight: 400
                       }}>
                         {day} {isToday && '📍'}
                       </td>
