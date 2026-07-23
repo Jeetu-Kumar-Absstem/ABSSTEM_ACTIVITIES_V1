@@ -403,24 +403,36 @@ const DashboardPage = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>
-            {/* Welcome message */}
-            <div style={{ 
-              fontSize: '2rem', 
-              color: '#000000', 
-              fontFamily: "'Lufga', sans-serif",
-              fontWeight: 400,
-              marginBottom: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-   
-              Welcome back, <span style={{ color: '#080b5c', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
-                {getUserDisplayName()}
+      {/* Welcome message */}
+<div
+  style={{
+    fontSize: '2rem',
+    color: '#000000',
+    fontFamily: "'Lufga', sans-serif",
+    fontWeight: 400,
+    marginBottom: '2px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    lineHeight: '1.2',
+  }}
+>
+  <span>Welcome back,</span>
 
-                <span style={{ fontSize: '1.75rem' }}> 👋</span>
-              </span>
-            </div>
+  <span
+    style={{
+      color: '#080b5c',
+      fontFamily: "'Lufga', sans-serif",
+      fontWeight: 700,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+    }}
+  >
+    {getUserDisplayName()}
+    <span style={{ fontSize: '1.75rem' }}>👋</span>
+  </span>
+</div>
             
             {/* <div style={{ fontSize: '0.75rem', color: '#6a6a8a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>
               PLANNING DASHBOARD
