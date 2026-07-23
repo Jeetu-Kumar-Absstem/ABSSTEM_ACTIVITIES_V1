@@ -1,6 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
 
 const ADMIN_TABS = [
   { id: 'registration-approval', label: 'Registration Approval' },
@@ -49,8 +66,18 @@ const AdminPage = () => {
     }
   };
 
+  useEffect(() => {
+    const styleId = 'lufga-font-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = lufgaFontStyle;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
+
   return (
-    <div style={{ display: 'grid', gap: '18px' }}>
+    <div style={{ display: 'grid', gap: '18px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       <div
         className="clay-card"
         style={{
@@ -60,7 +87,7 @@ const AdminPage = () => {
           color: 'white',
         }}
       >
-        <div style={{ fontSize: '0.78rem', opacity: 0.8 }}>Admin</div>
+        <div style={{ fontSize: '0.78rem', opacity: 0.8, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Admin</div>
         {/* <h1 style={{ margin: '6px 0 0 0', fontSize: '1.8rem', fontWeight: 800 }}>Registration Approval</h1>
         <div style={{ marginTop: '8px', fontSize: '0.85rem', opacity: 0.9 }}>
           Review pending tournament requests and approve them when space is available.
@@ -80,10 +107,11 @@ const AdminPage = () => {
                   borderRadius: '999px',
                   padding: '10px 16px',
                   fontSize: '0.8rem',
-                  fontWeight: 700,
+                  fontWeight: active ? 600 : 400,
                   cursor: 'pointer',
                   color: active ? '#fff' : '#1a3c6e',
                   background: active ? '#1a3c6e' : 'rgba(26,60,110,0.08)',
+                  fontFamily: "'Lufga', sans-serif",
                 }}
               >
                 {tab.label}
@@ -94,11 +122,11 @@ const AdminPage = () => {
 
         {activeTab === 'registration-approval' && (
           <div>
-            <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: '#667' }}>
-              Pending requests: <strong>{pendingRequests.length}</strong>
+            <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: '#667', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+              Pending requests: <strong style={{ fontWeight: 600 }}>{pendingRequests.length}</strong>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif" }}>
                 <thead>
                   <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
                     {['Emp ID', 'Tournament Code', 'Tournament Name', 'Game', 'Format', 'Status', 'Action'].map((head) => (
@@ -107,9 +135,10 @@ const AdminPage = () => {
                         style={{
                           padding: '10px 12px',
                           textAlign: 'left',
-                          fontWeight: 700,
+                          fontWeight: 600,
                           color: '#444466',
                           borderBottom: '1px solid rgba(200,210,230,0.3)',
+                          fontFamily: "'Lufga', sans-serif",
                         }}
                       >
                         {head}
@@ -127,9 +156,9 @@ const AdminPage = () => {
                   ) : (
                     pendingRequests.map((row) => (
                       <tr key={row.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.22)' }}>
-                        <td style={{ padding: '12px' }}>
-                          <strong>{row.employee_id}</strong>
-                          <div style={{ fontSize: '0.66rem', color: '#888', marginTop: '2px' }}>
+                        <td style={{ padding: '12px', fontFamily: "'Lufga', sans-serif" }}>
+                          <strong style={{ fontWeight: 600 }}>{row.employee_id}</strong>
+                          <div style={{ fontSize: '0.66rem', color: '#888', marginTop: '2px', fontWeight: 400 }}>
                             {getEmployeeName(row.employee_id)}
                           </div>
                         </td>
@@ -146,8 +175,9 @@ const AdminPage = () => {
                               borderRadius: '999px',
                               background: 'rgba(249,168,37,0.12)',
                               color: '#b26a00',
-                              fontWeight: 700,
+                              fontWeight: 600,
                               fontSize: '0.68rem',
+                              fontFamily: "'Lufga', sans-serif",
                             }}
                           >
                             Pending
@@ -162,10 +192,11 @@ const AdminPage = () => {
                               borderRadius: '999px',
                               padding: '8px 14px',
                               fontSize: '0.72rem',
-                              fontWeight: 700,
+                              fontWeight: 600,
                               cursor: approvingId === row.id ? 'wait' : 'pointer',
                               color: '#fff',
                               background: approvingId === row.id ? '#888' : '#1a3c6e',
+                              fontFamily: "'Lufga', sans-serif",
                             }}
                           >
                             {approvingId === row.id ? 'Approving...' : 'Approve'}

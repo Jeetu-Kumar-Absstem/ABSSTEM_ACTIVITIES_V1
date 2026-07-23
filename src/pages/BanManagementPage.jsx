@@ -5,6 +5,23 @@ import { useToast } from '../context/ToastContext';
 import { supabase } from '../utils/supabase';
 import { GAMES } from '../utils/constants';
 
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+
 const normalizeGameValue = (value) =>
   String(value || '')
     .trim()
@@ -82,6 +99,16 @@ const BanManagementPage = () => {
       ]);
     }
   };
+
+  useEffect(() => {
+    const styleId = 'lufga-font-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = lufgaFontStyle;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
 
   useEffect(() => {
     loadEmployees();
@@ -284,9 +311,9 @@ const BanManagementPage = () => {
   };
 
   return (
-    <div>
+    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 600, color: '#1e1e2f' }}>
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
           🚫 Ban Management ({bans.length} total)
         </h2>
         {isAdmin() && (
@@ -307,7 +334,7 @@ const BanManagementPage = () => {
         {/* Active Bans */}
         <div className="clay-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
               🔴 Active Bans ({activeBans.length})
             </h3>
           </div>
@@ -347,7 +374,7 @@ const BanManagementPage = () => {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{ban.employee}</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.8rem', fontFamily: "'Lufga', sans-serif" }}>{ban.employee}</div>
                     <div style={{ fontSize: '0.6rem', color: '#8888aa' }}>
                       ID: {ban.employee_id} · Game: {resolveGameLabel(ban.game, availableGames)}
                     </div>
@@ -397,33 +424,33 @@ const BanManagementPage = () => {
 
         {/* Ban History */}
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
             📜 Ban History ({expiredBans.length})
           </h3>
           <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem', fontFamily: "'Lufga', sans-serif" }}>
               <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 2 }}>
                 <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
-                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Employee</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Game</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Until</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Status</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Employee</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Game</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Until</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {expiredBans.length === 0 ? (
                   <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#8888aa' }}>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
                       No ban history found.
                     </td>
                   </tr>
                 ) : (
                   expiredBans.map(ban => (
                     <tr key={ban.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-                      <td style={{ padding: '6px 8px' }}>{ban.employee}</td>
-                      <td style={{ padding: '6px 8px' }}>{resolveGameLabel(ban.game, availableGames)}</td>
-                      <td style={{ padding: '6px 8px' }}>{new Date(ban.until_date).toLocaleDateString()}</td>
-                      <td style={{ padding: '6px 8px' }}>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{ban.employee}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{resolveGameLabel(ban.game, availableGames)}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{new Date(ban.until_date).toLocaleDateString()}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
                         {getBanStatusBadge(ban)}
                       </td>
                     </tr>
@@ -437,7 +464,7 @@ const BanManagementPage = () => {
 
       {isAdmin() ? (
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
             🔍 Quick Ban Check
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -495,7 +522,8 @@ const BanManagementPage = () => {
               }}>
                 <div style={{ 
                   fontWeight: 600, 
-                  color: checkResult.type === 'banned' ? '#c62828' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa' 
+                  color: checkResult.type === 'banned' ? '#c62828' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa',
+                  fontFamily: "'Lufga', sans-serif"
                 }}>
                   {checkResult.type === 'banned' ? '🚫 BANNED' : checkResult.type === 'allowed' ? '✅ ALLOWED' : 'ℹ️ INFO'}
                 </div>
@@ -590,9 +618,11 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
         maxHeight: '90vh',
         overflowY: 'auto',
         background: 'rgba(255,255,255,0.95)',
+        fontFamily: "'Lufga', sans-serif",
+        fontWeight: 400,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f' }}>🚫 Issue Ban</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>🚫 Issue Ban</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#8888aa' }}>✕</button>
         </div>
 
@@ -610,7 +640,7 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Employee <span style={{ color: '#e53935' }}>*</span>
             </label>
             <select
@@ -628,7 +658,7 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Game <span style={{ color: '#e53935' }}>*</span>
             </label>
             <select
@@ -648,7 +678,7 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
                 From Date <span style={{ color: '#e53935' }}>*</span>
               </label>
               <input
@@ -660,7 +690,7 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
                 Until Date <span style={{ color: '#e53935' }}>*</span>
               </label>
               <input
@@ -674,7 +704,7 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
               Reason <span style={{ color: '#e53935' }}>*</span>
             </label>
             <textarea
