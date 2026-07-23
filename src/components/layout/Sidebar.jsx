@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { LogOut } from 'lucide-react';
 
 // 👇 Replace with your actual logo path
-import absstemLogo from '/public/absstem_logo_with_name.png';
+import absstemLogo from '../../assets/absstem_game_light_logo.png';
 
 const BLUE_COLOR = {
   bg: '#080b5c',
@@ -292,25 +292,21 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
       >
         {!collapsed ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px',
+            }}>
               <img
                 src={absstemLogo}
                 alt="Absstem Arena"
                 style={{
-                  height: '40px',
+                  height: '50px',
                   width: 'auto',
                   objectFit: 'contain',
+                  display: 'block',
                 }}
               />
-              <span style={{
-                color: BLUE_COLOR.bg,
-                fontSize: '18px',
-                fontFamily: "'Lufga', sans-serif",
-                fontWeight: 700,
-                letterSpacing: '0.5px',
-              }}>
-                ARENA
-              </span>
             </div>
             <button
               onClick={() => handleToggle(true)}
@@ -331,26 +327,47 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
             </button>
           </>
         ) : (
-          <button
-            onClick={() => handleToggle(false)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: BLUE_COLOR.bg,
-              fontSize: '20px',
-              cursor: 'pointer',
-              padding: '4px',
-              opacity: 0.6,
-              transition: 'opacity 0.2s',
-              width: '100%',
+          <>
+            <div style={{
               display: 'flex',
-              justifyContent: 'center',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-          >
-            ▶
-          </button>
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              width: '100%',
+            }}>
+              <img
+                src={absstemLogo}
+                alt="Absstem Arena"
+                style={{
+                  height: '40px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <button
+              onClick={() => handleToggle(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: BLUE_COLOR.bg,
+                fontSize: '20px',
+                cursor: 'pointer',
+                padding: '4px',
+                opacity: 0.6,
+                transition: 'opacity 0.2s',
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                marginTop: '8px',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+            >
+              ▶
+            </button>
+          </>
         )}
       </div>
 

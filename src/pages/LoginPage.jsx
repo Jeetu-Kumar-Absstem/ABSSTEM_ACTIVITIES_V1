@@ -1,8 +1,34 @@
 // src/pages/LoginPage.jsx
 import React, { useState } from 'react';
+import absstemLogo from '../assets/absstem_game_light_logo.png';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../context/ToastContext';
 import { validateEmpId, formatEmpId, validatePassword } from '../utils/validators';
+
+const lufgaFontStyle = `
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Lufga';
+    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+  *, *::before, *::after {
+    font-family: 'Lufga', sans-serif;
+    font-weight: 400;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Lufga', sans-serif;
+    font-weight: 600;
+  }
+`;
 
 // Eye icons as inline SVG components
 const EyeIcon = () => (
@@ -285,6 +311,8 @@ const LoginPage = ({ onLogin }) => {
     padding: '20px',
     position: 'relative',
     zIndex: 1,
+    fontFamily: "'Lufga', sans-serif",
+    fontWeight: 400,
   };
 
   const cardStyle = {
@@ -306,7 +334,7 @@ const LoginPage = ({ onLogin }) => {
           {forgotSuccess ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📬</div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '8px' }}>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: 600, color: '#1a3c6e', marginBottom: '8px', fontFamily: "'Lufga', sans-serif" }}>
                 Check Your Email
               </h1>
               <p style={{ fontSize: '0.82rem', color: '#555', lineHeight: 1.6, marginBottom: '8px' }}>
@@ -340,7 +368,7 @@ const LoginPage = ({ onLogin }) => {
             <>
               <div style={{ textAlign: 'center', marginBottom: '28px' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🔑</div>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a3c6e' }}>Forgot Password?</h1>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a3c6e', fontFamily: "'Lufga', sans-serif" }}>Forgot Password?</h1>
                 <p style={{ fontSize: '0.8rem', color: '#8888aa', marginTop: '4px' }}>
                   Enter your Employee ID and we'll send the reset link to your registered email.
                 </p>
@@ -428,8 +456,8 @@ const LoginPage = ({ onLogin }) => {
     <div style={containerStyle}>
       <div className="clay" style={cardStyle}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎮</div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1a3c6e' }}>
+          <img src={absstemLogo} alt="Absstem Logo" style={{ height: '64px', marginBottom: '8px', objectFit: 'contain' }} />
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#4d4d4f', fontFamily: "'Lufga', sans-serif" }}>
             {isRegister ? 'Create Account' : 'Welcome Back'}
           </h1>
           <p style={{ fontSize: '0.8rem', color: '#8888aa', marginTop: '4px' }}>
