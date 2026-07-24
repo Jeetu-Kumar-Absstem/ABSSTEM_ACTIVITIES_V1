@@ -30,6 +30,11 @@ import {
 } from '../utils/helpers';
 
 const AppContext = createContext();
+const THEME_STORAGE_KEY = 'absstem-theme';
+const THEME_MODES = {
+  light: 'light',
+  dark: 'dark',
+};
 const APPROVED_TOURNAMENT_STATUSES = new Set([
   'registered',
   'active',
@@ -65,6 +70,26 @@ export const AppProvider = ({ children }) => {
   const [selectedGame, setSelectedGame] = useState('carrom');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
+  const [themeMode, setThemeMode] = useState(() => {
+    if (typeof window === 'undefined') return THEME_MODES.light;
+    try {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored === THEME_MODES.dark || stored === THEME_MODES.light) {
+        return stored;
+      }
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+        ? THEME_MODES.dark
+        : THEME_MODES.light;
+    } catch (error) {
+      return THEME_MODES.light;
+    }
+  });
+
+  const themeTokens = {
+    mode: themeMode,
+    isDark: themeMode === THEME_MODES.dark,
+    isLight: themeMode === THEME_MODES.light,
+  };
 
   // Check if current user is admin using the utils
   const isAdmin = () => {
@@ -74,6 +99,10 @@ export const AppProvider = ({ children }) => {
       currentUser?.user_metadata?.empId ||
       '';
     return isAdminId(empId);
+  };
+
+  const toggleTheme = () => {
+    setThemeMode((current) => (current === THEME_MODES.dark ? THEME_MODES.light : THEME_MODES.dark));
   };
 
   const getCurrentEmpId = () =>
@@ -98,6 +127,20 @@ export const AppProvider = ({ children }) => {
       teamB: [...new Set(teamB)],
     };
   };
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    const body = document.body;
+    root.dataset.theme = themeMode;
+    body.dataset.theme = themeMode;
+    root.style.colorScheme = themeMode;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    } catch (error) {
+      // Ignore storage failures, theme still applies for this session.
+    }
+  }, [themeMode]);
 
   const getMatchResultLabel = (status) => {
     const value = String(status || '').toLowerCase();
@@ -2614,6 +2657,10 @@ const loadTournamentMatches = async () => {
     activeTab,
     setActiveTab,
     currentUser,
+    themeMode,
+    themeTokens,
+    setThemeMode,
+    toggleTheme,
     employees,
     isAdmin,
     addBooking,

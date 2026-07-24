@@ -26,7 +26,7 @@ const StatsRow = () => {
       label: "Today's Bookings", 
       value: stats.todayBookings, 
       sub: `Across all games (${gameName})`, 
-      color: '#1a3c6e' 
+      color: 'var(--accent)' 
     },
     { 
       label: 'Available Slots', 
@@ -74,9 +74,9 @@ const StatsRow = () => {
             cursor: 'default',
           }}
         >
-          <div style={{ fontSize: '0.6rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 700, color: stat.color }}>{stat.value}</div>
-          <div style={{ fontSize: '0.6rem', color: '#8888aa', marginTop: '2px' }}>{stat.sub}</div>
+          <div style={{ fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>{stat.label}</div>
+          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: stat.color }}>{stat.value}</div>
+          <div style={{ fontSize: '0.6rem', color: 'var(--muted)', marginTop: '2px', fontWeight: 600 }}>{stat.sub}</div>
         </div>
       ))}
     </div>

@@ -20,23 +20,23 @@ function getGameIcon(game) {
 }
 
 const ACTIVE_STYLE = {
-  background: '#113768',
-  border: '2px solid #1a3c6e',
-  color: '#fff',
+  background: 'var(--accent)',
+  border: '2px solid var(--accent-strong)',
+  color: 'var(--text-strong)',
   boxShadow: '0 4px 14px rgba(26,60,110,0.35), 0 1px 3px rgba(0,0,0,0.1)',
 };
 
 const INACTIVE_STYLE = {
-  background: 'transparent',
-  border: '2px solid rgba(200,210,230,0.5)',
-  color: '#555',
+  background: 'var(--bg-surface)',
+  border: '2px solid var(--border)',
+  color: 'var(--text)',
   boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
 };
 
 const DISABLED_STYLE = {
-  background: 'rgba(136,136,170,0.06)',
-  border: '2px solid rgba(200,210,230,0.3)',
-  color: '#8888aa',
+  background: 'var(--bg-surface-strong)',
+  border: '2px solid var(--border)',
+  color: 'var(--muted)',
   boxShadow: 'none',
   opacity: 0.6,
 };
@@ -84,7 +84,7 @@ const GameSelector = () => {
         marginBottom: '12px',
       }}
     >
-      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#8888aa' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted)' }}>
         Select Game:
       </span>
 
@@ -139,8 +139,8 @@ const GameSelector = () => {
               fontWeight: 500,
               padding: '1px 8px',
               borderRadius: '12px',
-              background: isSelected ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
-              color: isSelected ? '#fff' : '#777',
+              background: isSelected ? 'rgba(255,255,255,0.16)' : 'rgba(var(--accent-rgb),0.08)',
+              color: isSelected ? 'var(--text-strong)' : 'var(--text)',
             }}>
               {bookingCount} booked
             </span>
@@ -149,8 +149,8 @@ const GameSelector = () => {
             {isDisabled && (
               <span style={{
                 fontSize: '0.55rem', fontWeight: 600,
-                color: '#c62828',
-                background: 'rgba(198,40,40,0.1)',
+                color: 'var(--danger)',
+                background: 'rgba(198,40,40,0.14)',
                 padding: '1px 8px', borderRadius: '12px',
               }}>
                 Inactive

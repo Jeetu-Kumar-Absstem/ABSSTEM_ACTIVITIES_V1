@@ -5,13 +5,6 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #eef0f4;
-  color: #1e1e2f;
-  min-height: 100vh;
-}
-
 :root {
   --navy: #1a3c6e;
   --navy2: #112244;
@@ -20,21 +13,110 @@ body {
   --amber: #f9a825;
   --green: #388e3c;
   --purple: #6a1b9a;
-  --text: #1e1e2f;
-  --text2: #444466;
-  --muted: #8888aa;
-  --border: #d0d4e0;
+
   --bg: #eef0f4;
-  --white: #ffffff;
-  --shadow: 8px 8px 16px rgba(0,0,0,0.06), -8px -8px 16px rgba(255,255,255,0.7);
-  --shadow-inset: inset 2px 2px 6px rgba(255,255,255,0.8), inset -4px -4px 10px rgba(0,0,0,0.02);
+  --bg-elevated: rgba(255, 255, 255, 0.9);
+  --bg-surface: rgba(255, 255, 255, 0.84);
+  --bg-surface-strong: rgba(255, 255, 255, 0.96);
+  --bg-soft: rgba(248, 250, 255, 0.86);
+  --bg-muted: rgba(237, 241, 248, 0.95);
+
+  --text: #1e1e2f;
+  --text-strong: #10131f;
+  --text-soft: #444466;
+  --muted: #6d7590;
+  --muted-strong: #8a8aa8;
+  --inverse-text: #ffffff;
+
+  --border: rgba(200, 210, 230, 0.55);
+  --border-strong: rgba(120, 140, 180, 0.2);
+
+  --surface-shadow: 8px 8px 16px rgba(0, 0, 0, 0.06), -8px -8px 16px rgba(255, 255, 255, 0.7);
+  --surface-shadow-soft: 6px 6px 14px rgba(0, 0, 0, 0.04), -6px -6px 14px rgba(255, 255, 255, 0.48);
+  --surface-shadow-inset: inset 2px 2px 6px rgba(255, 255, 255, 0.8), inset -4px -4px 10px rgba(0, 0, 0, 0.02);
+
+  --accent: #1a3c6e;
+  --accent-rgb: 26, 60, 110;
+  --accent-strong: #0f2550;
+  --accent-soft: rgba(26, 60, 110, 0.08);
+  --accent-soft-2: rgba(26, 60, 110, 0.14);
+  --accent-contrast: #ffffff;
+  --accent-glow: rgba(26, 60, 110, 0.18);
+
+  --success: #2e7d32;
+  --warning: #f9a825;
+  --danger: #e53935;
+
+  --shell-gradient: linear-gradient(135deg, rgba(31, 212, 191, 0.98), rgba(187, 246, 198, 0.92), rgba(229, 119, 205, 0.92));
+  --shell-border: rgba(255, 255, 255, 0.45);
+  --drawer-bg: rgba(255, 255, 255, 0.96);
+  --drawer-hover: rgba(26, 60, 110, 0.05);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #000000;
+  --bg-elevated: rgba(8, 8, 12, 0.96);
+  --bg-surface: rgba(10, 10, 14, 0.88);
+  --bg-surface-strong: rgba(13, 13, 18, 0.96);
+  --bg-soft: rgba(16, 16, 22, 0.9);
+  --bg-muted: rgba(22, 22, 28, 0.95);
+
+  --text: #eef3ff;
+  --text-strong: #ffffff;
+  --text-soft: #d8e0f4;
+  --muted: #9ea8bf;
+  --muted-strong: #b8c0d3;
+  --inverse-text: #0b1020;
+
+  --border: rgba(122, 143, 190, 0.22);
+  --border-strong: rgba(148, 171, 220, 0.28);
+
+  --surface-shadow: 0 18px 50px rgba(0, 0, 0, 0.54), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --surface-shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --surface-shadow-inset: inset 1px 1px 0 rgba(255, 255, 255, 0.03), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+
+  --accent: #6f9cff;
+  --accent-rgb: 111, 156, 255;
+  --accent-strong: #a9c0ff;
+  --accent-soft: rgba(111, 156, 255, 0.16);
+  --accent-soft-2: rgba(111, 156, 255, 0.24);
+  --accent-contrast: #06101f;
+  --accent-glow: rgba(111, 156, 255, 0.22);
+
+  --success: #7ddc91;
+  --warning: #ffd166;
+  --danger: #ff7b7b;
+
+  --shell-gradient: linear-gradient(135deg, rgba(2, 2, 4, 0.98), rgba(5, 5, 8, 0.95), rgba(9, 9, 16, 0.92));
+  --shell-border: rgba(144, 166, 225, 0.14);
+  --drawer-bg: rgba(5, 5, 8, 0.96);
+  --drawer-hover: rgba(111, 156, 255, 0.16);
+
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(111, 156, 255, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(49, 210, 200, 0.06), transparent 28%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: #c0c8d8; border-radius: 20px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.38); border-radius: 20px; }
 ::-webkit-scrollbar-track { background: transparent; }
-
-/* src/index.css - Add at the bottom */
 
 /* Ensure dropdowns appear above everything */
 .dropdown-container {
@@ -67,70 +149,6 @@ body {
   to   { transform: rotate(360deg); }
 }
 
-/* src/styles/sidebar.css or add to your global CSS */
-
-.sidebar-expanded::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar-expanded::-webkit-scrollbar-track {
-  background: #f0f2f7;
-}
-
-.sidebar-expanded::-webkit-scrollbar-thumb {
-  background: #d0d5e0;
-  border-radius: 10px;
-}
-
-.sidebar-item.indent {
-  padding-left: 48px !important;
-  font-size: 13px !important;
-}
-
-.sidebar-item.indent::before {
-  content: '';
-  position: absolute;
-  left: 28px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #e8edf5;
-  border-radius: 2px;
-}
-
-.sidebar-item.active.indent::before {
-  background: #080b5c;
-}
-
-/* For responsive - hide sidebar on mobile */
-@media (max-width: 768px) {
-  .sidebar-expanded,
-  .sidebar-collapsed {
-    display: none !important;
-  }
-  
-  /* Remove padding on mobile since sidebar is hidden */
-  .app-shell > div:first-child {
-    padding-left: 0 !important;
-  }
-}
-/* Add to your global CSS file */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: #f8f9fc;
-}
-
-.app-shell {
-  background: #f8f9fc;
-}
-
 /* Sidebar scrollbar styling */
 .sidebar-expanded::-webkit-scrollbar,
 .sidebar-collapsed::-webkit-scrollbar {
@@ -139,12 +157,12 @@ body {
 
 .sidebar-expanded::-webkit-scrollbar-track,
 .sidebar-collapsed::-webkit-scrollbar-track {
-  background: #f0f2f7;
+  background: transparent;
 }
 
 .sidebar-expanded::-webkit-scrollbar-thumb,
 .sidebar-collapsed::-webkit-scrollbar-thumb {
-  background: #d0d5e0;
+  background: rgba(var(--accent-rgb), 0.28);
   border-radius: 10px;
 }
 
@@ -160,12 +178,90 @@ body {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #e8edf5;
+  background: var(--border);
   border-radius: 2px;
 }
 
 .sidebar-item.active.indent::before {
-  background: #080b5c;
+  background: var(--accent);
+}
+
+/* Page-specific dark-mode overrides for remaining light screens */
+[data-theme="dark"] .booking-page,
+[data-theme="dark"] .slot-master-page,
+[data-theme="dark"] .rules-page,
+[data-theme="dark"] .ban-management-page,
+[data-theme="dark"] .events-calendar-page {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .booking-page :is(h1,h2,h3,h4,h5,h6,p,label,span,td,th,li,small,strong,em,button,div),
+[data-theme="dark"] .slot-master-page :is(h1,h2,h3,h4,h5,h6,p,label,span,td,th,li,small,strong,em,button,div),
+[data-theme="dark"] .rules-page :is(h1,h2,h3,h4,h5,h6,p,label,span,td,th,li,small,strong,em,button,div),
+[data-theme="dark"] .ban-management-page :is(h1,h2,h3,h4,h5,h6,p,label,span,td,th,li,small,strong,em,button,div),
+[data-theme="dark"] .events-calendar-page :is(h1,h2,h3,h4,h5,h6,p,label,span,td,th,li,small,strong,em,button,div) {
+  color: var(--text) !important;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .booking-page .clay-card,
+[data-theme="dark"] .booking-page .clay-soft,
+[data-theme="dark"] .booking-page table,
+[data-theme="dark"] .booking-page th,
+[data-theme="dark"] .booking-page td,
+[data-theme="dark"] .booking-page .clay-input,
+[data-theme="dark"] .booking-page .clay-select,
+[data-theme="dark"] .booking-page .mobile-day-card,
+[data-theme="dark"] .booking-page .mobile-slot-row,
+[data-theme="dark"] .slot-master-page .clay-card,
+[data-theme="dark"] .slot-master-page .clay-soft,
+[data-theme="dark"] .slot-master-page table,
+[data-theme="dark"] .slot-master-page th,
+[data-theme="dark"] .slot-master-page td,
+[data-theme="dark"] .slot-master-page .clay-input,
+[data-theme="dark"] .slot-master-page .clay-select,
+[data-theme="dark"] .rules-page .clay-card,
+[data-theme="dark"] .rules-page .clay-soft,
+[data-theme="dark"] .rules-page table,
+[data-theme="dark"] .rules-page th,
+[data-theme="dark"] .rules-page td,
+[data-theme="dark"] .rules-page .clay-input,
+[data-theme="dark"] .rules-page .clay-select,
+[data-theme="dark"] .ban-management-page .clay-card,
+[data-theme="dark"] .ban-management-page .clay-soft,
+[data-theme="dark"] .ban-management-page table,
+[data-theme="dark"] .ban-management-page th,
+[data-theme="dark"] .ban-management-page td,
+[data-theme="dark"] .ban-management-page .clay-input,
+[data-theme="dark"] .ban-management-page .clay-select,
+[data-theme="dark"] .events-calendar-page .clay-card,
+[data-theme="dark"] .events-calendar-page .clay-soft,
+[data-theme="dark"] .events-calendar-page table,
+[data-theme="dark"] .events-calendar-page th,
+[data-theme="dark"] .events-calendar-page td,
+[data-theme="dark"] .events-calendar-page .clay-input,
+[data-theme="dark"] .events-calendar-page .clay-select {
+  background: var(--bg-surface-strong) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--surface-shadow-soft) !important;
+}
+
+[data-theme="dark"] .booking-page table,
+[data-theme="dark"] .booking-page th,
+[data-theme="dark"] .booking-page td,
+[data-theme="dark"] .slot-master-page table,
+[data-theme="dark"] .slot-master-page th,
+[data-theme="dark"] .slot-master-page td,
+[data-theme="dark"] .rules-page table,
+[data-theme="dark"] .rules-page th,
+[data-theme="dark"] .rules-page td,
+[data-theme="dark"] .ban-management-page table,
+[data-theme="dark"] .ban-management-page th,
+[data-theme="dark"] .ban-management-page td,
+[data-theme="dark"] .events-calendar-page table,
+[data-theme="dark"] .events-calendar-page th,
+[data-theme="dark"] .events-calendar-page td {
+  color: var(--text) !important;
 }
 
 /* Mobile responsive */
@@ -174,7 +270,7 @@ body {
   .sidebar-collapsed {
     display: none !important;
   }
-  
+
   .app-shell > div:last-child {
     margin-left: 0 !important;
     width: 100% !important;

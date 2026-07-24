@@ -49,7 +49,7 @@ const CapacitySummary = () => {
       <div style={{ 
         fontWeight: 600, 
         fontSize: '0.7rem', 
-        color: '#013a0a', 
+        color: 'var(--text)', 
         marginBottom: '10px',
         display: 'flex',
         justifyContent: 'space-between',
@@ -86,15 +86,15 @@ const CapacitySummary = () => {
               padding: '10px 6px', 
               textAlign: 'center', 
               borderRadius: '16px',
-              backgroundColor: '#f8f9fc',
-              border: '1px solid #e8edf5',
+              backgroundColor: 'var(--bg-surface-strong)',
+              border: '1px solid var(--border)',
               transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ fontSize: '0.55rem', fontWeight: 600, color: '#080c12', marginBottom: '4px' }}>
+            <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>
               {slot.label}
             </div>
-            <div style={{ fontSize: '0.45rem', color: '#8a8aa8', marginBottom: '6px' }}>
+            <div style={{ fontSize: '0.45rem', color: 'var(--muted)', marginBottom: '6px' }}>
               {slot.time}
             </div>
             
@@ -111,7 +111,7 @@ const CapacitySummary = () => {
                 borderRadius: '50%',
                 background: `conic-gradient(
                   ${getSlotColor(slot.pct)} ${slot.pct}%, 
-                  #e8edf5 ${slot.pct}% 100%
+                  var(--border) ${slot.pct}% 100%
                 )`,
                 display: 'flex',
                 alignItems: 'center',
@@ -122,13 +122,13 @@ const CapacitySummary = () => {
                   width: '28px',
                   height: '28px',
                   borderRadius: '50%',
-                  backgroundColor: '#ffffff',
+                  backgroundColor: 'var(--bg-surface)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '0.6rem',
                   fontWeight: 700,
-                  color: slot.isFull ? '#F44336' : '#080c12',
+                  color: slot.isFull ? 'var(--danger)' : 'var(--text)',
                 }}>
                   {slot.pct}%
                 </div>
@@ -139,7 +139,7 @@ const CapacitySummary = () => {
             <div style={{ 
               fontSize: '0.55rem', 
               fontWeight: 600, 
-              color: '#080c12',
+              color: 'var(--text)',
               marginTop: '2px',
             }}>
               {slot.total}/{slot.maxPerSlot}

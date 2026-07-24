@@ -66,14 +66,14 @@ const MobileBookingList = ({
             key={day}
             id={`mobile-day-${day}`}
             className="clay-card mobile-day-card"
-            style={{
-              padding: isOpen ? '14px' : '12px 14px',
-              borderRadius: '24px',
-              background: isToday
-                ? 'linear-gradient(180deg, rgba(247,238,134,0.18), rgba(255,255,255,0.96))'
-                : 'rgba(255,255,255,0.96)',
-              border: isToday ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(200,210,230,0.4)',
-            }}
+              style={{
+                padding: isOpen ? '14px' : '12px 14px',
+                borderRadius: '24px',
+                background: isToday
+                  ? 'linear-gradient(180deg, rgba(var(--accent-rgb),0.14), var(--bg-surface-strong))'
+                  : 'var(--bg-surface-strong)',
+                border: isToday ? '1.5px solid rgba(var(--accent-rgb),0.45)' : '1px solid var(--border)',
+              }}
           >
             <button
               type="button"
@@ -103,8 +103,8 @@ const MobileBookingList = ({
                     justifyContent: 'center',
                     width: '24px', height: '24px',
                     borderRadius: '8px',
-                    background: 'rgba(26,60,110,0.08)',
-                    color: '#1a3c6e',
+                    background: 'rgba(var(--accent-rgb),0.12)',
+                    color: 'var(--text)',
                     fontSize: '0.7rem',
                     transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
                     transition: 'transform 0.2s ease',
@@ -114,13 +114,13 @@ const MobileBookingList = ({
                   <div style={{
                     fontSize: '0.78rem',
                     fontWeight: 700,
-                    color: '#1a3c6e',
+                    color: 'var(--text)',
                     letterSpacing: '0.04em',
                     textTransform: 'uppercase',
                   }}>
                     {day} {isToday && '📍'}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8888aa' }}>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>
                     {hasAny ? `${bookedCount} booking${bookedCount === 1 ? '' : 's'}` : 'No bookings yet'}
                   </div>
                 </div>
@@ -185,10 +185,10 @@ const MobileBookingList = ({
                             borderRadius: '50%',
                             background:
                               status === 'full' ? '#f9a825' :
-                              status === 'booked' ? '#1a3c6e' : '#ffffff',
+                              status === 'booked' ? 'var(--text)' : 'var(--text-strong)',
                             border: '2px solid ' + (
                               status === 'full' ? '#f9a825' :
-                              status === 'booked' ? '#1a3c6e' : '#b8c1d0'
+                              status === 'booked' ? 'var(--text)' : 'var(--muted)'
                             ),
                             boxShadow: '0 0 0 3px rgba(26,60,110,0.08)',
                             zIndex: 1,
@@ -215,7 +215,7 @@ const MobileBookingList = ({
                           gap: '8px',
                         }}>
                           <div style={{
-                            fontSize: '0.7rem', fontWeight: 700, color: '#1a3c6e',
+                            fontSize: '0.7rem', fontWeight: 700, color: 'var(--text)',
                             letterSpacing: '0.02em',
                           }}>
                             {slot.label} · {slot.time}
@@ -224,7 +224,7 @@ const MobileBookingList = ({
                             fontSize: '0.6rem', fontWeight: 600,
                             color:
                               status === 'full' ? '#e65100' :
-                              status === 'booked' ? '#1a3c6e' : '#00897b',
+                              status === 'booked' ? 'var(--text)' : 'var(--success)',
                           }}>
                             {status === 'full' ? 'Full' : status === 'booked' ? `${players.length}/${maxPlayers}` : 'Available'}
                           </div>

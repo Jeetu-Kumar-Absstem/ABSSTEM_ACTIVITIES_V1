@@ -79,6 +79,14 @@ const MobileDrawer = ({ open, onClose, user, onLogout }) => {
             </button>
             <button
               type="button"
+              className="drawer-item"
+              onClick={() => { setActiveTab('settings'); onClose(); }}
+            >
+              <span className="drawer-item-icon" aria-hidden>⚙️</span>
+              <span className="drawer-item-label">Settings</span>
+            </button>
+            <button
+              type="button"
               className="drawer-item drawer-item--danger"
               onClick={() => { onClose(); onLogout && onLogout(); }}
             >

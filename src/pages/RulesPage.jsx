@@ -150,16 +150,16 @@ const RulesPage = () => {
     return (
       <div className="clay-card" style={{ textAlign: 'center', padding: '40px', fontFamily: "'Lufga', sans-serif" }}>
         <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⏳</div>
-        <div style={{ color: '#8888aa', fontWeight: 400 }}>Loading rules...</div>
+        <div style={{ color: 'var(--muted)', fontWeight: 700 }}>Loading rules...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
       <div className="clay-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
             Activity Rules ({rules.length})
           </h2>
           {isAdmin() ? (
@@ -167,14 +167,14 @@ const RulesPage = () => {
               + Add Rule
             </button>
           ) : (
-            <span style={{ fontSize: '0.65rem', color: '#8888aa', background: '#f5f5f5', padding: '4px 12px', borderRadius: '12px' }}>
+            <span style={{ fontSize: '0.65rem', color: 'var(--muted)', background: 'var(--bg-surface-strong)', padding: '4px 12px', borderRadius: '12px' }}>
               👁️ View Only
             </span>
           )}
         </div>
 
         <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-          <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             Game:
             <select className="clay-select" style={{ padding: '6px 14px', fontSize: '0.7rem', width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="all">All Games</option>
@@ -200,7 +200,7 @@ const RulesPage = () => {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: '#8888aa' }}>
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
               No rules found. {isAdmin() ? 'Click "Add Rule" to create one.' : 'Contact admin to add rules.'}
             </div>
           ) : (
@@ -208,12 +208,12 @@ const RulesPage = () => {
               <div key={rule.id} className="clay-soft" style={{ 
                 padding: '12px 16px', 
                 borderRadius: '16px', 
-                borderLeft: `4px solid ${rule.game === 'General' ? '#1a3c6e' : '#f9a825'}` 
+                borderLeft: `4px solid ${rule.game === 'General' ? 'var(--accent)' : 'var(--warning)'}` 
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.8rem', color: '#1e1e2f' }}>{rule.rule_description}</div>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '0.6rem', color: '#8888aa', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>{rule.rule_description}</div>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '0.6rem', color: 'var(--muted)', flexWrap: 'wrap' }}>
                       <span>📅 {rule.created_at || 'N/A'}</span>
                       <span>👤 {rule.created_by || 'Admin'}</span>
                       <span className="clay-badge clay-badge-navy">{rule.game || 'General'}</span>
@@ -249,12 +249,12 @@ const RulesPage = () => {
       {/* Right sidebar */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>📋 Recent Violations</h3>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>📋 Recent Violations</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="clay-soft" style={{ padding: '10px 14px', borderRadius: '16px', borderLeft: '3px solid #e53935' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Anil Rawat</div>
-              <div style={{ fontSize: '0.65rem', color: '#8888aa' }}>Using mobile phone during game</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.6rem', color: '#8888aa' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Anil Rawat</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>Using mobile phone during game</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.6rem', color: 'var(--muted)' }}>
                 <span>25 Apr 2026 · Carrom</span>
                 <span className="clay-badge clay-badge-red">Violation #2</span>
               </div>
@@ -268,8 +268,8 @@ const RulesPage = () => {
         </div>
 
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>⚙️ Auto-Ban Settings</h3>
-          <div style={{ fontSize: '0.7rem', color: '#444466', marginBottom: '8px' }}>Automatically ban an employee when they accumulate violations:</div>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>⚙️ Auto-Ban Settings</h3>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text)', marginBottom: '8px' }}>Automatically ban an employee when they accumulate violations:</div>
           <div className="clay-soft" style={{ padding: '8px 12px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
             <span>Ban after <strong>3 violations</strong> (same game)</span>
             <span className="clay-badge clay-badge-green">Enabled</span>
@@ -301,21 +301,21 @@ const RulesPage = () => {
             borderRadius: '32px',
             maxHeight: '90vh',
             overflowY: 'auto',
-            background: 'white',
+            background: 'var(--bg-surface-strong)',
             fontFamily: "'Lufga', sans-serif",
             fontWeight: 400,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
                 {editingRule ? '✏️ Edit Rule' : '📝 Add New Rule'}
               </h3>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#8888aa' }}>✕</button>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
             </div>
 
             <form onSubmit={handleSaveRule}>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-                  Rule Description <span style={{ color: '#e53935' }}>*</span>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+                  Rule Description <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
                 <textarea
                   className="clay-input"
@@ -330,8 +330,8 @@ const RulesPage = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-                    Created At <span style={{ color: '#e53935' }}>*</span>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+                    Created At <span style={{ color: 'var(--danger)' }}>*</span>
                   </label>
                   <input
                     type="date"
@@ -342,7 +342,7 @@ const RulesPage = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
                     Game
                   </label>
                   <select
@@ -359,8 +359,8 @@ const RulesPage = () => {
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#444466', display: 'block', marginBottom: '4px' }}>
-                  Created By <span style={{ color: '#e53935' }}>*</span>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+                  Created By <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
                 <input
                   className="clay-input"

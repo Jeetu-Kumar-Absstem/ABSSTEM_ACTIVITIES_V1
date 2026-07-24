@@ -311,9 +311,9 @@ const BanManagementPage = () => {
   };
 
   return (
-    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+    <div className="ban-management-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
           🚫 Ban Management ({bans.length} total)
         </h2>
         {isAdmin() && (
@@ -325,7 +325,7 @@ const BanManagementPage = () => {
             🚫 Issue Ban
           </button>
         )}
-        <span style={{ fontSize: '0.7rem', color: isAdmin() ? '#2e7d32' : '#8888aa', background: isAdmin() ? 'rgba(56,142,60,0.1)' : 'rgba(136,136,170,0.1)', padding: '4px 12px', borderRadius: '12px' }}>
+        <span style={{ fontSize: '0.7rem', color: isAdmin() ? 'var(--success)' : 'var(--muted)', background: isAdmin() ? 'rgba(56,142,60,0.14)' : 'var(--bg-surface-strong)', padding: '4px 12px', borderRadius: '12px' }}>
           {isAdmin() ? '🔑 Admin Mode' : '👁️ View Only'}
         </span>
       </div>
@@ -334,13 +334,13 @@ const BanManagementPage = () => {
         {/* Active Bans */}
         <div className="clay-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
               🔴 Active Bans ({activeBans.length})
             </h3>
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               Game:
               <select 
                 className="clay-select" 
@@ -358,9 +358,9 @@ const BanManagementPage = () => {
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: '#8888aa' }}>⏳ Loading bans...</div>
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>⏳ Loading bans...</div>
           ) : activeBans.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px', color: '#8888aa' }}>
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
               ✅ No active bans found.
             </div>
           ) : (
@@ -375,20 +375,20 @@ const BanManagementPage = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '0.8rem', fontFamily: "'Lufga', sans-serif" }}>{ban.employee}</div>
-                    <div style={{ fontSize: '0.6rem', color: '#8888aa' }}>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>
                       ID: {ban.employee_id} · Game: {resolveGameLabel(ban.game, availableGames)}
                     </div>
-                    <div style={{ fontSize: '0.6rem', color: '#8888aa' }}>
+                    <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>
                       📅 {new Date(ban.from_date).toLocaleDateString()} → {new Date(ban.until_date).toLocaleDateString()}
                     </div>
                   </div>
                   {getBanStatusBadge(ban)}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: '#444466', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text)', marginTop: '4px' }}>
                   📝 {ban.reason}
                 </div>
                 {ban.created_by && (
-                  <div style={{ fontSize: '0.55rem', color: '#8888aa', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.55rem', color: 'var(--muted)', marginTop: '2px' }}>
                     👤 By: {ban.created_by}
                   </div>
                 )}
@@ -413,7 +413,7 @@ const BanManagementPage = () => {
                   </div>
                 )}
                 {!isAdmin() && (
-                  <div style={{ fontSize: '0.55rem', color: '#8888aa', marginTop: '4px', fontStyle: 'italic' }}>
+                  <div style={{ fontSize: '0.55rem', color: 'var(--muted)', marginTop: '4px', fontStyle: 'italic' }}>
                     Contact admin to lift this ban
                   </div>
                 )}
@@ -424,33 +424,33 @@ const BanManagementPage = () => {
 
         {/* Ban History */}
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
             📜 Ban History ({expiredBans.length})
           </h3>
           <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem', fontFamily: "'Lufga', sans-serif" }}>
-              <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 2 }}>
+              <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-surface-strong)', zIndex: 2 }}>
                 <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Employee</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Game</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Until</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Status</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Employee</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Game</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Until</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {expiredBans.length === 0 ? (
                   <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
                       No ban history found.
                     </td>
                   </tr>
                 ) : (
                   expiredBans.map(ban => (
-                    <tr key={ban.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{ban.employee}</td>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{resolveGameLabel(ban.game, availableGames)}</td>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{new Date(ban.until_date).toLocaleDateString()}</td>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+                    <tr key={ban.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{ban.employee}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{resolveGameLabel(ban.game, availableGames)}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{new Date(ban.until_date).toLocaleDateString()}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>
                         {getBanStatusBadge(ban)}
                       </td>
                     </tr>
@@ -464,12 +464,12 @@ const BanManagementPage = () => {
 
       {isAdmin() ? (
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e1e2f', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
             🔍 Quick Ban Check
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '160px' }}>
-              <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
                 Employee
               </label>
               <select 
@@ -486,7 +486,7 @@ const BanManagementPage = () => {
               </select>
             </div>
             <div style={{ flex: 1, minWidth: '120px' }}>
-              <label style={{ fontSize: '0.7rem', color: '#8888aa', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
                 Game
               </label>
               <select 
@@ -517,21 +517,21 @@ const BanManagementPage = () => {
               <div className="clay-soft" style={{ 
                 padding: '12px 16px', 
                 borderRadius: '16px', 
-                borderLeft: `4px solid ${checkResult.type === 'banned' ? '#e53935' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa'}`,
-                background: checkResult.type === 'banned' ? 'rgba(229,57,53,0.03)' : checkResult.type === 'allowed' ? 'rgba(56,142,60,0.03)' : 'transparent'
+                borderLeft: `4px solid ${checkResult.type === 'banned' ? 'var(--danger)' : checkResult.type === 'allowed' ? 'var(--success)' : 'var(--muted)'}`,
+                background: checkResult.type === 'banned' ? 'rgba(229,57,53,0.08)' : checkResult.type === 'allowed' ? 'rgba(56,142,60,0.08)' : 'transparent'
               }}>
                 <div style={{ 
-                  fontWeight: 600, 
-                  color: checkResult.type === 'banned' ? '#c62828' : checkResult.type === 'allowed' ? '#2e7d32' : '#8888aa',
+                  fontWeight: 700, 
+                  color: checkResult.type === 'banned' ? 'var(--danger)' : checkResult.type === 'allowed' ? 'var(--success)' : 'var(--muted)',
                   fontFamily: "'Lufga', sans-serif"
                 }}>
                   {checkResult.type === 'banned' ? '🚫 BANNED' : checkResult.type === 'allowed' ? '✅ ALLOWED' : 'ℹ️ INFO'}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#444466', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text)', marginTop: '4px' }}>
                   {checkResult.message}
                 </div>
                 {checkResult.details && (
-                  <div style={{ fontSize: '0.65rem', color: '#8888aa', marginTop: '4px', whiteSpace: 'pre-line' }}>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: '4px', whiteSpace: 'pre-line' }}>
                     {checkResult.details}
                   </div>
                 )}
@@ -540,7 +540,7 @@ const BanManagementPage = () => {
           )}
         </div>
       ) : (
-        <div className="clay-card" style={{ padding: '18px', color: '#666' }}>
+        <div className="clay-card" style={{ padding: '18px', color: 'var(--muted)' }}>
           Quick Ban Check is available to admins only.
         </div>
       )}
@@ -617,31 +617,31 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
         borderRadius: '32px',
         maxHeight: '90vh',
         overflowY: 'auto',
-        background: 'rgba(255,255,255,0.95)',
+        background: 'var(--bg-surface-strong)',
         fontFamily: "'Lufga', sans-serif",
         fontWeight: 400,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" }}>🚫 Issue Ban</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#8888aa' }}>✕</button>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>🚫 Issue Ban</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
         </div>
 
         <div style={{ 
-          background: '#ffebee', 
+          background: 'rgba(229,57,53,0.12)', 
           padding: '10px 14px', 
           borderRadius: '12px', 
           fontSize: '0.7rem', 
-          color: '#c62828',
+          color: 'var(--danger)',
           marginBottom: '16px',
-          borderLeft: '3px solid #e53935'
+          borderLeft: '3px solid var(--danger)'
         }}>
           ⚠️ Banned employees will be blocked from booking the selected game(s). This action is logged and the employee is notified.
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              Employee <span style={{ color: '#e53935' }}>*</span>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+              Employee <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <select
               className="clay-select"
@@ -658,8 +658,8 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              Game <span style={{ color: '#e53935' }}>*</span>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+              Game <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <select
               className="clay-select"
@@ -678,8 +678,8 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-                From Date <span style={{ color: '#e53935' }}>*</span>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+                From Date <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="date"
@@ -690,8 +690,8 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-                Until Date <span style={{ color: '#e53935' }}>*</span>
+              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+                Until Date <span style={{ color: 'var(--danger)' }}>*</span>
               </label>
               <input
                 type="date"
@@ -704,8 +704,8 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#444466', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              Reason <span style={{ color: '#e53935' }}>*</span>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+              Reason <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <textarea
               className="clay-input"
@@ -718,7 +718,7 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
             />
           </div>
 
-          <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff8e1', borderRadius: '8px', fontSize: '0.65rem', color: '#e65100' }}>
+          <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(249,168,37,0.12)', borderRadius: '8px', fontSize: '0.65rem', color: 'var(--warning)' }}>
             ⚠️ This action will ban <strong>{formData.employee || '[Employee]'}</strong> from <strong>{formData.game || '[Game]'}</strong>. 
             They will not be able to book slots until the ban expires.
           </div>

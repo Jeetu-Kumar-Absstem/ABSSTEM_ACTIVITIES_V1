@@ -43,10 +43,10 @@ const DateNavigator = () => {
       </button>
 
       <div>
-        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1a3c6e' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>
           {formatDate(currentDate)}
         </div>
-        <div style={{ fontSize: '0.62rem', color: '#8888aa' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>
           Week view: {start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - {end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
         </div>
       </div>
@@ -58,21 +58,21 @@ const DateNavigator = () => {
         Today
       </button>
 
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', fontSize: '0.65rem', color: '#8888aa', flexWrap: 'wrap' }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', fontSize: '0.65rem', color: 'var(--muted)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'rgba(26,60,110,0.1)' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'rgba(var(--accent-rgb),0.22)' }} />
           Booked
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'rgba(249,168,37,0.2)' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'rgba(249,168,37,0.24)' }} />
           Full
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'white', border: '1px solid #d0d4e0' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'var(--bg-surface)', border: '1px solid var(--border)' }} />
           Available
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'rgba(229,57,53,0.2)' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '4px', background: 'rgba(229,57,53,0.24)' }} />
           Banned
         </span>
       </div>

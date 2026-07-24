@@ -3,8 +3,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import MobileDrawer from './MobileDrawer';
 import useViewport from '../../hooks/useViewport';
+import { useApp } from '../../context/AppContext';
 
-import bgImage from "../../assets/bg_image_light.png";
+import bgImageLight from "../../assets/bg_image_light.png";
+import bgImageDark from "../../assets/bg_image_dark.png";
 
 const lufgaFontStyle = `
   @font-face {
@@ -44,6 +46,7 @@ if (typeof document !== 'undefined') {
 
 const Layout = ({ children, user, onLogout }) => {
   const { isMobile, isTablet } = useViewport();
+  const { themeMode } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -71,6 +74,7 @@ const Layout = ({ children, user, onLogout }) => {
 
   // Calculate padding based on sidebar state
   const sidebarWidth = sidebarCollapsed ? 72 : 280;
+  const shellBgImage = themeMode === 'dark' ? bgImageDark : bgImageLight;
 
   return (
     <div className="app-shell" style={{ display: 'flex', minHeight: '100vh' }}>
@@ -95,7 +99,7 @@ const Layout = ({ children, user, onLogout }) => {
           <main
             className="app-main"
             style={{
-              backgroundImage: `url(${bgImage})`,
+              backgroundImage: `linear-gradient(180deg, rgba(3, 8, 18, 0.08), rgba(3, 8, 18, 0.18)), url(${shellBgImage})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
               backgroundRepeat: "no-repeat",
@@ -103,6 +107,7 @@ const Layout = ({ children, user, onLogout }) => {
               borderRadius: '24px',
               padding: '24px',
               minHeight: 'calc(100vh - 100px)',
+              color: 'var(--text)',
             }}
           >
             <div className="app-main-inner">
@@ -114,18 +119,18 @@ const Layout = ({ children, user, onLogout }) => {
         <footer className="app-footer" style={{
           padding: '16px 24px',
           textAlign: 'center',
-          borderTop: '1px solid #e8edf5',
+          borderTop: '1px solid var(--border)',
           marginTop: 'auto',
         }}>
-          <p className="app-footer-copy" style={{ margin: 0, fontSize: '13px', color: '#ffffff', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <p className="app-footer-copy" style={{ margin: 0, fontSize: '13px', color: 'var(--text)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             © {new Date().getFullYear()} Absstem Technologies. All rights reserved.
           </p>
           <div className="app-footer-links" style={{ marginTop: '4px', display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '12px', fontFamily: "'Lufga', sans-serif" }}>
-            <a href="https://absstem.com/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: '#f4f4f7', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
-            <span className="app-footer-sep" style={{ color: '#d0d5e0', fontWeight: 400 }}>|</span>
-            <a href="https://absstem.com/terms-condition" target="_blank" rel="noopener noreferrer" style={{ color: '#fafafa', textDecoration: 'none', fontWeight: 600 }}>Terms & Conditions</a>
-            <span className="app-footer-sep" style={{ color: '#d0d5e0', fontWeight: 400 }}>|</span>
-            <a href="https://absstem.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f3f3f6', textDecoration: 'none', fontWeight: 600 }}>absstem.com</a>
+            <a href="https://absstem.com/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-soft)', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
+            <span className="app-footer-sep" style={{ color: 'var(--muted)', fontWeight: 400 }}>|</span>
+            <a href="https://absstem.com/terms-condition" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-soft)', textDecoration: 'none', fontWeight: 600 }}>Terms & Conditions</a>
+            <span className="app-footer-sep" style={{ color: 'var(--muted)', fontWeight: 400 }}>|</span>
+            <a href="https://absstem.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-soft)', textDecoration: 'none', fontWeight: 600 }}>absstem.com</a>
           </div>
         </footer>
       </div>

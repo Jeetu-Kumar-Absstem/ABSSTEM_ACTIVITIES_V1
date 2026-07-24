@@ -395,8 +395,10 @@ const DashboardPage = () => {
         style={{
           padding: '24px 32px',
           borderRadius: '24px',
-          background: '#f0f4ff',
-          color: '#1a1a2e',
+          background: 'var(--bg-surface-strong)',
+          color: 'var(--text)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--surface-shadow-soft)',
           position: 'relative',
           zIndex: 1,
         }}
@@ -407,7 +409,7 @@ const DashboardPage = () => {
 <div
   style={{
     fontSize: '2rem',
-    color: '#000000',
+    color: 'var(--text-strong)',
     fontFamily: "'Lufga', sans-serif",
     fontWeight: 400,
     marginBottom: '2px',
@@ -421,7 +423,7 @@ const DashboardPage = () => {
 
   <span
     style={{
-      color: '#080b5c',
+      color: 'var(--accent)',
       fontFamily: "'Lufga', sans-serif",
       fontWeight: 700,
       display: 'flex',
@@ -440,7 +442,7 @@ const DashboardPage = () => {
             {/* <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
               Employee activity at a glance
             </h1> */}
-            <div style={{ fontSize: '0.8rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               {formatDate(currentDate)} • Week: {weekLabel}
             </div>
           </div>
@@ -451,11 +453,11 @@ const DashboardPage = () => {
               display: 'flex', 
               alignItems: 'center',
               gap: '12px',
-              background: 'rgba(255,255,255,0.7)',
+              background: 'var(--bg-surface)',
               borderRadius: '16px',
               padding: '12px 16px',
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.5)',
+              border: '1px solid var(--border)',
               minWidth: '260px',
               maxWidth: '360px',
               position: 'relative',
@@ -469,7 +471,7 @@ const DashboardPage = () => {
               onClick={() => navigateMatch('prev')}
               disabled={upcomingMatches.length === 0 || isFlipping}
               style={{
-                background: 'rgba(26,60,110,0.08)',
+                background: 'var(--accent-soft)',
                 border: 'none',
                 borderRadius: '50%',
                 width: '28px',
@@ -478,7 +480,7 @@ const DashboardPage = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: upcomingMatches.length > 0 && !isFlipping ? 'pointer' : 'default',
-                color: '#1a3c6e',
+                color: 'var(--accent)',
                 fontSize: '12px',
                 transition: 'all 0.2s ease',
                 flexShrink: 0,
@@ -486,11 +488,11 @@ const DashboardPage = () => {
               }}
               onMouseEnter={(e) => {
                 if (upcomingMatches.length > 0 && !isFlipping) {
-                  e.currentTarget.style.background = 'rgba(26,60,110,0.15)';
+                  e.currentTarget.style.background = 'var(--accent-soft-2)';
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(26,60,110,0.08)';
+                e.currentTarget.style.background = 'var(--accent-soft)';
               }}
             >
               ◀
@@ -526,7 +528,7 @@ const DashboardPage = () => {
                     {currentMatch.isUserInMatch || currentMatch.isUserBooking ? (
                       <div style={{
                         fontSize: '0.5rem',
-                        color: '#1a3c6e',
+                        color: 'var(--accent)',
                         fontFamily: "'Lufga', sans-serif",
                         fontWeight: 700,
                         textTransform: 'uppercase',
@@ -541,7 +543,7 @@ const DashboardPage = () => {
                     ) : (
                       <div style={{
                         fontSize: '0.5rem',
-                        color: '#8888aa',
+                        color: 'var(--muted)',
                         fontFamily: "'Lufga', sans-serif",
                         fontWeight: 400,
                         textTransform: 'uppercase',
@@ -557,7 +559,7 @@ const DashboardPage = () => {
                       fontSize: '0.8rem',
                       fontFamily: "'Lufga', sans-serif",
                       fontWeight: 700,
-                      color: currentMatch.isUserInMatch || currentMatch.isUserBooking ? '#1a3c6e' : '#1a1a2e',
+                      color: currentMatch.isUserInMatch || currentMatch.isUserBooking ? 'var(--accent)' : 'var(--text-strong)',
                       marginBottom: '1px',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -572,7 +574,7 @@ const DashboardPage = () => {
                     {/* Match Time */}
                     <div style={{
                       fontSize: '0.6rem',
-                      color: '#8888aa',
+                      color: 'var(--muted)',
                       fontFamily: "'Lufga', sans-serif",
                       fontWeight: 400,
                       display: 'flex',
@@ -582,20 +584,20 @@ const DashboardPage = () => {
                       <span>
                         {isToday(currentMatch.scheduled_at) ? 'Today' : formatMatchDate(currentMatch.scheduled_at)}
                       </span>
-                      <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8888aa' }} />
+                      <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--muted)' }} />
                       <span>{formatMatchTime(currentMatch.scheduled_at)}</span>
                       {currentMatch.type === 'slot' && (
                         <>
-                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8888aa' }} />
-                          <span style={{ color: '#1a3c6e', fontWeight: 500 }}>
+                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--muted)' }} />
+                          <span style={{ color: 'var(--accent)', fontWeight: 500 }}>
                             {currentMatch.playerAName}
                           </span>
                         </>
                       )}
                       {currentMatch.isUserInMatch && (
                         <>
-                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#8888aa' }} />
-                          <span style={{ color: '#1b5e20', fontWeight: 600, fontSize: '0.55rem' }}>Your Match</span>
+                          <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--muted)' }} />
+                          <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: '0.55rem' }}>Your Match</span>
                         </>
                       )}
                     </div>
@@ -608,7 +610,7 @@ const DashboardPage = () => {
                   justifyContent: 'center',
                   height: '100%',
                   fontSize: '0.7rem',
-                  color: '#8888aa',
+                  color: 'var(--muted)',
                 }}>
                   No upcoming matches
                 </div>
@@ -620,7 +622,7 @@ const DashboardPage = () => {
               onClick={() => navigateMatch('next')}
               disabled={upcomingMatches.length === 0 || isFlipping}
               style={{
-                background: 'rgba(26,60,110,0.08)',
+                background: 'var(--accent-soft)',
                 border: 'none',
                 borderRadius: '50%',
                 width: '28px',
@@ -629,7 +631,7 @@ const DashboardPage = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: upcomingMatches.length > 0 && !isFlipping ? 'pointer' : 'default',
-                color: '#1a3c6e',
+                color: 'var(--accent)',
                 fontSize: '12px',
                 transition: 'all 0.2s ease',
                 flexShrink: 0,
@@ -637,11 +639,11 @@ const DashboardPage = () => {
               }}
               onMouseEnter={(e) => {
                 if (upcomingMatches.length > 0 && !isFlipping) {
-                  e.currentTarget.style.background = 'rgba(26,60,110,0.15)';
+                  e.currentTarget.style.background = 'var(--accent-soft-2)';
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(26,60,110,0.08)';
+                e.currentTarget.style.background = 'var(--accent-soft)';
               }}
             >
               ▶
@@ -651,7 +653,7 @@ const DashboardPage = () => {
             {upcomingMatches.length > 0 && (
               <div style={{
                 fontSize: '0.45rem',
-                color: '#8888aa',
+                color: 'var(--muted)',
                 whiteSpace: 'nowrap',
                 position: 'absolute',
                 bottom: '4px',
@@ -679,7 +681,7 @@ const DashboardPage = () => {
                       width: index === currentMatchIndex ? '12px' : '6px',
                       height: '3px',
                       borderRadius: '2px',
-                      background: index === currentMatchIndex ? '#1a3c6e' : '#d0d5e0',
+                      background: index === currentMatchIndex ? 'var(--accent)' : 'var(--border)',
                       transition: 'all 0.3s ease',
                     }}
                   />
@@ -694,9 +696,9 @@ const DashboardPage = () => {
               type="button"
               onClick={() => setShowGameDropdown(!showGameDropdown)}
               style={{
-                background: 'rgba(255,255,255,0.85)',
-                border: '1px solid rgba(0,0,0,0.06)',
-                color: '#1a1a2e',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
                 padding: '8px 18px',
                 borderRadius: '999px',
                 fontFamily: "'Lufga', sans-serif",
@@ -711,15 +713,15 @@ const DashboardPage = () => {
                 justifyContent: 'space-between',
                 backdropFilter: 'blur(4px)',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.95)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.85)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface-strong)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
             >
               <span>{selectedGameRecord?.name || 'Select Game'}</span>
               <span style={{
                 transition: 'transform 0.2s ease',
                 transform: showGameDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
                 fontSize: '10px',
-                color: '#8888aa',
+                color: 'var(--muted)',
               }}>▼</span>
             </button>
 
@@ -729,12 +731,12 @@ const DashboardPage = () => {
                   position: 'absolute',
                   top: 'calc(100% + 8px)',
                   right: 0,
-                  backgroundColor: '#ffffff',
+                  backgroundColor: 'var(--bg-surface-strong)',
                   borderRadius: '12px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                  boxShadow: 'var(--surface-shadow)',
                   minWidth: '160px',
                   padding: '6px 0',
-                  border: '1px solid #e8edf5',
+                  border: '1px solid var(--border)',
                   zIndex: 9999,
                   overflow: 'hidden',
                 }}
@@ -753,8 +755,8 @@ const DashboardPage = () => {
                         padding: '10px 16px',
                         cursor: 'pointer',
                         fontSize: '13px',
-                        color: isActive ? '#080b5c' : '#1a1a2e',
-                        backgroundColor: isActive ? '#e8edf5' : 'transparent',
+                        color: isActive ? 'var(--accent-contrast)' : 'var(--text)',
+                        backgroundColor: isActive ? 'var(--accent)' : 'transparent',
                         fontFamily: "'Lufga', sans-serif",
                         fontWeight: isActive ? 700 : 400,
                         transition: 'all 0.15s ease',
@@ -764,7 +766,7 @@ const DashboardPage = () => {
                       }}
                       onMouseEnter={(e) => {
                         if (!isActive) {
-                          e.currentTarget.style.backgroundColor = '#f8f9fc';
+                          e.currentTarget.style.backgroundColor = 'var(--accent-soft)';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -775,7 +777,7 @@ const DashboardPage = () => {
                     >
                       <span>{game.name}</span>
                       {isActive && (
-                        <span style={{ color: '#080b5c', fontSize: '12px' }}>✓</span>
+                        <span style={{ color: 'var(--accent-contrast)', fontSize: '12px' }}>✓</span>
                       )}
                     </div>
                   );
@@ -817,11 +819,11 @@ const DashboardPage = () => {
       {/* 80/20 Layout: Today's Bookings + Upcoming Events */}
       <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
         {/* Today's Bookings - 80% with 5 slots per row */}
-        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Today&apos;s bookings
           </div>
-          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
             {selectedGameRecord.name} on {currentDayName}
           </h2>
 
@@ -842,15 +844,15 @@ const DashboardPage = () => {
                     padding: '10px 12px', 
                     borderRadius: '16px', 
                     background: isFull 
-                      ? 'rgba(198,40,40,0.06)' 
+                      ? 'rgba(198,40,40,0.12)' 
                       : hasBooking 
-                        ? 'rgba(26,60,110,0.04)' 
-                        : '#f8f9fc',
+                        ? 'rgba(111,156,255,0.08)' 
+                        : 'var(--bg-muted)',
                     border: isFull 
-                      ? '1px solid rgba(198,40,40,0.3)' 
+                      ? '1px solid rgba(198,40,40,0.35)' 
                       : hasBooking 
-                        ? '1px solid rgba(26,60,110,0.1)' 
-                        : '1px solid #e8edf5',
+                        ? '1px solid var(--border)' 
+                        : '1px solid var(--border)',
                     minHeight: '80px',
                     opacity: isFull ? 0.85 : 1,
                   }}
@@ -861,18 +863,18 @@ const DashboardPage = () => {
                         fontSize: '0.7rem',
                         fontFamily: "'Lufga', sans-serif",
                         fontWeight: 700, 
-                        color: isFull ? '#c62828' : '#1e1e2f',
+                        color: isFull ? 'var(--danger)' : 'var(--text-strong)',
                       }}>
                         {slot.label}
                       </div>
-                      <div style={{ fontSize: '0.55rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{slot.time}</div>
+                      <div style={{ fontSize: '0.55rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{slot.time}</div>
                     </div>
                     <div style={{ 
                       fontSize: '0.7rem',
                       fontFamily: "'Lufga', sans-serif",
                       fontWeight: 700, 
-                      color: isFull ? '#c62828' : hasBooking ? '#1a3c6e' : '#8888aa',
-                      background: isFull ? 'rgba(198,40,40,0.1)' : hasBooking ? 'rgba(26,60,110,0.08)' : 'transparent',
+                      color: isFull ? 'var(--danger)' : hasBooking ? 'var(--accent)' : 'var(--muted)',
+                      background: isFull ? 'rgba(198,40,40,0.16)' : hasBooking ? 'var(--accent-soft)' : 'transparent',
                       padding: '2px 8px',
                       borderRadius: '12px',
                     }}>
@@ -884,11 +886,11 @@ const DashboardPage = () => {
                       {players.map((player) => (
                         <span 
                           key={`${slot.id}-${player.booking_id || player.user_id}-${player.name}`} 
-                          style={{
-                            fontSize: '0.55rem',
-                            background: isFull ? '#c62828' : '#1a3c6e',
-                            color: 'white',
-                            padding: '2px 6px',
+                            style={{
+                              fontSize: '0.55rem',
+                              background: isFull ? 'var(--danger)' : 'var(--accent)',
+                              color: 'white',
+                              padding: '2px 6px',
                             borderRadius: '4px',
                             fontFamily: "'Lufga', sans-serif",
                             fontWeight: 400,
@@ -902,7 +904,7 @@ const DashboardPage = () => {
                   {!hasBooking && (
                     <div style={{ 
                       fontSize: '0.55rem', 
-                      color: '#b0b0b0', 
+                      color: 'var(--muted)', 
                       marginTop: '6px',
                       fontStyle: 'italic',
                       fontFamily: "'Lufga', sans-serif",
@@ -918,11 +920,11 @@ const DashboardPage = () => {
         </section>
 
         {/* Upcoming Events - 20% */}
-        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-          <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Upcoming Events
           </div>
-          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
             What's next
           </h2>
 
@@ -935,24 +937,24 @@ const DashboardPage = () => {
                   style={{
                     padding: '10px 12px',
                     borderRadius: '12px',
-                    background: index % 2 === 0 ? 'rgba(26,60,110,0.04)' : 'transparent',
-                    borderLeft: `3px solid #1a3c6e`,
+                    background: index % 2 === 0 ? 'var(--accent-soft)' : 'transparent',
+                    borderLeft: `3px solid var(--accent)`,
                   }}
                 >
-                  <div style={{ fontSize: '0.55rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1a3c6e', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '0.55rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--accent)', marginBottom: '2px' }}>
                     {eventDate}
                   </div>
-                  <div style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f' }}>
+                  <div style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)' }}>
                     {event.title}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400, marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400, marginTop: '2px' }}>
                     {event.event_type?.charAt(0).toUpperCase() + event.event_type?.slice(1) || 'Event'}
                   </div>
                 </div>
               );
             })}
             {upcomingEvents.length === 0 && (
-              <div style={{ padding: '18px', color: '#8888aa', fontSize: '0.75rem', textAlign: 'center' }}>
+              <div style={{ padding: '18px', color: 'var(--muted)', fontSize: '0.75rem', textAlign: 'center' }}>
                 No upcoming events
               </div>
             )}
@@ -963,17 +965,17 @@ const DashboardPage = () => {
       {/* 80/20 Layout: Leaderboard + Quick Actions (Admin Only) */}
       <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
         {/* Leaderboard - 80% with colors */}
-        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
+        <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
             <div>
-              <div style={{ fontSize: '0.72rem', color: '#01010f', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
                 Leaderboard
               </div>
-              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
                 Points and Ranking
               </h2>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#666', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Points: win = 4, draw = 2, loss = 1
             </div>
           </div>
@@ -981,7 +983,7 @@ const DashboardPage = () => {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
               <thead>
-                <tr style={{ background: 'linear-gradient(135deg, #1a3c6e, #2a5c8e)', color: 'white' }}>
+                <tr style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-strong))', color: 'var(--accent-contrast)' }}>
                   <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Rank</th>
                   <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Employee</th>
                   <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Employee ID</th>
@@ -1007,7 +1009,7 @@ const DashboardPage = () => {
                         transition: 'background 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, rgba(200,210,230,0.1))` : '#f8f9fc';
+                        e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, rgba(111,156,255,0.08))` : 'var(--bg-muted)';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, transparent)` : 'transparent';
@@ -1035,7 +1037,7 @@ const DashboardPage = () => {
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: '6px',
-                          color: isTop3 ? rankColor.text : '#1a1a2e',
+                          color: isTop3 ? rankColor.text : 'var(--text-strong)',
                         }}>
                           {row.name}
                           {isTop3 && (
@@ -1052,24 +1054,24 @@ const DashboardPage = () => {
                           )}
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', color: '#666' }}>{row.employee_id || 'N/A'}</td>
+                      <td style={{ ...tdStyle, padding: '8px 12px', color: 'var(--text-soft)' }}>{row.employee_id || 'N/A'}</td>
                       <td style={{ ...tdStyle, padding: '8px 12px' }}>
                         <span style={{
-                          background: '#e8edf5',
+                          background: 'var(--bg-muted)',
                           padding: '2px 8px',
                           borderRadius: '12px',
                           fontSize: '0.65rem',
-                          color: '#444466',
+                          color: 'var(--text-soft)',
                         }}>
                           {row.department || 'General'}
                         </span>
                       </td>
                       <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
                         <span style={{
-                          background: '#e3f2fd',
+                          background: 'rgba(111,156,255,0.18)',
                           padding: '2px 10px',
                           borderRadius: '12px',
-                          color: '#1565c0',
+                          color: 'var(--accent)',
                           fontWeight: 600,
                           fontSize: '0.7rem',
                         }}>
@@ -1078,10 +1080,10 @@ const DashboardPage = () => {
                       </td>
                       <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
                         <span style={{
-                          background: '#e8f5e9',
+                          background: 'rgba(46,125,50,0.18)',
                           padding: '2px 10px',
                           borderRadius: '12px',
-                          color: '#2e7d32',
+                          color: 'var(--success)',
                           fontWeight: 600,
                           fontSize: '0.7rem',
                         }}>
@@ -1090,10 +1092,10 @@ const DashboardPage = () => {
                       </td>
                       <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
                         <span style={{
-                          background: '#ffebee',
+                          background: 'rgba(229,57,53,0.18)',
                           padding: '2px 10px',
                           borderRadius: '12px',
-                          color: '#c62828',
+                          color: 'var(--danger)',
                           fontWeight: 600,
                           fontSize: '0.7rem',
                         }}>
@@ -1102,10 +1104,10 @@ const DashboardPage = () => {
                       </td>
                       <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
                         <span style={{
-                          background: '#fff3e0',
+                          background: 'rgba(249,168,37,0.18)',
                           padding: '2px 10px',
                           borderRadius: '12px',
-                          color: '#e65100',
+                          color: 'var(--warning)',
                           fontWeight: 600,
                           fontSize: '0.7rem',
                         }}>
@@ -1115,7 +1117,7 @@ const DashboardPage = () => {
                       <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
                         <span style={{
                           background: `linear-gradient(135deg, ${pointsColor}, ${pointsColor}dd)`,
-                          color: 'white',
+                          color: 'var(--accent-contrast)',
                           padding: '4px 14px',
                           borderRadius: '20px',
                           fontWeight: 700,
@@ -1131,7 +1133,7 @@ const DashboardPage = () => {
                 })}
                 {topLeaderboard.length === 0 && (
                   <tr>
-                    <td colSpan="9" style={{ padding: '18px', textAlign: 'center', color: '#8888aa' }}>
+                    <td colSpan="9" style={{ padding: '18px', textAlign: 'center', color: 'var(--muted)' }}>
                       No employees found.
                     </td>
                   </tr>
@@ -1143,11 +1145,11 @@ const DashboardPage = () => {
 
         {/* Quick Actions - 20% (Admin Only) */}
         {isAdmin && isAdmin() ? (
-          <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.96)' }}>
-            <div style={{ fontSize: '0.72rem', color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Quick Actions
             </div>
-            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: '#1e1e2f', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
               Quick Actions
             </h2>
 
@@ -1188,13 +1190,13 @@ const QuickActionButton = ({ icon, label, onClick }) => {
         gap: '10px',
         padding: '8px 12px',
         borderRadius: '10px',
-        border: '1px solid #e8edf5',
-        background: hovered ? '#f0f2f7' : 'transparent',
+        border: '1px solid var(--border)',
+        background: hovered ? 'var(--accent-soft)' : 'transparent',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         width: '100%',
         fontSize: '0.7rem',
-        color: '#1a1a2e',
+        color: 'var(--text-strong)',
         fontFamily: "'Lufga', sans-serif",
         fontWeight: 400,
       }}
@@ -1215,7 +1217,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
       style={{
         padding: '18px 20px',
         borderRadius: '24px',
-        background: hovered ? accent : 'rgba(255,255,255,0.96)',
+        background: hovered ? accent : 'var(--bg-surface-strong)',
         border: 'none',
         boxShadow: hovered 
           ? `0 8px 30px ${accent}44` 
@@ -1249,7 +1251,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
       }}>
         <div style={{ 
           fontSize: '0.65rem', 
-          color: hovered ? 'rgba(255,255,255,0.85)' : '#8888aa', 
+          color: hovered ? 'rgba(255,255,255,0.85)' : 'var(--muted)', 
           textTransform: 'uppercase', 
           letterSpacing: '0.08em',
           fontFamily: "'Lufga', sans-serif",
@@ -1263,7 +1265,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
         fontSize: '2.2rem',
         fontFamily: "'Lufga', sans-serif",
         fontWeight: 700, 
-        color: hovered ? '#ffffff' : accent, 
+        color: hovered ? 'var(--accent-contrast)' : accent, 
         lineHeight: 1,
         letterSpacing: '-0.02em',
         marginBottom: '2px',
@@ -1277,7 +1279,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
         fontSize: '0.68rem',
         fontFamily: "'Lufga', sans-serif",
         fontWeight: 400,
-        color: hovered ? 'rgba(255,255,255,0.8)' : '#667',
+        color: hovered ? 'rgba(255,255,255,0.8)' : 'var(--text-soft)',
         opacity: 0.8,
         position: 'relative',
         zIndex: 1,

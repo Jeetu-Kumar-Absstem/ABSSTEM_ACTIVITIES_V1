@@ -30,18 +30,18 @@ const MONTHS = [
 ];
 
 const EVENT_TYPE_STYLE = {
-  company:     { background: '#e3f2fd', color: '#1565c0' },
-  tournament:  { background: '#fce4ec', color: '#880e4f' },
-  outstation:  { background: '#e8f5e9', color: '#2e7d32' },
-  celebration: { background: '#fff3e0', color: '#e65100' },
+  company:     { background: 'rgba(111,156,255,0.14)', color: 'var(--accent)' },
+  tournament:  { background: 'rgba(106,27,154,0.16)', color: '#d8a4ff' },
+  outstation:  { background: 'rgba(46,125,50,0.16)', color: 'var(--success)' },
+  celebration: { background: 'rgba(249,168,37,0.16)', color: 'var(--warning)' },
 };
 
 const STATUS_BADGE = {
-  scheduled: { label: 'Scheduled', bg: '#e3f2fd', color: '#1565c0' },
-  ongoing:   { label: 'Ongoing',   bg: '#fff3e0', color: '#e65100' },
-  completed: { label: 'Completed', bg: '#e8f5e9', color: '#2e7d32' },
-  cancelled: { label: 'Cancelled', bg: '#ffebee', color: '#c62828' },
-  postponed: { label: 'Postponed', bg: '#f3e5f5', color: '#6a1b9a' },
+  scheduled: { label: 'Scheduled', bg: 'rgba(111,156,255,0.14)', color: 'var(--accent)' },
+  ongoing:   { label: 'Ongoing',   bg: 'rgba(249,168,37,0.16)', color: 'var(--warning)' },
+  completed: { label: 'Completed', bg: 'rgba(46,125,50,0.16)', color: 'var(--success)' },
+  cancelled: { label: 'Cancelled', bg: 'rgba(229,57,53,0.16)', color: 'var(--danger)' },
+  postponed: { label: 'Postponed', bg: 'rgba(106,27,154,0.16)', color: '#d8a4ff' },
 };
 
 const pad2 = n => String(n).padStart(2, '0');
@@ -247,13 +247,13 @@ const EventsCalendarPage = () => {
   };
 
   return (
-    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: '#212121' }}>
+    <div className="events-calendar-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
       <EventsTopBar active="eventsCalendar" />
 
       {/* Stats row */}
       <div style={styles.statsRow}>
         {[
-          { label: 'Total Events',  val: totalEvents,      color: '#1a3c6e', sub: 'This year' },
+          { label: 'Total Events',  val: totalEvents,      color: 'var(--accent)', sub: 'This year' },
           { label: 'Upcoming',      val: upcomingCount,   color: '#f9a825', sub: 'Future' },
           { label: 'Completed',     val: pastCount,       color: '#00897b', sub: 'This year' },
           { label: 'Tournaments',   val: tournamentCount, color: '#6a1b9a', sub: 'All time' },
@@ -321,14 +321,14 @@ const EventsCalendarPage = () => {
                   }}
                   style={{
                     ...styles.calendarCell,
-                    background: cell.other ? '#fafafa' : cell.isToday ? '#e8f0fe' : cell.evs.length ? '#fff8f0' : '#fff',
+                    background: cell.other ? 'var(--bg-surface-strong)' : cell.isToday ? 'rgba(var(--accent-rgb),0.12)' : cell.evs.length ? 'rgba(249,168,37,0.08)' : 'var(--bg-surface-strong)',
                     cursor: cell.other ? 'default' : 'pointer',
                   }}
                 >
                   {cell.isToday ? (
                     <div style={styles.todayBadge}>{cell.day}</div>
                   ) : (
-                    <div style={{ ...styles.cellDay, color: cell.other ? '#ccc' : '#212121' }}>{cell.day}</div>
+                    <div style={{ ...styles.cellDay, color: cell.other ? 'var(--muted)' : 'var(--text)' }}>{cell.day}</div>
                   )}
                   {!cell.other && cell.evs.slice(0, 3).map((ev, j) => (
                     <div
@@ -378,8 +378,8 @@ const EventsCalendarPage = () => {
                     key={ev.id}
                     style={{
                       ...styles.sideItem,
-                      background: isPending ? '#ffebee' : 'transparent',
-                      borderLeft: isPending ? '3px solid #c62828' : '3px solid transparent',
+                      background: isPending ? 'rgba(229,57,53,0.08)' : 'transparent',
+                      borderLeft: isPending ? '3px solid var(--danger)' : '3px solid transparent',
                     }}
                     onClick={() => {
                       if (isPending) {
@@ -399,9 +399,9 @@ const EventsCalendarPage = () => {
                             onClick={(e) => requestDeleteFromCard(e, ev)}
                             title={isPending ? 'Click again to confirm delete' : 'Delete this event'}
                             style={{
-                              background: isPending ? '#c62828' : 'transparent',
-                              color: isPending ? 'white' : '#c62828',
-                              border: `1px solid ${isPending ? '#c62828' : '#ffcdd2'}`,
+                              background: isPending ? 'var(--danger)' : 'transparent',
+                              color: isPending ? 'var(--text-strong)' : 'var(--danger)',
+                              border: `1px solid ${isPending ? 'var(--danger)' : 'rgba(229,57,53,0.24)'}`,
                               borderRadius: 4,
                               padding: '0.1rem 0.35rem',
                               fontSize: '0.66rem',
@@ -432,14 +432,14 @@ const EventsCalendarPage = () => {
 
       {/* Past events table */}
       <div style={{ ...styles.calendarCard, marginTop: '1rem' }}>
-        <div style={{ ...styles.calendarNav, borderBottom: '1px solid #d0d0d0' }}>
+        <div style={{ ...styles.calendarNav, borderBottom: '1px solid var(--border)' }}>
           <div style={{ ...styles.calendarTitle, textAlign: 'left', minWidth: 0 }}>🕓 Past Events</div>
-          <div style={{ fontSize: '0.7rem', color: '#888' }}>{pastCount} event(s)</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{pastCount} event(s)</div>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' }}>
             <thead>
-              <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
+              <tr style={{ background: 'rgba(var(--accent-rgb),0.08)' }}>
                 <th style={styles.th}>Event</th>
                 <th style={styles.th}>Date</th>
                 <th style={styles.th}>Type</th>
@@ -450,7 +450,7 @@ const EventsCalendarPage = () => {
             <tbody>
               {pastEvents.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ ...styles.td, textAlign: 'center', color: '#888' }}>
+                  <td colSpan="5" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)' }}>
                     No past events recorded yet.
                   </td>
                 </tr>
@@ -458,10 +458,10 @@ const EventsCalendarPage = () => {
                 const status = STATUS_BADGE[ev.event_status] || STATUS_BADGE.completed;
                 const type = EVENT_TYPE_STYLE[ev.event_type] || EVENT_TYPE_STYLE.company;
                 return (
-                  <tr key={ev.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr key={ev.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={styles.td}>
                       <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{ev.title}</div>
-                      {ev.organizer && <div style={{ fontSize: '0.6rem', color: '#888' }}>by {ev.organizer}</div>}
+                      {ev.organizer && <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>by {ev.organizer}</div>}
                     </td>
                     <td style={styles.td}>{formatDateRange(ev)}</td>
                     <td style={styles.td}><span style={{ ...type, ...styles.tableChip }}>{ev.event_type}</span></td>
@@ -613,9 +613,9 @@ const EventsCalendarPage = () => {
 };
 
 const DetailRow = ({ label, value }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.6rem', padding: '0.3rem 0', borderBottom: '1px solid #f0f0f0' }}>
-    <div style={{ color: '#888', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</div>
-    <div style={{ color: '#212121', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{value}</div>
+  <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.6rem', padding: '0.3rem 0', borderBottom: '1px solid var(--border)' }}>
+    <div style={{ color: 'var(--muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 600 }}>{label}</div>
+    <div style={{ color: 'var(--text)', fontFamily: "'Lufga', sans-serif", fontWeight: 500 }}>{value}</div>
   </div>
 );
 
@@ -627,132 +627,132 @@ const styles = {
     marginBottom: '1rem',
   },
   statCard: {
-    background: 'white',
-    border: '1px solid #d0d0d0',
+    background: 'var(--bg-surface-strong)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: '0.7rem 0.9rem',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    boxShadow: 'var(--surface-shadow-soft)',
   },
-  statLabel: { fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  statLabel: { fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 600 },
   statVal:   { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1, fontFamily: "'Lufga', sans-serif" },
-  statSub:   { fontSize: '0.6rem', color: '#888', marginTop: '0.18rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  statSub:   { fontSize: '0.6rem', color: 'var(--muted)', marginTop: '0.18rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
 
   gridLayout: { display: 'grid', gridTemplateColumns: '1fr 320px', gap: '0.8rem' },
 
   calendarCard: {
-    background: 'white',
-    border: '1px solid #d0d0d0',
+    background: 'var(--bg-surface-strong)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    boxShadow: 'var(--surface-shadow-soft)',
   },
   calendarNav: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.6rem',
     padding: '0.6rem 0.9rem',
-    borderBottom: '1px solid #d0d0d0',
+    borderBottom: '1px solid var(--border)',
     flexWrap: 'wrap',
   },
-  calendarTitle: { fontSize: '0.95rem', fontWeight: 600, color: '#1a3c6e', minWidth: 150, textAlign: 'center', fontFamily: "'Lufga', sans-serif" },
+  calendarTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-strong)', minWidth: 150, textAlign: 'center', fontFamily: "'Lufga', sans-serif" },
   navBtn: {
-    background: 'white',
-    border: '1px solid #d0d0d0',
+    background: 'var(--bg-muted)',
+    border: '1px solid var(--border)',
     borderRadius: 4,
     width: 28, height: 28,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', fontSize: '0.75rem', color: '#1a3c6e',
+    cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text)',
   },
   outlineBtn: {
-    background: 'white', color: '#1a3c6e', border: '1px solid #d0d0d0', borderRadius: 4,
+    background: 'var(--bg-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4,
     padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 400, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
   },
   navyBtn: {
-    background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4,
+    background: 'var(--accent)', color: 'var(--accent-contrast)', border: 'none', borderRadius: 4,
     padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
   },
   dangerBtn: {
-    background: '#c62828', color: 'white', border: 'none', borderRadius: 4,
+    background: 'var(--danger)', color: 'var(--accent-contrast)', border: 'none', borderRadius: 4,
     padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
   },
 
   weekHeader: {
     display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
-    background: '#f5f5f5', borderBottom: '1px solid #d0d0d0',
+    background: 'var(--bg-muted)', borderBottom: '1px solid var(--border)',
   },
   weekHeaderCell: {
-    textAlign: 'center', fontSize: '0.62rem', fontWeight: 600, color: '#888',
+    textAlign: 'center', fontSize: '0.62rem', fontWeight: 700, color: 'var(--muted)',
     padding: '0.4rem 0', textTransform: 'uppercase', fontFamily: "'Lufga', sans-serif",
   },
   calendarGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' },
   calendarCell: {
     minHeight: 88,
-    borderRight: '1px solid #eee',
-    borderBottom: '1px solid #eee',
+    borderRight: '1px solid var(--border)',
+    borderBottom: '1px solid var(--border)',
     padding: '0.3rem 0.35rem',
   },
   todayBadge: {
-    width: 22, height: 22, background: '#1a3c6e', color: 'white',
+    width: 22, height: 22, background: 'var(--accent)', color: 'var(--accent-contrast)',
     borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '0.7rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif",
   },
-  cellDay: { fontSize: '0.72rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
+  cellDay: { fontSize: '0.72rem', fontWeight: 700, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
   eventChip: {
     fontSize: '0.6rem', padding: '0.08rem 0.3rem', borderRadius: 3,
     marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden',
     textOverflow: 'ellipsis', cursor: 'pointer', fontWeight: 400, fontFamily: "'Lufga', sans-serif",
   },
-  moreChip: { fontSize: '0.58rem', color: '#888', padding: '0.05rem 0.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  moreChip: { fontSize: '0.58rem', color: 'var(--muted)', padding: '0.05rem 0.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
 
   legend: { display: 'flex', gap: '1rem', padding: '0.6rem 0.2rem', flexWrap: 'wrap' },
-  legendItem: { display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.66rem', color: '#666' },
+  legendItem: { display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.66rem', color: 'var(--text-soft)' },
   legendSwatch: { display: 'inline-block', width: 12, height: 12, borderRadius: 3 },
 
   sideCard: {
-    background: 'white', border: '1px solid #d0d0d0', borderRadius: 8, overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    background: 'var(--bg-surface-strong)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden',
+    boxShadow: 'var(--surface-shadow-soft)',
   },
   sideHeader: {
-    background: '#1a3c6e', color: 'white', padding: '0.5rem 0.85rem',
+    background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.5rem 0.85rem',
     fontSize: '0.78rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif",
   },
-  sideEmpty: { padding: '0.8rem', fontSize: '0.75rem', color: '#888', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
-  sideItem: { borderBottom: '1px solid #eee', padding: '0.7rem 0.85rem', cursor: 'pointer', transition: 'background 0.15s', fontFamily: "'Lufga', sans-serif" },
-  sideItemTitle: { fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
-  sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: '#666', marginTop: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  sideEmpty: { padding: '0.8rem', fontSize: '0.75rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
+  sideItem: { borderBottom: '1px solid var(--border)', padding: '0.7rem 0.85rem', cursor: 'pointer', transition: 'background 0.15s', fontFamily: "'Lufga', sans-serif" },
+  sideItemTitle: { fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
+  sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: 'var(--text-soft)', marginTop: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
   miniChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 400, textTransform: 'capitalize', fontFamily: "'Lufga', sans-serif" },
   statusChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" },
   tableChip: { padding: '0.1rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, textTransform: 'capitalize', fontFamily: "'Lufga', sans-serif" },
 
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.65rem', color: '#444', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 600 },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.65rem', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 700 },
   td: { padding: '0.5rem 0.6rem', verticalAlign: 'top', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
 
   modalBackdrop: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300,
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300,
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 70,
   },
   modalCard: {
-    background: 'white', borderRadius: 8, width: 540, maxWidth: '96vw',
-    maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.22)',
+    background: 'var(--bg-surface-strong)', borderRadius: 8, width: 540, maxWidth: '96vw',
+    maxHeight: '85vh', overflowY: 'auto', boxShadow: 'var(--surface-shadow)',
   },
   modalHeader: {
-    background: '#1a3c6e', color: 'white', padding: '0.7rem 1rem',
+    background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.7rem 1rem',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0',
     fontFamily: "'Lufga', sans-serif",
   },
-  modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
+  modalClose: { background: 'none', border: 'none', color: 'var(--accent-contrast)', fontSize: '1rem', cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
   modalFooter: {
-    padding: '0.7rem 1rem', borderTop: '1px solid #d0d0d0', display: 'flex',
-    justifyContent: 'flex-end', gap: '0.4rem', background: '#fafafa', borderRadius: '0 0 8px 8px',
+    padding: '0.7rem 1rem', borderTop: '1px solid var(--border)', display: 'flex',
+    justifyContent: 'flex-end', gap: '0.4rem', background: 'var(--bg-muted)', borderRadius: '0 0 8px 8px',
     fontFamily: "'Lufga', sans-serif",
   },
 
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  formLabel: { fontSize: '0.7rem', fontWeight: 600, color: '#555', fontFamily: "'Lufga', sans-serif" },
+  formLabel: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif" },
   formInput: {
-    padding: '0.32rem 0.55rem', border: '1px solid #d0d0d0', borderRadius: 4,
-    fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: '#212121', width: '100%',
+    padding: '0.32rem 0.55rem', border: '1px solid var(--border)', borderRadius: 4,
+    fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500, color: 'var(--text)', width: '100%',
   },
 };
 

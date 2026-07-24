@@ -12,8 +12,8 @@ import MatchResultConfirm from '../../ui/MatchResultConfirm';
 export const GRID_STYLES = {
   // Day/Time label column
   dayCell: {
-    background: 'linear-gradient(135deg, #1a3c6e 0%, #1e4d8c 100%)',
-    color: '#fff',
+    background: 'linear-gradient(135deg, var(--accent) 0%, #3158b8 100%)',
+    color: 'var(--text-strong)',
     fontWeight: 700,
     fontSize: '0.72rem',
     padding: '10px 14px',
@@ -28,8 +28,8 @@ export const GRID_STYLES = {
   },
   // Corner cell (top-left "Day / Time")
   cornerCell: {
-    background: 'linear-gradient(135deg, #0f2447 0%, #1a3c6e 100%)',
-    color: 'rgba(255,255,255,0.85)',
+    background: 'linear-gradient(135deg, #06101f 0%, var(--accent) 100%)',
+    color: 'var(--text-strong)',
     fontWeight: 700,
     fontSize: '0.7rem',
     padding: '10px 14px',
@@ -43,14 +43,14 @@ export const GRID_STYLES = {
   },
   // Slot header row cells
   slotHeader: {
-    background: 'linear-gradient(180deg, #e8f0fe 0%, #dce8fd 100%)',
-    color: '#1a3c6e',
+    background: 'linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-surface-strong) 100%)',
+    color: 'var(--text)',
     fontWeight: 700,
     fontSize: '0.65rem',
     padding: '8px 10px',
     textAlign: 'center',
-    borderBottom: '2px solid rgba(26,60,110,0.18)',
-    borderRight: '1px solid rgba(173,207,255,0.6)',
+    borderBottom: '2px solid var(--border)',
+    borderRight: '1px solid var(--border)',
     letterSpacing: '0.01em',
     position: 'sticky',
     top: 0,
@@ -63,7 +63,7 @@ export const GRID_STYLES = {
   tableWrapper: {
     overflowX: 'auto',
     borderRadius: '16px',
-    border: '1.5px solid rgba(173,207,255,0.55)',
+    border: '1.5px solid var(--border)',
     boxShadow: '0 2px 16px rgba(26,60,110,0.07)',
   },
 };
@@ -206,10 +206,10 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
 
   // ── cell background based on state ───────────────────────────────
   let cellBg;
-  if (isFull)                  cellBg = 'rgba(249,168,37,0.08)';
-  else if (slotFinished)       cellBg = 'rgba(200,210,230,0.12)';
-  else if (gamePlayers.length) cellBg = 'rgba(34,197,94,0.06)';
-  else                         cellBg = 'rgba(255,255,255,0.55)';
+  if (isFull)                  cellBg = 'rgba(249,168,37,0.12)';
+  else if (slotFinished)       cellBg = 'rgba(var(--accent-rgb),0.08)';
+  else if (gamePlayers.length) cellBg = 'rgba(34,197,94,0.08)';
+  else                         cellBg = 'var(--bg-surface)';
 
   return (
     <>
@@ -232,7 +232,7 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
           margin: '2px',
         }}
         onMouseEnter={e => {
-          if (!isFull) e.currentTarget.style.boxShadow = '0 0 0 2px rgba(26,60,110,0.18)';
+          if (!isFull) e.currentTarget.style.boxShadow = '0 0 0 2px rgba(var(--accent-rgb),0.18)';
         }}
         onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
         onClick={() => !isFull && handleBookSlot()}
@@ -243,9 +243,9 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
           const isAdminUser = isAdmin();
 
           let bgColor, textColor;
-          if (banned)        { bgColor = 'rgba(229,57,53,0.15)';  textColor = '#c62828'; }
-          else if (isOwner)  { bgColor = 'rgba(27,94,32,0.15)';   textColor = '#1b5e20'; }
-          else               { bgColor = 'rgba(26,26,26,0.08)';   textColor = '#1a1a1a'; }
+          if (banned)        { bgColor = 'rgba(229,57,53,0.18)';  textColor = 'var(--danger)'; }
+          else if (isOwner)  { bgColor = 'rgba(34,197,94,0.16)';   textColor = 'var(--success)'; }
+          else               { bgColor = 'rgba(var(--accent-rgb),0.12)';   textColor = 'var(--text)'; }
 
           return (
             <span
@@ -255,14 +255,14 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
                 padding: '2px 10px',
                 borderRadius: '20px',
                 fontSize: '0.6rem',
-                fontWeight: 500,
+                fontWeight: 700,
                 color: textColor,
                 textDecoration: banned ? 'line-through' : 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
                 cursor: 'pointer',
-                border: isOwner && !banned ? '1px solid rgba(27,94,32,0.3)' : 'none',
+                border: isOwner && !banned ? '1px solid rgba(34,197,94,0.32)' : 'none',
                 position: 'relative',
                 transition: 'all 0.15s ease',
               }}
@@ -275,7 +275,7 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
                 if (isAdminUser)  { setBanConfirm(player); return; }
                 showToast(`Booked by ${player.name}`, 'info');
               }}
-              onMouseEnter={e => { if (!banned) { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; } }}
+              onMouseEnter={e => { if (!banned) { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.22)'; } }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
               title={banned ? '🚫 Banned player' : 'Click for options'}
             >
@@ -289,23 +289,23 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
         })}
 
         {!isFull && gamePlayers.length < maxPlayers && (
-          <span style={{ fontSize: '0.6rem', color: '#00897b', opacity: 0.5 }}>+</span>
+          <span style={{ fontSize: '0.6rem', color: 'var(--success)', opacity: 0.75 }}>+</span>
         )}
         {isFull && (
-          <span style={{ fontSize: '0.5rem', color: '#e65100', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.5rem', color: 'var(--warning)', fontWeight: 700 }}>
             FULL ({gamePlayers.length}/{maxPlayers})
           </span>
         )}
         {!isFull && gamePlayers.length > 0 && (
-          <span style={{ fontSize: '0.4rem', color: '#8888aa', opacity: 0.5 }}>
+          <span style={{ fontSize: '0.4rem', color: 'var(--muted)', opacity: 0.72 }}>
             ({gamePlayers.length}/{maxPlayers})
           </span>
         )}
         {slotResult && (
           <span style={{
             fontSize: '0.48rem',
-            color: slotResult.result === 'draw' ? '#b26a00' : '#1a3c6e',
-            background: slotResult.result === 'draw' ? 'rgba(249,168,37,0.12)' : 'rgba(26,60,110,0.08)',
+            color: slotResult.result === 'draw' ? 'var(--warning)' : 'var(--text)',
+            background: slotResult.result === 'draw' ? 'rgba(249,168,37,0.16)' : 'rgba(var(--accent-rgb),0.12)',
             borderRadius: '999px',
             padding: '2px 6px',
           }}>
@@ -318,8 +318,8 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
             onClick={e => { e.stopPropagation(); setResultConfirm(true); }}
             style={{
               border: 'none',
-              background: 'rgba(26,60,110,0.1)',
-              color: '#1a3c6e',
+              background: 'rgba(var(--accent-rgb),0.16)',
+              color: 'var(--text)',
               borderRadius: '999px',
               padding: '3px 8px',
               fontSize: '0.48rem',
@@ -339,18 +339,18 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
             position: 'fixed',
             top: menuPosition.y,
             left: Math.min(menuPosition.x, window.innerWidth - 220),
-            background: 'white',
+            background: 'var(--bg-surface-strong)',
             borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
             padding: '8px 0',
             minWidth: '200px',
             maxWidth: '250px',
             zIndex: 9999,
-            border: '1px solid rgba(200,210,230,0.3)',
+            border: '1px solid var(--border)',
           }}
           onMouseLeave={() => setShowPlayerActions(false)}
         >
-          <div style={{ padding: '6px 14px', borderBottom: '1px solid rgba(200,210,230,0.2)', fontSize: '0.7rem', fontWeight: 600, color: '#444466' }}>
+          <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text)' }}>
             {actionPlayer.name}
           </div>
           {getPlayerActions(actionPlayer).map((action, index) => (
@@ -359,15 +359,15 @@ const SlotCell = ({ day, slotId, players, maxPlayers, onBook, onRemove }) => {
               onClick={() => { if (action.action) handlePlayerAction(action.action, actionPlayer); }}
               style={{
                 padding: '8px 14px', fontSize: '0.75rem',
-                color: action.disabled ? '#8888aa' : '#1e1e2f',
+                color: action.disabled ? 'var(--muted)' : 'var(--text)',
                 cursor: action.disabled ? 'default' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: '8px',
                 transition: 'all 0.15s ease',
-                background: action.action === 'remove' ? 'rgba(27,94,32,0.05)' : action.action === 'ban' ? 'rgba(229,57,53,0.05)' : 'transparent',
+                background: action.action === 'remove' ? 'rgba(34,197,94,0.08)' : action.action === 'ban' ? 'rgba(229,57,53,0.08)' : 'transparent',
                 borderRadius: '4px', margin: '0 4px',
               }}
-              onMouseEnter={e => { if (!action.disabled) e.currentTarget.style.background = action.action === 'remove' ? 'rgba(27,94,32,0.15)' : action.action === 'ban' ? 'rgba(229,57,53,0.15)' : 'rgba(0,0,0,0.05)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = action.action === 'remove' ? 'rgba(27,94,32,0.05)' : action.action === 'ban' ? 'rgba(229,57,53,0.05)' : 'transparent'; }}
+              onMouseEnter={e => { if (!action.disabled) e.currentTarget.style.background = action.action === 'remove' ? 'rgba(34,197,94,0.14)' : action.action === 'ban' ? 'rgba(229,57,53,0.14)' : 'rgba(var(--accent-rgb),0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = action.action === 'remove' ? 'rgba(34,197,94,0.08)' : action.action === 'ban' ? 'rgba(229,57,53,0.08)' : 'transparent'; }}
             >
               {action.label}
             </div>

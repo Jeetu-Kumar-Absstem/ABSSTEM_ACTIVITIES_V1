@@ -143,9 +143,9 @@ const BookingGridPage = () => {
   };
 
   return (
-    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+    <div className="booking-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 600, color: '#0f0fb2', fontFamily: "'Lufga', sans-serif" }}>Book Your Slot</h1>
+        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>Book Your Slot</h1>
       </div>
 
       <StatsRow />
@@ -173,22 +173,22 @@ const BookingGridPage = () => {
                 borderCollapse: 'separate',
                 borderSpacing: '0',
                 fontSize: '0.7rem',
-                background: '#d0cece',
+                background: 'var(--bg-surface-strong)',
                 fontFamily: "'Lufga', sans-serif"
               }}>
               <thead>
                 <tr
                   style={{
-                    background: '#cacdd2'
+                    background: 'var(--bg-surface)'
                   }}>
-                  <th style={{ padding: '14px', textAlign: 'center', fontWeight: 600, color: '#fff', position: 'sticky', left: 0, background: '#1e3a8a', zIndex: 2, minWidth: '120px',
-                        border: '1px solid #bfdbfe', fontFamily: "'Lufga', sans-serif" }}>Day / Time</th>
+                  <th style={{ padding: '14px', textAlign: 'center', fontWeight: 700, color: 'var(--text-strong)', position: 'sticky', left: 0, background: 'var(--accent)', zIndex: 2, minWidth: '120px',
+                        border: '1px solid var(--border)', fontFamily: "'Lufga', sans-serif" }}>Day / Time</th>
                   {SLOTS.map(s => (
-                    <th key={s.id} style={{ padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '0.6rem', color: '#1e3a8a', minWidth: '110px',
-                      background: '#c1f6bc',
-                      border: '1px solid #bfdbfe', fontFamily: "'Lufga', sans-serif" }}>
+                    <th key={s.id} style={{ padding: '12px', textAlign: 'center', fontWeight: 700, fontSize: '0.6rem', color: 'var(--text)', minWidth: '110px',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)', fontFamily: "'Lufga', sans-serif" }}>
                       {s.label}
-                      <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.6, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{s.time}</span>
+                      <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.82, fontFamily: "'Lufga', sans-serif", fontWeight: 600, color: 'var(--muted)' }}>{s.time}</span>
                     </th>
                   ))}
                 </tr>
@@ -198,20 +198,20 @@ const BookingGridPage = () => {
                   const isToday = day === getCurrentDay();
                   return (
                     <tr key={day} style={{
-                      borderBottom: '1px solid rgba(200,210,230,0.2)',
-                      background: isToday ? 'rgba(26,60,110,0.03)' : 'transparent'
+                      borderBottom: '1px solid var(--border)',
+                      background: isToday ? 'rgba(var(--accent-rgb),0.08)' : 'transparent'
                     }}>
                       <td style={{
                         padding: '14px',
-                        fontWeight: 400,
-                        color: isToday ? '#1a3c6e' : '#1a3c6e',
+                        fontWeight: 700,
+                        color: 'var(--text)',
                         position: 'sticky',
                         left: 0,
-                        background: isToday ? '#f7ee86' : '#f8fbff',
+                        background: isToday ? 'var(--bg-surface)' : 'var(--bg-surface-strong)',
                         zIndex: 4,
-                        border: '1px solid #bfdbfe',
+                        border: '1px solid var(--border)',
                         fontFamily: "'Lufga', sans-serif",
-                        fontWeight: 400
+                        fontWeight: 700
                       }}>
                         {day} {isToday && '📍'}
                       </td>
@@ -220,8 +220,8 @@ const BookingGridPage = () => {
                         const maxPlayers = getMaxPlayers();
                         return (
                           <td key={slot.id} style={{ padding: '4px 4px', verticalAlign: 'middle', textAlign: 'center', minWidth: '110px',
-                    background: '#e0ffe0',
-                    border: '1px solid #bfdbfe' }}>
+                    background: 'var(--bg-surface-strong)',
+                    border: '1px solid var(--border)' }}>
                             <SlotCell
                               day={day}
                               slotId={slot.id}

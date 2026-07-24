@@ -15,8 +15,9 @@ const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
         borderRadius: '16px',
         position: 'relative',
         zIndex: 1000,
-        background: 'linear-gradient(135deg, rgba(31, 212, 191, 0.98), rgba(187, 246, 198, 0.92),rgba(229, 119, 205, 0.92))',
-        boxShadow: '0 4px 20px rgba(26,60,110,0.08)',
+        background: 'var(--shell-gradient)',
+        boxShadow: 'var(--surface-shadow-soft)',
+        border: '1px solid var(--shell-border)',
       }}
     >
       {showHamburger && (
@@ -35,9 +36,9 @@ const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
             padding: '4px',
           }}
         >
-          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: '#1a1a2e', borderRadius: '2px' }} />
-          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: '#1a1a2e', borderRadius: '2px' }} />
-          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: '#1a1a2e', borderRadius: '2px' }} />
+          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: 'var(--text)', borderRadius: '2px' }} />
+          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: 'var(--text)', borderRadius: '2px' }} />
+          <span style={{ display: 'block', width: '24px', height: '2px', backgroundColor: 'var(--text)', borderRadius: '2px' }} />
         </button>
       )}
 
@@ -47,7 +48,7 @@ const Topbar = ({ user, onLogout, onOpenDrawer, showHamburger = false }) => {
         alignItems: 'center',
         gap: '12px',
         fontSize: '0.75rem',
-        color: '#444466',
+        color: 'var(--text)',
         position: 'relative',
         zIndex: 1001,
       }}>

@@ -83,8 +83,8 @@ const AdminPage = () => {
         style={{
           padding: '24px',
           borderRadius: '32px',
-          background: 'linear-gradient(135deg, rgba(26,60,110,0.96), rgba(40,76,131,0.92))',
-          color: 'white',
+          background: 'linear-gradient(135deg, var(--accent), var(--accent-strong))',
+          color: 'var(--accent-contrast)',
         }}
       >
         <div style={{ fontSize: '0.78rem', opacity: 0.8, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Admin</div>
@@ -94,7 +94,7 @@ const AdminPage = () => {
         </div> */}
       </div>
 
-      <div className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
+      <div className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)' }}>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
           {ADMIN_TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -109,8 +109,8 @@ const AdminPage = () => {
                   fontSize: '0.8rem',
                   fontWeight: active ? 600 : 400,
                   cursor: 'pointer',
-                  color: active ? '#fff' : '#1a3c6e',
-                  background: active ? '#1a3c6e' : 'rgba(26,60,110,0.08)',
+                  color: active ? 'var(--accent-contrast)' : 'var(--accent)',
+                  background: active ? 'var(--accent)' : 'var(--accent-soft)',
                   fontFamily: "'Lufga', sans-serif",
                 }}
               >
@@ -128,7 +128,7 @@ const AdminPage = () => {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif" }}>
                 <thead>
-                  <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
+                <tr style={{ background: 'var(--accent-soft)' }}>
                     {['Emp ID', 'Tournament Code', 'Tournament Name', 'Game', 'Format', 'Status', 'Action'].map((head) => (
                       <th
                         key={head}
@@ -195,7 +195,7 @@ const AdminPage = () => {
                               fontWeight: 600,
                               cursor: approvingId === row.id ? 'wait' : 'pointer',
                               color: '#fff',
-                              background: approvingId === row.id ? '#888' : '#1a3c6e',
+                              background: approvingId === row.id ? 'var(--muted)' : 'var(--accent)',
                               fontFamily: "'Lufga', sans-serif",
                             }}
                           >
