@@ -77,9 +77,8 @@ export const AppProvider = ({ children }) => {
       if (stored === THEME_MODES.dark || stored === THEME_MODES.light) {
         return stored;
       }
-      return window.matchMedia?.('(prefers-color-scheme: dark)').matches
-        ? THEME_MODES.dark
-        : THEME_MODES.light;
+      // Default is always light — only use stored preference, not OS theme
+      return THEME_MODES.light;
     } catch (error) {
       return THEME_MODES.light;
     }

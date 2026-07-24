@@ -28,7 +28,35 @@ const lufgaFontStyle = `
     font-family: 'Lufga', sans-serif;
     font-weight: 600;
   }
+
+  /* Force all inputs/selects inside login to always render in light mode */
+  .login-light-scope {
+    color-scheme: light !important;
+  }
+  .login-light-scope input,
+  .login-light-scope select,
+  .login-light-scope textarea {
+    color-scheme: light !important;
+    background: rgba(240, 243, 250, 0.85) !important;
+    color: #1e1e2f !important;
+    border-color: rgba(200, 210, 230, 0.6) !important;
+  }
+  .login-light-scope input::placeholder {
+    color: #9090aa !important;
+    opacity: 1 !important;
+  }
 `;
+
+// Inject the font + login light-scope styles once
+if (typeof document !== 'undefined') {
+  const styleId = 'login-page-styles';
+  if (!document.getElementById(styleId)) {
+    const styleTag = document.createElement('style');
+    styleTag.id = styleId;
+    styleTag.innerHTML = lufgaFontStyle;
+    document.head.appendChild(styleTag);
+  }
+}
 
 // Eye icons as inline SVG components
 const EyeIcon = () => (
@@ -332,7 +360,7 @@ const LoginPage = ({ onLogin }) => {
   // ── Forgot Password Screen ────────────────────────────────────────────────────
   if (isForgotPassword) {
     return (
-      <div style={containerStyle}>
+      <div style={containerStyle} className="login-light-scope">
         <div className="clay" style={cardStyle}>
           {forgotSuccess ? (
             <div style={{ textAlign: 'center' }}>
@@ -456,7 +484,7 @@ const LoginPage = ({ onLogin }) => {
 
   // ── Main Login / Register Screen ──────────────────────────────────────────────
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} className="login-light-scope">
       <div className="clay" style={cardStyle}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <img src={absstemLogo} alt="Absstem Logo" style={{ height: '64px', marginBottom: '8px', objectFit: 'contain' }} />
