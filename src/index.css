@@ -315,3 +315,55 @@ body,
     min-height: calc(100vh - 180px) !important;
   }
 }
+/* ── StatsRow stat cards ─────────────────────────────────────────────── */
+.stats-row-card {
+  border-top: 3px solid var(--stat-color) !important;
+  border-right: 2px solid transparent !important;
+  border-bottom: 2px solid transparent !important;
+  border-left: 2px solid transparent !important;
+  background: var(--bg-surface-strong) !important;
+  box-shadow: var(--surface-shadow-soft) !important;
+  transform: translateY(0) scale(1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.stats-row-card[data-hovered="true"] {
+  background: var(--stat-color) !important;
+  border-color: var(--stat-color) !important;
+  transform: translateY(-5px) scale(1.03) !important;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--stat-color) 40%, transparent) !important;
+}
+
+.stats-row-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.stats-row-card[data-hovered="true"] .stats-row-label {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.stats-row-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--stat-color);
+  margin: 4px 0 2px;
+  line-height: 1;
+}
+
+.stats-row-card[data-hovered="true"] .stats-row-value {
+  color: #fff !important;
+}
+
+.stats-row-sub {
+  font-size: 0.6rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.stats-row-card[data-hovered="true"] .stats-row-sub {
+  color: rgba(255, 255, 255, 0.8) !important;
+}

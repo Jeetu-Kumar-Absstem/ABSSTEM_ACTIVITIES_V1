@@ -1212,17 +1212,19 @@ const MetricCard = ({ label, value, caption, accent }) => {
   const [hovered, setHovered] = React.useState(false);
   return (
     <div
-      className="clay-card"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         padding: '18px 20px',
         borderRadius: '24px',
         background: hovered ? accent : 'var(--bg-surface-strong)',
-        border: 'none',
-        boxShadow: hovered 
-          ? `0 8px 30px ${accent}44` 
-          : '0 2px 8px rgba(0,0,0,0.04)',
+        borderTop: `3px solid ${accent}`,
+        borderRight: `2px solid ${hovered ? accent : 'rgba(200,210,230,0.3)'}`,
+        borderBottom: `2px solid ${hovered ? accent : 'rgba(200,210,230,0.3)'}`,
+        borderLeft: `2px solid ${hovered ? accent : 'rgba(200,210,230,0.3)'}`,
+        boxShadow: hovered
+          ? `0 8px 30px ${accent}66`
+          : '6px 6px 14px rgba(0,0,0,0.06), -6px -6px 14px rgba(255,255,255,0.5)',
         transform: hovered ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: 'default',
@@ -1230,18 +1232,6 @@ const MetricCard = ({ label, value, caption, accent }) => {
         overflow: 'hidden',
       }}
     >
-      {!hovered && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '4px',
-          background: accent,
-          borderRadius: '24px 24px 0 0',
-        }} />
-      )}
-
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -1252,7 +1242,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
       }}>
         <div style={{ 
           fontSize: '0.65rem', 
-          color: hovered ? 'rgba(255,255,255,0.95)' : 'var(--muted)', 
+          color: hovered ? 'var(--text)' : 'var(--muted)',
           textTransform: 'uppercase', 
           letterSpacing: '0.08em',
           fontFamily: "'Lufga', sans-serif",
@@ -1266,7 +1256,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
         fontSize: '2.2rem',
         fontFamily: "'Lufga', sans-serif",
         fontWeight: 700, 
-        color: hovered ? 'var(--accent-contrast)' : accent, 
+        color: hovered ? 'var(--text-strong)' : accent,
         lineHeight: 1,
         letterSpacing: '-0.02em',
         marginBottom: '2px',
@@ -1280,8 +1270,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
         fontSize: '0.68rem',
         fontFamily: "'Lufga', sans-serif",
         fontWeight: 700,
-        color: hovered ? 'rgba(255,255,255,0.95)' : 'var(--text-soft)',
-        opacity: 1,
+        color: hovered ? 'var(--text-soft)' : 'var(--text-soft)',
         position: 'relative',
         zIndex: 1,
       }}>

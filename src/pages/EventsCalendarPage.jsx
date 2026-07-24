@@ -262,25 +262,25 @@ const EventsCalendarPage = () => {
         ].map((s, i) => (
           <div
             key={i}
-            className="clay-card"
             onMouseEnter={() => setHoveredIndex(i)}
             onMouseLeave={() => setHoveredIndex(null)}
             style={{
               ...styles.statCard,
               padding: '12px 16px',
+              background: hoveredIndex === i ? s.color : 'var(--bg-surface-strong)',
               borderTop: `3px solid ${s.color}`,
-              borderRight: `2px solid ${hoveredIndex === i ? s.color : 'transparent'}`,
-              borderBottom: `2px solid ${hoveredIndex === i ? s.color : 'transparent'}`,
-              borderLeft: `2px solid ${hoveredIndex === i ? s.color : 'transparent'}`,
+              borderRight: `2px solid ${hoveredIndex === i ? s.color : 'rgba(200,210,230,0.3)'}`,
+              borderBottom: `2px solid ${hoveredIndex === i ? s.color : 'rgba(200,210,230,0.3)'}`,
+              borderLeft: `2px solid ${hoveredIndex === i ? s.color : 'rgba(200,210,230,0.3)'}`,
               transform: hoveredIndex === i ? 'translateY(-5px) scale(1.03)' : 'translateY(0) scale(1)',
-              boxShadow: hoveredIndex === i ? `0 8px 20px ${s.color}33` : 'none',
-              transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+              boxShadow: hoveredIndex === i ? `0 8px 24px ${s.color}66` : '6px 6px 14px rgba(0,0,0,0.06), -6px -6px 14px rgba(255,255,255,0.5)',
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               cursor: 'default',
             }}
           >
-            <div style={styles.statLabel}>{s.label}</div>
-            <div style={{ ...styles.statVal, color: s.color }}>{s.val}</div>
-            <div style={styles.statSub}>{s.sub}</div>
+            <div style={{ ...styles.statLabel, color: hoveredIndex === i ? 'rgba(255,255,255,0.85)' : 'var(--muted)' }}>{s.label}</div>
+            <div style={{ ...styles.statVal, color: hoveredIndex === i ? '#fff' : s.color }}>{s.val}</div>
+            <div style={{ ...styles.statSub, color: hoveredIndex === i ? 'rgba(255,255,255,0.8)' : 'var(--muted)' }}>{s.sub}</div>
           </div>
         ))}
       </div>
@@ -627,11 +627,8 @@ const styles = {
     marginBottom: '1rem',
   },
   statCard: {
-    background: 'var(--bg-surface-strong)',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
+    borderRadius: 16,
     padding: '0.7rem 0.9rem',
-    boxShadow: 'var(--surface-shadow-soft)',
   },
   statLabel: { fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 600 },
   statVal:   { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1, fontFamily: "'Lufga', sans-serif" },

@@ -27,7 +27,7 @@ const GameMasterPage = () => {
           style={{
             fontSize: "2rem",
             fontWeight: 600,
-            color: "#000000",
+            color: 'var(--text-strong)',
           }}
         >
           Game Master — All Activities
@@ -50,7 +50,7 @@ const GameMasterPage = () => {
         <label
           style={{
             fontSize: "0.7rem",
-            color: "#8888aa",
+            color: 'var(--muted)',
             display: "flex",
             alignItems: "center",
             gap: "6px",
@@ -110,7 +110,7 @@ const GameMasterPage = () => {
           }}
         >
           <thead>
-            <tr style={{ background: "rgba(26,60,110,0.05)" }}>
+            <tr style={{ background: 'var(--accent-soft)' }}>
               <th style={thStyle}>Edit</th>
               <th style={thStyle}>Game Code</th>
               <th style={thStyle}>Game Name</th>
@@ -129,7 +129,7 @@ const GameMasterPage = () => {
               <tr
                 key={game.id}
                 style={{
-                  borderBottom: "1px solid rgba(200,210,230,0.2)",
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 <td style={tdStyle}>
@@ -139,7 +139,7 @@ const GameMasterPage = () => {
                 <td
                   style={{
                     ...tdStyle,
-                    color: "#1a3c6e",
+                    color: 'var(--accent)',
                     fontWeight: 500,
                   }}
                 >
@@ -162,7 +162,7 @@ const GameMasterPage = () => {
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
-                      color: "#1a3c6e",
+                      color: 'var(--accent)',
                     }}
                   >
                     {gameIcons[game.icon?.toLowerCase()] || (
@@ -229,7 +229,7 @@ const GameMasterPage = () => {
                       style={{
                         padding: "4px 10px",
                         fontSize: "0.6rem",
-                        color: "#e53935",
+                        color: 'var(--danger)',
                       }}
                     >
                       🗑
@@ -249,7 +249,7 @@ const thStyle = {
   padding: "8px 10px",
   textAlign: "left",
   fontWeight: 500,
-  color: "#444466",
+  color: 'var(--text-soft)',
 };
 
 const tdStyle = {
