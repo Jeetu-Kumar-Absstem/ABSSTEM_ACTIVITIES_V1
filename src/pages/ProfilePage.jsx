@@ -111,9 +111,9 @@ const ProfilePage = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '0.78rem', color: '#000000', marginBottom: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>My Profile</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>My Profile</div>
             <h1 style={{ fontSize: '1.8rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)', margin: 0 }}>{userName}</h1>
-            <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', color: '#667' }}>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', color: 'var(--text-soft)' }}>
               <span className="clay-badge clay-badge-navy">{empId || 'N/A'}</span>
               <span className="clay-badge clay-badge-green">{department}</span>
             </div>
@@ -128,8 +128,8 @@ const ProfilePage = () => {
       <div className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Select Game</div>
-            <div style={{ fontSize: '0.95rem', color: '#444466', marginTop: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 900 }}>Select Game</div>
+            <div style={{ fontSize: '0.95rem', color: 'var(--text-soft)', marginTop: '4px', fontFamily: "'Lufga', sans-serif", fontWeight: 500 }}>
               Choose Carrom or Chess to view that game&apos;s results.
             </div>
           </div>
@@ -199,7 +199,7 @@ const ProfilePage = () => {
                   width: '120px',
                   height: '120px',
                   borderRadius: '50%',
-                  background: 'white',
+                  background: 'var(--bg-surface-strong)',
                   display: 'grid',
                   placeItems: 'center',
                   textAlign: 'center',
@@ -210,7 +210,7 @@ const ProfilePage = () => {
                   <div style={{ fontSize: '1.6rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1 }}>
                     {stats.points}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: '#777', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Points</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Points</div>
                 </div>
               </div>
             </div>
@@ -295,20 +295,20 @@ const ProfilePage = () => {
         </div>
 
         {certLoading ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: '#aaa', fontSize: '0.78rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             Loading certificates…
           </div>
         ) : certLog.length === 0 ? (
           <div style={{
             padding: '1.8rem',
             textAlign: 'center',
-            color: '#aaa',
+            color: 'var(--muted)',
             fontSize: '0.78rem',
             fontFamily: "'Lufga', sans-serif",
             fontWeight: 400,
             background: 'var(--accent-soft)',
             borderRadius: 16,
-            border: '1px dashed #d0d0d0',
+            border: '1px dashed var(--border)',
           }}>
             No certificates issued yet. Participate in a tournament to earn one!
           </div>
@@ -384,18 +384,18 @@ const ProfilePage = () => {
                             whiteSpace: 'nowrap',
                           }}>{posLabel}</span>
                         ) : (
-                          <span style={{ color: '#bbb', fontSize: '0.68rem' }}>—</span>
+                          <span style={{ color: 'var(--muted)', fontSize: '0.68rem' }}>—</span>
                         )}
                       </td>
 
                       {/* Tournament period */}
-                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: '#555' }}>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>
                         {formatDateShort(t?.start_date)}
                         {t?.end_date ? ` → ${formatDateShort(t.end_date)}` : ''}
                       </td>
 
                       {/* Issued on */}
-                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: '#555' }}>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>
                         {formatDateShort(c.issued_at)}
                       </td>
 
@@ -455,7 +455,7 @@ const LegendRow = ({ label, value, color }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, display: 'inline-block' }} />
-      <span style={{ fontSize: '0.75rem', color: '#445', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</span>
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</span>
     </div>
     <span style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)' }}>{value}</span>
   </div>
@@ -482,7 +482,7 @@ const thStyle = {
   textAlign: 'left',
   fontFamily: "'Lufga', sans-serif",
   fontWeight: 700,
-  color: '#444466',
+  color: 'var(--text-soft)',
 };
 
 const tdStyle = {

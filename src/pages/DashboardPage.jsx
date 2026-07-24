@@ -611,6 +611,7 @@ const DashboardPage = () => {
                   height: '100%',
                   fontSize: '0.7rem',
                   color: 'var(--muted)',
+                  fontWeight:700
                 }}>
                   No upcoming matches
                 </div>
@@ -1251,11 +1252,11 @@ const MetricCard = ({ label, value, caption, accent }) => {
       }}>
         <div style={{ 
           fontSize: '0.65rem', 
-          color: hovered ? 'rgba(255,255,255,0.85)' : 'var(--muted)', 
+          color: hovered ? 'rgba(255,255,255,0.95)' : 'var(--muted)', 
           textTransform: 'uppercase', 
           letterSpacing: '0.08em',
           fontFamily: "'Lufga', sans-serif",
-          fontWeight: 400,
+          fontWeight: 700,
         }}>
           {label}
         </div>
@@ -1278,9 +1279,9 @@ const MetricCard = ({ label, value, caption, accent }) => {
       <div style={{ 
         fontSize: '0.68rem',
         fontFamily: "'Lufga', sans-serif",
-        fontWeight: 400,
-        color: hovered ? 'rgba(255,255,255,0.8)' : 'var(--text-soft)',
-        opacity: 0.8,
+        fontWeight: 700,
+        color: hovered ? 'rgba(255,255,255,0.95)' : 'var(--text-soft)',
+        opacity: 1,
         position: 'relative',
         zIndex: 1,
       }}>

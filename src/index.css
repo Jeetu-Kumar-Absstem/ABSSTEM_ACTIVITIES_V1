@@ -204,6 +204,30 @@ body,
   font-weight: 700;
 }
 
+[data-theme="dark"] .tournaments-page {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .tournaments-page :is(h1,h2,h3,h4,h5,h6) {
+  color: var(--text-strong) !important;
+}
+
+[data-theme="dark"] .tournaments-page .clay-card,
+[data-theme="dark"] .tournaments-page .clay-soft,
+[data-theme="dark"] .tournaments-page .clay-input,
+[data-theme="dark"] .tournaments-page .clay-select {
+  background: var(--bg-surface-strong) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--surface-shadow-soft) !important;
+}
+
+[data-theme="dark"] .tournaments-page table,
+[data-theme="dark"] .tournaments-page th,
+[data-theme="dark"] .tournaments-page td {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
 [data-theme="dark"] .booking-page .clay-card,
 [data-theme="dark"] .booking-page .clay-soft,
 [data-theme="dark"] .booking-page table,

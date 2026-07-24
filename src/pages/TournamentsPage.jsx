@@ -38,11 +38,11 @@ const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Delete Tournament</h3>
         <button onClick={onCancel} style={styles.modalClose}>✕</button>
       </div>
-      <div style={{ padding: '1rem', fontSize: '0.78rem', color: '#333' }}>
+      <div style={{ padding: '1rem', fontSize: '0.78rem', color: 'var(--text)' }}>
         <p style={{ margin: '0 0 0.5rem 0' }}>
           Are you sure you want to delete <strong>{tournament?.name}</strong> ({tournament?.code})?
         </p>
-        <p style={{ margin: 0, color: '#c62828', fontSize: '0.72rem' }}>
+        <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.72rem' }}>
           This will also remove all participants, matches and final results linked to it. This cannot be undone.
         </p>
       </div>
@@ -86,11 +86,11 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
           <button onClick={onCancel} style={styles.modalClose}>✕</button>
         </div>
         <div style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.72rem', color: '#666', marginBottom: '0.6rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', marginBottom: '0.6rem' }}>
             One registration per person per tournament. Tick all tournaments you'd like to join — you can pick one or many.
           </div>
           {eligible.length === 0 ? (
-            <div style={{ padding: '1.2rem', textAlign: 'center', color: '#888', fontSize: '0.78rem' }}>
+            <div style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem' }}>
               No open tournaments available — either you're already registered or they're all full.
             </div>
           ) : (
@@ -104,8 +104,8 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
                     style={{
                       display: 'flex', gap: '0.6rem', alignItems: 'center',
                       padding: '0.55rem 0.7rem', borderRadius: 6,
-                      border: `1px solid ${isSel ? '#1a3c6e' : '#d0d0d0'}`,
-                      background: isSel ? '#e8eef7' : '#fafafa',
+                      border: `1px solid ${isSel ? 'var(--accent)' : 'var(--border)'}`,
+                      background: isSel ? 'var(--accent-soft)' : 'var(--bg-muted)',
                       cursor: 'pointer', fontSize: '0.75rem',
                     }}
                   >
@@ -116,12 +116,12 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
                       style={{ cursor: 'pointer' }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, color: '#1e1e2f' , fontFamily: "'Lufga', sans-serif" }}>{t.name}</div>
-                      <div style={{ fontSize: '0.66rem', color: '#666' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text-strong)' , fontFamily: "'Lufga', sans-serif" }}>{t.name}</div>
+                      <div style={{ fontSize: '0.66rem', color: 'var(--text-soft)' }}>
                         {t.code} · {t.game} · {t.format.replace('_', ' ')} · {formatDate(t.start_date)}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.66rem', color: '#444', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
                       {parts.length} / {t.max_participants}
                     </div>
                   </label>
@@ -131,7 +131,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
           )}
         </div>
         <div style={styles.modalFooter}>
-          <span style={{ flex: 1, fontSize: '0.7rem', color: '#666' }}>
+          <span style={{ flex: 1, fontSize: '0.7rem', color: 'var(--text-soft)' }}>
             {selected.size} selected
           </span>
             <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
@@ -373,7 +373,7 @@ const canEditMatch = (m) => {
   // ── Sub-tab renderers ─────────────────────────────────────────────────
   const renderActiveTournaments = () => {
     return (
-      <div className="clay-card" style={{background:'#f4bf70'}}>
+      <div className="clay-card" style={{background:'var(--bg-surface-strong)'}}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>Active & Upcoming Tournaments</div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -396,7 +396,7 @@ const canEditMatch = (m) => {
             <tbody>
               {tournaments.length === 0 ? (
                 <tr>
-                  <td colSpan="11" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
+                  <td colSpan="11" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1.4rem' }}>
                     No tournaments yet. {isAdmin() && 'Click "New Tournament" to create one.'}
                   </td>
                 </tr>
@@ -433,7 +433,7 @@ const canEditMatch = (m) => {
                           ? (isFull ? '🔒 Full' : '🏆 Register')
                           : '📝 Request';
                 return (
-                  <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={styles.td}><strong>{t.code}</strong></td>
                     <td style={styles.td}><strong>{t.name}</strong></td>
                     <td style={styles.td}>{t.game}</td>
@@ -448,7 +448,7 @@ const canEditMatch = (m) => {
                         disabled={!canRegister}
                         style={{
                           ...styles.tinyEnterBtn,
-                          background: alreadyRegistered ? '#388e3c' : hasPendingRequest ? '#f9a825' : isCompleted || startDatePassed || (isAdmin() && isFull) ? '#9e9e9e' : '#1a3c6e',
+                        background: alreadyRegistered ? 'var(--success)' : hasPendingRequest ? 'var(--warning)' : isCompleted || startDatePassed || (isAdmin() && isFull) ? 'var(--muted)' : 'var(--accent)',
                           opacity: canRegister || alreadyRegistered || hasPendingRequest ? 1 : 0.6,
                           cursor: canRegister || alreadyRegistered || hasPendingRequest ? 'pointer' : 'not-allowed',
                         }}
@@ -466,24 +466,24 @@ const canEditMatch = (m) => {
                     <td style={styles.td}>
                       {alreadyRegistered && !isCompleted && !isAdmin() ? (
                         hasPendingWithdrawal ? (
-                          <span style={{ ...styles.tinyChip, background: '#fff3e0', color: '#e65100', fontSize: '0.68rem' }}>
+                          <span style={{ ...styles.tinyChip, background: 'rgba(249,168,37,0.14)', color: 'var(--warning)', fontSize: '0.68rem' }}>
                             ⏳ Withdrawal pending
                           </span>
                         ) : (
                           <button
                             onClick={() => handleUnregisterForOne(t.id)}
-                            style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                            style={{ ...styles.tinyEnterBtn, background: 'var(--danger)' }}
                             title="Request to withdraw from this tournament"
                           >✕ Unregister</button>
                         )
                       ) : alreadyRegistered && !isCompleted && isAdmin() ? (
                         <button
                           onClick={() => handleUnregisterForOne(t.id)}
-                          style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                          style={{ ...styles.tinyEnterBtn, background: 'var(--danger)' }}
                           title="Remove participant immediately (admin)"
                         >✕ Remove</button>
                       ) : (
-                        <span style={{ fontSize: '0.66rem', color: '#bbb' }}>—</span>
+                        <span style={{ fontSize: '0.66rem', color: 'var(--muted)' }}>—</span>
                       )}
                     </td>
                     <td style={styles.td}>
@@ -494,7 +494,7 @@ const canEditMatch = (m) => {
                       >📊</button>
                       <button
                         onClick={() => setActiveTournament(t.id)}
-                        style={{ ...styles.tinyIconBtn, background: activeTournament === t.id ? '#fff3e0' : undefined }}
+                        style={{ ...styles.tinyIconBtn, background: activeTournament === t.id ? 'rgba(249,168,37,0.14)' : undefined }}
                         title="Select"
                       >{activeTournament === t.id ? '✓' : '→'}</button>
                       {isAdmin() && (
@@ -509,14 +509,14 @@ const canEditMatch = (m) => {
                             });
                             setEditTournamentId(t.id);
                           }}
-                          style={{ ...styles.tinyIconBtn, color: '#5c6bc0', borderColor: '#c5cae9' }}
+                          style={{ ...styles.tinyIconBtn, color: 'var(--accent)', borderColor: 'var(--border)' }}
                           title="Edit status / registration / date"
                         >⚙️</button>
                       )}
                       {isAdmin() && (
                         <button
                           onClick={() => setTournamentToDelete(t)}
-                          style={{ ...styles.tinyIconBtn, color: '#000000', borderColor: '#ffcdd2' }}
+                          style={{ ...styles.tinyIconBtn, color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.24)' }}
                           title="Delete tournament"
                         >🗑</button>
                       )}
@@ -535,7 +535,7 @@ const canEditMatch = (m) => {
 
         {/* ── Admin: Pending Registration Requests ─────────────────────── */}
         {isAdmin() && tournamentRegistrationRequests.filter(r => String(r.status||'').toLowerCase() === 'pending').length > 0 && (
-          <div style={{ ...styles.card, background: '#fff8e1', marginTop: '1rem', borderRadius: 8, padding: '0.8rem 1rem' }}>
+          <div style={{ ...styles.card, background: 'rgba(249,168,37,0.08)', marginTop: '1rem', borderRadius: 8, padding: '0.8rem 1rem' }}>
             <div style={{ ...styles.cardHeaderTitle, marginBottom: '0.6rem' }}>📋 Pending Registration Requests</div>
             {tournamentRegistrationRequests
               .filter(r => String(r.status || '').toLowerCase() === 'pending')
@@ -544,21 +544,21 @@ const canEditMatch = (m) => {
                 return (
                   <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #ffe082', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, minWidth: 120 , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(r.employee_id)}</span>
-                    <span style={{ color: '#888', fontSize: '0.78rem' }}>→ {t?.name || `Tournament #${r.tournament_id}`}</span>
+                    <span style={{ color: 'var(--muted)', fontSize: '0.78rem' }}>→ {t?.name || `Tournament #${r.tournament_id}`}</span>
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
                       <button
                         onClick={async () => {
                           const res = await approveTournamentRegistration(r.id);
                           res.success ? showToast(`Approved ${getEmployeeName(r.employee_id)}`) : showToast(res.error || 'Failed', 'error');
                         }}
-                        style={{ ...styles.tinyEnterBtn, background: '#2e7d32' }}
+                        style={{ ...styles.tinyEnterBtn, background: 'var(--success)' }}
                       >✓ Approve</button>
                       <button
                         onClick={async () => {
                           const { error } = await import('../utils/supabase').then(m => m.supabase.from('tournament_registration_requests').delete().match({ id: r.id }));
                           if (!error) { showToast('Request rejected'); }
                         }}
-                        style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                        style={{ ...styles.tinyEnterBtn, background: 'var(--danger)' }}
                       >✕ Reject</button>
                     </div>
                   </div>
@@ -570,29 +570,29 @@ const canEditMatch = (m) => {
 
         {/* ── Admin: Pending Withdrawal Requests ───────────────────────── */}
         {isAdmin() && Object.values(withdrawalPendingByTournament).flat().length > 0 && (
-          <div style={{ ...styles.card, background: '#fce4ec', marginTop: '0.6rem', borderRadius: 8, padding: '0.8rem 1rem' }}>
+          <div style={{ ...styles.card, background: 'rgba(233,30,99,0.08)', marginTop: '0.6rem', borderRadius: 8, padding: '0.8rem 1rem' }}>
             <div style={{ ...styles.cardHeaderTitle, marginBottom: '0.6rem' }}>🚪 Pending Withdrawal Requests</div>
             {Object.values(withdrawalPendingByTournament).flat().map(p => {
               const t = tournaments.find(x => x.id === p.tournament_id);
               return (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #f48fb1', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600, minWidth: 120 , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(p.employee_id)}</span>
-                  <span style={{ color: '#888', fontSize: '0.78rem' }}>wants to leave <strong>{t?.name || `Tournament #${p.tournament_id}`}</strong></span>
-                  <span style={{ ...styles.tinyChip, background: '#fff3e0', color: '#e65100', fontSize: '0.68rem' }}>⚠ Tournament is live</span>
+                  <span style={{ color: 'var(--muted)', fontSize: '0.78rem' }}>wants to leave <strong>{t?.name || `Tournament #${p.tournament_id}`}</strong></span>
+                  <span style={{ ...styles.tinyChip, background: 'rgba(249,168,37,0.14)', color: 'var(--warning)', fontSize: '0.68rem' }}>⚠ Tournament is live</span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
                     <button
                       onClick={async () => {
                         const res = await approveWithdrawalRequest(p.id);
                         res.success ? showToast(`${getEmployeeName(p.employee_id)} withdrawn from ${t?.name || 'tournament'}`, 'warning') : showToast(res.error || 'Failed', 'error');
                       }}
-                      style={{ ...styles.tinyEnterBtn, background: '#c62828' }}
+                      style={{ ...styles.tinyEnterBtn, background: 'var(--danger)' }}
                     >✓ Approve Withdrawal</button>
                     <button
                       onClick={async () => {
                         const res = await rejectWithdrawalRequest(p.id);
                         res.success ? showToast(`Withdrawal rejected — ${getEmployeeName(p.employee_id)} stays enrolled`) : showToast(res.error || 'Failed', 'error');
                       }}
-                      style={{ ...styles.tinyEnterBtn, background: '#5c6bc0' }}
+                      style={{ ...styles.tinyEnterBtn, background: 'var(--accent)' }}
                     >✕ Keep in Tournament</button>
                   </div>
                 </div>
@@ -608,14 +608,14 @@ const canEditMatch = (m) => {
     if (tournaments.length === 0) {
       return (
         <div className="clay-card" style={{ ...styles.card, textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', color: '#888' }}>No tournaments exist yet.</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No tournaments exist yet.</div>
         </div>
       );
     }
     if (!activeTournamentRecord) {
       return (
         <div className="clay-card" style={{ ...styles.card, textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', color: '#888' }}>Loading tournament data…</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Loading tournament data…</div>
         </div>
       );
     }
@@ -728,18 +728,18 @@ const renderMatch = (m) => {
     <div key={m.id || m.match_code} style={{
       ...styles.matchCard,
       border: isFinal ? '2px solid #f9a825'
-            : isPhantom ? '1px dashed #90caf9'
-            : isBye ? '1px dashed #b0bec5'
+            : isPhantom ? '1px dashed rgba(144,202,249,0.6)'
+            : isBye ? '1px dashed var(--border-strong)'
             : isTBDMatch ? '1px dashed #ff9800'
-            : '1px solid #d0d0d0',
+            : '1px solid var(--border)',
       opacity: isBye || isPhantom ? 0.82 : 1,
-      background: isPhantom ? '#f8fbff' : isTBDMatch ? '#fff8e1' : 'white',
+      background: isPhantom ? 'var(--bg-soft)' : isTBDMatch ? 'rgba(255,152,0,0.07)' : 'var(--bg-surface-strong)',
     }}>
       {/* Time badge */}
       {matchTime && (
         <div style={{
           fontSize: '0.62rem', fontWeight: 600,
-          color: '#1a3c6e', background: '#e8eef7',
+          color: 'var(--accent)', background: 'var(--accent-soft)',
           borderRadius: 3, padding: '0.12rem 0.4rem',
           marginBottom: '0.28rem', display: 'inline-block',
           fontFamily: "'Lufga', sans-serif" }}>
@@ -759,12 +759,12 @@ const renderMatch = (m) => {
       {/* Player A */}
       <div style={{
         ...styles.matchPlayer,
-        background: hasScore && m.score_a > m.score_b ? '#e8f5e9' : 
-                    waitingForWinnerA ? '#fff3e0' : 'transparent',
-        color: isPhantom ? '#90a4ae'
-              : hasScore && m.score_a > m.score_b ? '#1b5e20' 
+        background: hasScore && m.score_a > m.score_b ? 'rgba(46,125,50,0.14)' : 
+                    waitingForWinnerA ? 'rgba(230,81,0,0.10)' : 'transparent',
+        color: isPhantom ? 'var(--muted)'
+              : hasScore && m.score_a > m.score_b ? 'var(--success)' 
               : waitingForWinnerA ? '#e65100'
-              : '#212121',
+              : 'var(--text)',
         fontWeight: hasScore && m.score_a > m.score_b ? 700 : 
                     waitingForWinnerA ? 600 : 500,
         fontStyle: isPhantom || waitingForWinnerA ? 'italic' : 'normal',
@@ -778,12 +778,12 @@ const renderMatch = (m) => {
       {/* Player B */}
       <div style={{
         ...styles.matchPlayer,
-        background: hasScore && m.score_b > m.score_a ? '#e8f5e9' : 
-                    waitingForWinnerB ? '#fff3e0' : 'transparent',
-        color: isPhantom ? '#90a4ae'
-              : hasScore && m.score_b > m.score_a ? '#1b5e20'
+        background: hasScore && m.score_b > m.score_a ? 'rgba(46,125,50,0.14)' : 
+                    waitingForWinnerB ? 'rgba(230,81,0,0.10)' : 'transparent',
+        color: isPhantom ? 'var(--muted)'
+              : hasScore && m.score_b > m.score_a ? 'var(--success)'
               : waitingForWinnerB ? '#e65100'
-              : (isBye && !m.player_b_employee_id) ? '#9e9e9e' : '#212121',
+              : (isBye && !m.player_b_employee_id) ? 'var(--muted)' : 'var(--text)',
         fontWeight: hasScore && m.score_b > m.score_a ? 700 : 
                     waitingForWinnerB ? 600 : 500,
         fontStyle: isPhantom || (isBye && !m.player_b_employee_id) || waitingForWinnerB ? 'italic' : 'normal',
@@ -842,7 +842,7 @@ const renderMatch = (m) => {
           padding: '0.2rem 0.55rem', 
           fontSize: '0.66rem', 
           color: '#e65100', 
-          background: '#fff3e0', 
+          background: 'rgba(255,152,0,0.10)', 
           borderRadius: 4,
           textAlign: 'center',
           border: '1px dashed #ff9800'
@@ -856,7 +856,7 @@ const renderMatch = (m) => {
         <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
           <button
             onClick={() => openEditMatchModal(m)}
-            style={{ ...styles.tinyEnterBtn, background: '#5c6bc0', flex: 1 }}
+            style={{ ...styles.tinyEnterBtn, background: 'var(--accent)', flex: 1 }}
             title="Edit match players / schedule"
           >✎ Edit</button>
           <button
@@ -919,13 +919,13 @@ const renderMatch = (m) => {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.75rem',
             flexWrap: 'wrap',
-            background: 'white',
+            background: 'var(--bg-surface-strong)',
             border: '1px solid #d8e2ef',
             borderRadius: 10,
             padding: '0.6rem 1rem',
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
           }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#555', whiteSpace: 'nowrap' , fontFamily: "'Lufga', sans-serif" }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-soft)', whiteSpace: 'nowrap' , fontFamily: "'Lufga', sans-serif" }}>
               📋 Tournament
             </span>
             <select
@@ -934,8 +934,8 @@ const renderMatch = (m) => {
               style={{
                 ...styles.formInput,
                 flex: 1, minWidth: 220, maxWidth: 400,
-                fontWeight: 600, color: '#1a3c6e',
-                borderColor: '#1a3c6e', borderRadius: 6,
+                fontWeight: 600, color: 'var(--accent)',
+                borderColor: 'var(--accent)', borderRadius: 6,
                 fontFamily: "'Lufga', sans-serif" }}
             >
               {tournaments.map(t => (
@@ -947,15 +947,15 @@ const renderMatch = (m) => {
             {activeTournamentRecord && (
               <span style={{
                 ...styles.tinyChip,
-                background: FORMAT_BADGE[activeTournamentRecord.format]?.bg || '#f5f5f5',
-                color: FORMAT_BADGE[activeTournamentRecord.format]?.color || '#444',
+                background: FORMAT_BADGE[activeTournamentRecord.format]?.bg || 'var(--bg-muted)',
+                color: FORMAT_BADGE[activeTournamentRecord.format]?.color || 'var(--text-soft)',
                 fontSize: '0.68rem', whiteSpace: 'nowrap',
               }}>
                 {FORMAT_BADGE[activeTournamentRecord.format]?.label || activeTournamentRecord.format}
               </span>
             )}
             {activeTournamentRecord && (
-              <span style={{ fontSize: '0.68rem', color: '#888', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                 {formatDate(activeTournamentRecord.start_date)}
                 {activeTournamentRecord.end_date ? ` → ${formatDate(activeTournamentRecord.end_date)}` : ''}
               </span>
@@ -965,7 +965,7 @@ const renderMatch = (m) => {
 
         {/* ── Round-Robin Standings Table ─────────────────────────────── */}
         {isRoundRobin && rrMatches.length > 0 && (
-          <div className="clay-card" style={{ ...styles.card, background: '#e8f4fd' }}>
+          <div className="clay-card" style={{ ...styles.card, background: 'var(--accent-soft)' }}>
             <div style={styles.cardHeader}>
               <div style={styles.cardHeaderTitle}>📋 Round-Robin Standings</div>
               {rrAllDone && hasKoPhase && (
@@ -991,7 +991,7 @@ const renderMatch = (m) => {
                 <tbody>
                   {rrStandings.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>
+                      <td colSpan={8} style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>
                         No results yet.
                       </td>
                     </tr>
@@ -1002,31 +1002,31 @@ const renderMatch = (m) => {
                       <tr
                         key={row.employee_id}
                         style={{
-                          borderBottom: '1px solid #d0d0d0',
-                          background: isTop3 ? '#f0fff4' : qualifies ? '#f5f5f5' : 'transparent',
+                          borderBottom: '1px solid var(--border)',
+                          background: isTop3 ? 'rgba(46,125,50,0.10)' : qualifies ? 'var(--bg-muted)' : 'transparent',
                           opacity: qualifies ? 1 : 0.55,
                         }}
                       >
-                        <td style={{ ...styles.td, fontWeight: 700, color: i === 0 ? '#f9a825' : i === 1 ? '#9e9e9e' : i === 2 ? '#d84315' : '#444' , fontFamily: "'Lufga', sans-serif" }}>
+                        <td style={{ ...styles.td, fontWeight: 700, color: i === 0 ? '#f9a825' : i === 1 ? 'var(--muted-strong)' : i === 2 ? '#d84315' : 'var(--text-soft)' , fontFamily: "'Lufga', sans-serif" }}>
                           {i + 1}
                         </td>
                         <td style={{ ...styles.td, fontWeight: 600 , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(row.employee_id)}</td>
                         <td style={styles.td}>{row.played}</td>
-                        <td style={{ ...styles.td, color: '#2e7d32', fontWeight: 600 , fontFamily: "'Lufga', sans-serif" }}>{row.won}</td>
+                        <td style={{ ...styles.td, color: 'var(--success)', fontWeight: 600 , fontFamily: "'Lufga', sans-serif" }}>{row.won}</td>
                         <td style={styles.td}>{row.drawn}</td>
-                        <td style={{ ...styles.td, color: '#c62828' }}>{row.lost}</td>
-                        <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{row.points}</td>
+                        <td style={{ ...styles.td, color: 'var(--danger)' }}>{row.lost}</td>
+                        <td style={{ ...styles.td, fontWeight: 700, color: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}>{row.points}</td>
                         <td style={styles.td}>
                           {qualifies ? (
                             <span style={{
                               ...styles.tinyChip,
-                              background: isTop3 ? '#e8f5e9' : '#fff3e0',
-                              color: isTop3 ? '#1b5e20' : '#e65100',
+                              background: isTop3 ? 'rgba(46,125,50,0.14)' : 'rgba(230,81,0,0.12)',
+                              color: isTop3 ? 'var(--success)' : '#e65100',
                             }}>
                               {isTop3 ? `Seed ${i + 1} — BYE` : `Seed ${i + 1}`}
                             </span>
                           ) : (
-                            <span style={{ ...styles.tinyChip, background: '#ffebee', color: '#c62828' }}>Eliminated</span>
+                            <span style={{ ...styles.tinyChip, background: 'rgba(229,57,53,0.12)', color: 'var(--danger)' }}>Eliminated</span>
                           )}
                         </td>
                       </tr>
@@ -1043,7 +1043,7 @@ const renderMatch = (m) => {
           <div className="clay-card" style={{ ...styles.card }}>
             <div style={styles.cardHeader}>
               <div style={styles.cardHeaderTitle}>🏆 Knockout Phase</div>
-              <span style={{ fontSize: '0.7rem', color: '#888' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
                 {rrAllDone ? 'Top 5 · QF → SF → Final' : '⏳ Players fill in as league results arrive · QF → SF → Final'}
               </span>
             </div>
@@ -1077,7 +1077,7 @@ const renderMatch = (m) => {
               <select
                 value={activeTournament || ''}
                 onChange={(e) => setActiveTournament(e.target.value)}
-                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}
+                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: 'var(--accent)', borderColor: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}
               >
                 {tournaments.map(t => (
                   <option key={t.id} value={t.id}>
@@ -1088,7 +1088,7 @@ const renderMatch = (m) => {
             </div>
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
               {activeTournamentRecord && (
-                <span style={{ fontSize: '0.7rem', color: '#888' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
                   {activeTournamentRecord.format.replace('_', ' ').toUpperCase()}
                 </span>
               )}
@@ -1108,7 +1108,7 @@ const renderMatch = (m) => {
                   disabled={!canGenerateFixtures}
                   style={{
                     ...styles.navyBtn,
-                    background: canGenerateFixtures ? '#1a3c6e' : '#9e9e9e',
+                    background: canGenerateFixtures ? 'var(--accent)' : 'var(--muted)',
                     opacity: canGenerateFixtures ? 1 : 0.55,
                     cursor: canGenerateFixtures ? 'pointer' : 'not-allowed',
                   }}
@@ -1136,7 +1136,7 @@ const renderMatch = (m) => {
                       showToast('Fixtures refreshed');
                     }
                   }}
-                  style={{ ...styles.navyBtn, background: '#37474f' }}
+                  style={{ ...styles.navyBtn, background: 'var(--accent-strong)' }}
                   title="Reload fixtures and participants from the database"
                 >🔄 Refresh</button>
               )}
@@ -1213,13 +1213,13 @@ const renderMatch = (m) => {
         </div>
 
         {/* Participants */}
-        <div className="clay-card" style={{background:'#f3dcd6'}}>
+        <div className="clay-card" style={{background:'var(--bg-surface-strong)'}}>
           <div style={styles.cardHeader}>
             <div style={styles.cardHeaderTitle}>
               Registered Participants — {activeTournamentRecord.name}
             </div>
             {isAdmin() && (
-              <span style={{ fontSize: '0.7rem', color: '#888' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
                 {partsList.length} registered
               </span>
             )}
@@ -1235,9 +1235,9 @@ const renderMatch = (m) => {
               </thead>
               <tbody>
                 {partsList.length === 0 ? (
-                  <tr><td colSpan="8" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>No participants yet.</td></tr>
+                  <tr><td colSpan="8" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>No participants yet.</td></tr>
                 ) : partsList.map((p, i) => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={styles.td}>{i + 1}</td>
                     <td style={styles.td}><strong>{getEmployeeName(p.employee_id)}</strong></td>
                     <td style={styles.td}>{employees.find(e => e.employee_code === p.employee_id)?.department || '—'}</td>
@@ -1251,8 +1251,8 @@ const renderMatch = (m) => {
                             title={`Registered in ${count} active tournament(s)`}
                             style={{
                               ...styles.tinyChip,
-                              background: count > 1 ? '#e3f2fd' : '#f5f5f5',
-                              color: count > 1 ? '#1565c0' : '#666',
+                              background: count > 1 ? 'var(--accent-soft)' : 'var(--bg-muted)',
+                              color: count > 1 ? 'var(--accent)' : 'var(--text-soft)',
                               fontWeight: count > 1 ? 700 : 400,
                             }}
                           >
@@ -1288,12 +1288,12 @@ const renderMatch = (m) => {
     if (!activeTournamentRecord) {
       return (
         <div className="clay-card" style={{ ...styles.card, textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', color: '#888' }}>Select a tournament first.</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Select a tournament first.</div>
         </div>
       );
     }
     return (
-      <div className="clay-card" style={{background:'#e6dd68'}}>
+      <div className="clay-card" style={{background:'var(--bg-surface-strong)'}}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>Match Records — {activeTournamentRecord.name}</div>
         </div>
@@ -1308,18 +1308,18 @@ const renderMatch = (m) => {
             </thead>
             <tbody>
               {matchesForActive.length === 0 ? (
-                <tr><td colSpan="10" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>No matches scheduled.</td></tr>
+                <tr><td colSpan="10" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>No matches scheduled.</td></tr>
               ) : matchesForActive.map((m) => {
                 const allowed = canEditMatch(m);
                 return (
-                <tr key={m.id} style={{ borderBottom: '1px solid #eee' }}>
+                <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={styles.td}>{m.round} · M{m.match_number}</td>
                   <td style={styles.td}><strong>{m.match_code || `M${m.match_number}`}</strong></td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_a_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_a_employee_id ? 700 : 500 }}>
                     {m.player_a_employee_id ? [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{m.score_a ?? '—'}</td>
-                  <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{m.score_b ?? '—'}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}>{m.score_a ?? '—'}</td>
+                  <td style={{ ...styles.td, fontWeight: 700, color: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}>{m.score_b ?? '—'}</td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_b_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_b_employee_id ? 700 : 500 }}>
                     {m.player_b_employee_id ? [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
@@ -1339,7 +1339,7 @@ const renderMatch = (m) => {
                         {m.status === 'completed' ? '✎ Result' : '⏎ Enter'}
                       </button>
                     ) : (
-                      <span style={{ fontSize: '0.62rem', color: '#bbb' }} title="Only the two players in this match (or an admin) can enter results">🔒</span>
+                      <span style={{ fontSize: '0.62rem', color: 'var(--muted)' }} title="Only the two players in this match (or an admin) can enter results">🔒</span>
                     )}
                   </td>
                   {/* Admin-only: edit match players/schedule + delete */}
@@ -1348,7 +1348,7 @@ const renderMatch = (m) => {
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
                         <button
                           onClick={() => openEditMatchModal(m)}
-                          style={{ ...styles.tinyIconBtn, color: '#5c6bc0', borderColor: '#c5cae9' }}
+                          style={{ ...styles.tinyIconBtn, color: 'var(--accent)', borderColor: 'var(--border)' }}
                           title="Edit match players / schedule"
                         >✎</button>
                         <button
@@ -1358,7 +1358,7 @@ const renderMatch = (m) => {
                         >🗑</button>
                       </div>
                     ) : (
-                      <span style={{ fontSize: '0.62rem', color: '#bbb' }}>—</span>
+                      <span style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>—</span>
                     )}
                   </td>
                 </tr>
@@ -1379,7 +1379,7 @@ const renderMatch = (m) => {
     if (!activeTournamentRecord) {
       return (
         <div className="clay-card" style={{ ...styles.card, textAlign: 'center', padding: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', color: '#888' }}>Select a tournament first.</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Select a tournament first.</div>
         </div>
       );
     }
@@ -1393,7 +1393,7 @@ const renderMatch = (m) => {
               <select
                 value={activeTournament || ''}
                 onChange={(e) => setActiveTournament(e.target.value)}
-                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: '#1a3c6e', borderColor: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}
+                style={{ ...styles.formInput, width: 'auto', minWidth: 200, fontWeight: 600, color: 'var(--accent)', borderColor: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}
               >
                 {tournaments.map(t => (
                   <option key={t.id} value={t.id}>
@@ -1547,15 +1547,15 @@ const renderMatch = (m) => {
               </thead>
               <tbody>
                 {resultsForActive.length === 0 ? (
-                  <tr><td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1rem' }}>No final results declared yet.</td></tr>
+                  <tr><td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>No final results declared yet.</td></tr>
                 ) : resultsForActive.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={styles.td}>
                       <span style={{
-                        ...(r.position === 1 ? { bg: '#fff8e1', color: '#f9a825' } :
-                            r.position === 2 ? { bg: '#eceff1', color: '#607d8b' } :
-                            r.position === 3 ? { bg: '#fff3e0', color: '#e65100' } :
-                            { bg: '#f5f5f5', color: '#666' }),
+                        ...(r.position === 1 ? { background: 'rgba(249,168,37,0.14)', color: '#f9a825' } :
+                            r.position === 2 ? { background: 'var(--bg-muted)', color: 'var(--muted-strong)' } :
+                            r.position === 3 ? { background: 'rgba(216,67,21,0.10)', color: '#e65100' } :
+                            { background: 'var(--bg-muted)', color: 'var(--text-soft)' }),
                         ...styles.tinyChip,
                       }}>
                         {r.position === 1 ? '🥇 1st' : r.position === 2 ? '🥈 2nd' : r.position === 3 ? '🥉 3rd' : `${r.position}th`}
@@ -1566,7 +1566,7 @@ const renderMatch = (m) => {
                     <td style={styles.td}>{r.matches_played}</td>
                     <td style={styles.td}>{r.wins}</td>
                     <td style={styles.td}>{r.losses}</td>
-                    <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{r.points}</td>
+                    <td style={{ ...styles.td, fontWeight: 700, color: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}>{r.points}</td>
                     <td style={styles.td}>{r.prize_description || '—'}</td>
                     <td style={styles.td}>
                       {/* Admin: can download certificates for ANY participant.
@@ -1613,7 +1613,7 @@ const renderMatch = (m) => {
                                 }}
                                 style={{
                                   ...styles.tinyEnterBtn,
-                                  background: certPrinting === btnKey ? '#888' : '#1a3c6e',
+                                  background: certPrinting === btnKey ? 'var(--muted)' : 'var(--accent)',
                                   opacity: certPrinting === btnKey ? 0.7 : 1,
                                   cursor: certPrinting === btnKey ? 'wait' : 'pointer',
                                   minWidth: 110,
@@ -1658,7 +1658,7 @@ const renderMatch = (m) => {
                                 }}
                                 style={{
                                   ...styles.tinyEnterBtn,
-                                  background: certPrinting === partKey ? '#888' : '#546e7a',
+                                  background: certPrinting === partKey ? 'var(--muted)' : 'var(--accent-strong)',
                                   opacity: certPrinting === partKey ? 0.7 : 1,
                                   cursor: certPrinting === partKey ? 'wait' : 'pointer',
                                   minWidth: 110,
@@ -1673,7 +1673,7 @@ const renderMatch = (m) => {
                         </div>
                       ) : (
                         <span
-                          style={{ fontSize: '0.66rem', color: '#bbb' }}
+                          style={{ fontSize: '0.66rem', color: 'var(--muted)' }}
                           title="Certificate available only for your own results"
                         >—</span>
                       )}
@@ -1694,7 +1694,7 @@ const renderMatch = (m) => {
               <div style={styles.cardHeaderTitle}>📜 All Participants — Participation Certificates</div>
               <span style={styles.recordCount}>{partsList.length} participant(s)</span>
             </div>
-            <p style={{ fontSize: '0.72rem', color: '#666', margin: '0 0 0.85rem 0', lineHeight: 1.55 }}>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-soft)', margin: '0 0 0.85rem 0', lineHeight: 1.55 }}>
               Every registered participant can download their Certificate of Participation here.
               {' '}Top‑3 finishers can additionally download their Rank certificate from the Final Results table above.
             </p>
@@ -1712,8 +1712,8 @@ const renderMatch = (m) => {
                     const canSee = isAdmin() || p.employee_id?.toUpperCase() === currentEmpId.toUpperCase();
                     const btnKey = `part_${p.employee_id}_participation`;
                     return (
-                      <tr key={p.id || p.employee_id} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ ...styles.td, color: '#666' }}>{p.employee_id}</td>
+                      <tr key={p.id || p.employee_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ ...styles.td, color: 'var(--text-soft)' }}>{p.employee_id}</td>
                         <td style={styles.td}><strong>{getEmployeeName(p.employee_id)}</strong></td>
                         <td style={styles.td}>{p.department || '—'}</td>
                         <td style={styles.td}>
@@ -1744,7 +1744,7 @@ const renderMatch = (m) => {
                               }}
                               style={{
                                 ...styles.tinyEnterBtn,
-                                background: certPrinting === btnKey ? '#888' : '#546e7a',
+                                background: certPrinting === btnKey ? 'var(--muted)' : 'var(--accent-strong)',
                                 opacity:    certPrinting === btnKey ? 0.7 : 1,
                                 cursor:     certPrinting === btnKey ? 'wait' : 'pointer',
                                 minWidth: 120,
@@ -1754,7 +1754,7 @@ const renderMatch = (m) => {
                             </button>
                           ) : (
                             <span
-                              style={{ fontSize: '0.66rem', color: '#bbb' }}
+                              style={{ fontSize: '0.66rem', color: 'var(--muted)' }}
                               title="Certificate available only for your own record"
                             >—</span>
                           )}
@@ -2129,7 +2129,7 @@ const renderMatch = (m) => {
   };
 
   return (
-    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: '#212121' }}>
+    <div className="tournaments-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
       <style>{lufgaFontStyle}</style>
       <EventsTopBar active="tournaments" />
 
@@ -2143,8 +2143,8 @@ const renderMatch = (m) => {
               onClick={() => setSub(t.id)}
               style={{
                 ...styles.subTabBtn,
-                color: isActive ? '#1a3c6e' : '#444466',
-                borderBottom: isActive ? '3px solid #1a3c6e' : '3px solid transparent',
+                color: isActive ? 'var(--accent)' : 'var(--muted)',
+                borderBottom: isActive ? '3px solid var(--accent)' : '3px solid transparent',
                 fontWeight: isActive ? 700 : 500,
               }}
             >
@@ -2231,9 +2231,9 @@ const renderMatch = (m) => {
                   />
                 </div>
                 <div style={{
-                  fontSize: '0.68rem', color: '#7b5800',
-                  background: '#fff8e1', borderRadius: 4,
-                  padding: '0.55rem 0.7rem', border: '1px solid #ffe082',
+                  fontSize: '0.68rem', color: 'var(--warning)',
+                  background: 'rgba(249,168,37,0.10)', borderRadius: 4,
+                  padding: '0.55rem 0.7rem', border: '1px solid rgba(249,168,37,0.32)',
                   lineHeight: 1.5,
                 }}>
                   💡 <strong>To unlock Generate Fixtures:</strong> set Status → <em>Registration Open</em>, Registration → <em>Closed</em>, Start Date → <em>today or earlier</em>.
@@ -2381,10 +2381,10 @@ const renderMatch = (m) => {
 
                     {/* Team A */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                      <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
+                      <div style={{ background: 'var(--accent-soft)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🔵 Team A
-                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                           {Array.from({ length: ppt }).map((_, idx) => (
@@ -2410,10 +2410,10 @@ const renderMatch = (m) => {
 
                     {/* Team B */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                      <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
+                      <div style={{ background: 'rgba(249,168,37,0.10)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🟠 Team B
-                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                           {Array.from({ length: ppt }).map((_, idx) => (
@@ -2505,10 +2505,10 @@ const renderMatch = (m) => {
 
                     {/* Team A */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                      <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1a3c6e', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
+                      <div style={{ background: 'var(--accent-soft)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🔵 Team A
-                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                           {Array.from({ length: ppt }).map((_, idx) => (
@@ -2534,10 +2534,10 @@ const renderMatch = (m) => {
 
                     {/* Team B */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
-                      <div style={{ background: '#fef3e2', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#c47f00', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
+                      <div style={{ background: 'rgba(249,168,37,0.10)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.45rem' , fontFamily: "'Lufga', sans-serif" }}>
                           🟠 Team B
-                          <span style={{ fontWeight: 400, color: '#666' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                           {Array.from({ length: ppt }).map((_, idx) => (
@@ -2766,7 +2766,7 @@ const renderMatch = (m) => {
             <div style={{ padding: '1rem', maxHeight: '62vh', overflowY: 'auto' }}>
 
               {/* Info banner */}
-              <div style={{ background: '#e8eef7', borderRadius: 6, padding: '0.55rem 0.75rem', fontSize: '0.72rem', color: '#1a3c6e', marginBottom: '0.9rem', lineHeight: 1.5 }}>
+              <div style={{ background: 'var(--accent-soft)', borderRadius: 6, padding: '0.55rem 0.75rem', fontSize: '0.72rem', color: 'var(--accent)', marginBottom: '0.9rem', lineHeight: 1.5 }}>
                 <strong>Auto-populated from bracket:</strong> Positions and match stats are taken from completed fixtures.
                 Only enter the <strong>prize money (₹)</strong> for each winner. Add 3rd place manually if needed.
               </div>
@@ -2782,8 +2782,8 @@ const renderMatch = (m) => {
                       const firstMember = members[0];
                       const isManual = firstMember?._manual;
                       const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `#${pos}`;
-                      const cardBg = pos === 1 ? '#fff8e1' : pos === 2 ? '#f5f5f5' : pos === 3 ? '#fff3e0' : '#fafafa';
-                      const borderColor = pos === 1 ? '#f9a825' : pos === 2 ? '#b0bec5' : pos === 3 ? '#d84315' : '#d0d0d0';
+                      const cardBg = pos === 1 ? 'rgba(249,168,37,0.10)' : pos === 2 ? 'var(--bg-muted)' : pos === 3 ? 'rgba(216,67,21,0.08)' : 'var(--bg-soft)';
+                      const borderColor = pos === 1 ? '#f9a825' : pos === 2 ? '#b0bec5' : pos === 3 ? '#d84315' : 'var(--border)';
                       // Shared prize amount — use first member's value
                       const sharedPrize = firstMember?.prize_amount ?? '';
 
@@ -2793,7 +2793,7 @@ const renderMatch = (m) => {
                           {/* Header row: medal + position label + remove btn */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                             <span style={{ fontSize: '1.25rem' }}>{medal}</span>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1e2f' , fontFamily: "'Lufga', sans-serif" }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-strong)' , fontFamily: "'Lufga', sans-serif" }}>
                               {pos === 1 ? '1st Place' : pos === 2 ? '2nd Place' : pos === 3 ? '3rd Place' : `${pos}th Place`}
                             </span>
                             {isManual && (
@@ -2851,8 +2851,8 @@ const renderMatch = (m) => {
                                 <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.3rem 0' }}>
                                   {/* Name + dept */}
                                   <div style={{ minWidth: 130, flex: 1 }}>
-                                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e1e2f' , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(member.employee_id)}</div>
-                                    <div style={{ fontSize: '0.65rem', color: '#777' }}>{member.department}</div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-strong)' , fontFamily: "'Lufga', sans-serif" }}>{getEmployeeName(member.employee_id)}</div>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>{member.department}</div>
                                   </div>
                                   {/* Per-player stats */}
                                   <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
@@ -2863,8 +2863,8 @@ const renderMatch = (m) => {
                                       { label: 'Pts',    val: member.points },
                                     ].map(({ label, val }) => (
                                       <div key={label} style={{ textAlign: 'center', minWidth: 36 }}>
-                                        <div style={{ fontSize: '0.58rem', color: '#999', textTransform: 'uppercase' }}>{label}</div>
-                                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{val ?? 0}</div>
+                                        <div style={{ fontSize: '0.58rem', color: 'var(--muted)', textTransform: 'uppercase' }}>{label}</div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}>{val ?? 0}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -2875,11 +2875,11 @@ const renderMatch = (m) => {
 
                           {/* Shared prize money input for this position */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderTop: `1px dashed ${borderColor}`, paddingTop: '0.5rem' }}>
-                            <label style={{ fontSize: '0.68rem', color: '#555', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                            <label style={{ fontSize: '0.68rem', color: 'var(--text-soft)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                               Prize Money (₹) {members.length > 1 ? '— per player' : ''}
                             </label>
-                            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #d0d0d0', borderRadius: 4, overflow: 'hidden', background: 'white' }}>
-                              <span style={{ padding: '0 0.35rem', color: '#888', fontSize: '0.75rem', background: '#f5f5f5', borderRight: '1px solid #d0d0d0', userSelect: 'none' }}>₹</span>
+                            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', background: 'var(--bg-surface-strong)' }}>
+                              <span style={{ padding: '0 0.35rem', color: 'var(--muted)', fontSize: '0.75rem', background: 'var(--bg-muted)', borderRight: '1px solid var(--border)', userSelect: 'none' }}>₹</span>
                               <input
                                 style={{ ...styles.formInput, border: 'none', width: 90, padding: '0.28rem 0.4rem' }}
                                 type="number" min="0" placeholder="0"
@@ -2951,13 +2951,13 @@ const renderMatch = (m) => {
               <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Delete Match</h3>
               <button onClick={() => setMatchToDelete(null)} style={styles.modalClose}>✕</button>
             </div>
-            <div style={{ padding: '1rem', fontSize: '0.78rem', color: '#333' }}>
+            <div style={{ padding: '1rem', fontSize: '0.78rem', color: 'var(--text)' }}>
               <p style={{ margin: '0 0 0.5rem 0' }}>
                 Are you sure you want to delete match{' '}
                 <strong>{matchToDelete.match_code || `M${matchToDelete.match_number}`}</strong>
                 {' '}({matchToDelete.round})?
               </p>
-              <p style={{ margin: 0, color: '#c62828', fontSize: '0.72rem' }}>
+              <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.72rem' }}>
                 This will also remove all player assignments for this match. This cannot be undone.
               </p>
             </div>
@@ -3148,7 +3148,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
           <div style={styles.cardHeader}>
             <div style={styles.cardHeaderTitle}>🔗 Link Stopwatch to Match</div>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#666', marginBottom: '0.55rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', marginBottom: '0.55rem' }}>
             Select a scheduled match to link this stopwatch session. The timer will be associated with the chosen match.
           </div>
           <select
@@ -3165,11 +3165,11 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
             ))}
           </select>
           {linkedMatch ? (
-            <div style={{ background: '#e8f5e9', borderRadius: 6, padding: '0.6rem 0.75rem', border: '1px solid #a5d6a7' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2e7d32', marginBottom: '0.25rem' , fontFamily: "'Lufga', sans-serif" }}>
+            <div style={{ background: 'rgba(46,125,50,0.10)', borderRadius: 6, padding: '0.6rem 0.75rem', border: '1px solid rgba(46,125,50,0.28)' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.25rem' , fontFamily: "'Lufga', sans-serif" }}>
                 ✓ Linked — {linkedMatch.round} · {linkedMatch.match_code || `M${linkedMatch.match_number}`}
               </div>
-              <div style={{ fontSize: '0.68rem', color: '#388e3c' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--success)' }}>
                 {linkedMatch.player_a_employee_id
                   ? linkedMatch.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
                   : 'TBD'}
@@ -3179,7 +3179,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
                   : 'TBD'}
               </div>
               {linkedMatch.scheduled_at && (
-                <div style={{ fontSize: '0.65rem', color: '#555', marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-soft)', marginTop: '0.2rem' }}>
                   Scheduled: {new Date(linkedMatch.scheduled_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}
                 </div>
               )}
@@ -3189,7 +3189,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
               >✕ Unlink</button>
             </div>
           ) : (
-            <div style={{ padding: '0.6rem', textAlign: 'center', color: '#aaa', fontSize: '0.7rem', background: '#fafafa', borderRadius: 6, border: '1px dashed #ddd' }}>
+            <div style={{ padding: '0.6rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.7rem', background: 'var(--bg-muted)', borderRadius: 6, border: '1px dashed var(--border-strong)' }}>
               No match linked — stopwatch runs independently
             </div>
           )}
@@ -3223,13 +3223,13 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
           </div>
           <div style={{ maxHeight: 220, overflowY: 'auto' }}>
             {todaySchedule.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', color: '#888', fontSize: '0.78rem' }}>No upcoming matches.</div>
+              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem' }}>No upcoming matches.</div>
             ) : todaySchedule.map(m => (
-              <div key={m.id} style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid #eee', fontSize: '0.74rem' }}>
-                <div style={{ fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>
+              <div key={m.id} style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--border)', fontSize: '0.74rem' }}>
+                <div style={{ fontWeight: 700, color: 'var(--accent)' , fontFamily: "'Lufga', sans-serif" }}>
                   {m.scheduled_at ? new Date(m.scheduled_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : 'TBD'} — {m.match_code || `Match ${m.match_number}`}
                 </div>
-                <div style={{ color: '#666' }}>
+                <div style={{ color: 'var(--text-soft)' }}>
                   {m.player_a_employee_id
                     ? m.player_a_employee_id.split(',').map(id => getEmployeeName(id.trim())).join(' & ')
                     : 'TBD'}
@@ -3252,7 +3252,7 @@ const LUFGA_BOLD    = "'Lufga', sans-serif"; // bold weight applied via fontWeig
 
 const styles = {
   subTabBar: {
-    background: 'white', borderRadius: 32, padding: '4px 8px',
+    background: 'var(--bg-surface-strong)', borderRadius: 32, padding: '4px 8px',
     marginBottom: '14px', display: 'flex', gap: '4px', alignItems: 'center',
     boxShadow: '0 2px 8px rgba(0,0,0,0.04)', flexWrap: 'wrap',
   },
@@ -3263,57 +3263,57 @@ const styles = {
     cursor: 'pointer', borderBottom: '3px solid transparent', marginBottom: '-1px',
     transition: 'color 0.2s ease, border-color 0.2s ease',
   },
-  card: { background: 'white', borderRadius: 16, padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid rgba(200,210,230,0.5)', fontFamily: LUFGA_REGULAR },
+  card: { background: 'var(--bg-surface-strong)', borderRadius: 16, padding: '1rem', boxShadow: 'var(--surface-shadow-soft)', border: '1px solid var(--border)', fontFamily: LUFGA_REGULAR },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' },
   // Headings → Lufga Bold (weight 700)
-  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 700, color: '#1e1e2f', fontFamily: LUFGA_BOLD },
-  recordCount: { fontSize: '0.7rem', color: '#666', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
-  navyBtn: { background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
-  outlineBtn: { background: 'white', color: '#1a3c6e', border: '1px solid #d0d0d0', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
-  dangerBtn: { background: '#c62828', color: 'white', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
-  tinyIconBtn: { background: 'transparent', border: '1px solid #d0d0d0', borderRadius: 4, padding: '0.18rem 0.4rem', margin: '0 2px', cursor: 'pointer', fontSize: '0.7rem', fontFamily: LUFGA_REGULAR },
-  tinyEnterBtn: { background: '#1a3c6e', color: 'white', border: 'none', borderRadius: 4, padding: '0.2rem 0.55rem', fontSize: '0.66rem', cursor: 'pointer', fontFamily: LUFGA_BOLD, fontWeight: 700 },
+  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', fontFamily: LUFGA_BOLD },
+  recordCount: { fontSize: '0.7rem', color: 'var(--muted)', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
+  navyBtn: { background: 'var(--accent)', color: 'var(--text-strong)', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  outlineBtn: { background: 'var(--bg-surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  dangerBtn: { background: 'var(--danger)', color: 'var(--text-strong)', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  tinyIconBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 4, padding: '0.18rem 0.4rem', margin: '0 2px', cursor: 'pointer', fontSize: '0.7rem', fontFamily: LUFGA_REGULAR },
+  tinyEnterBtn: { background: 'var(--accent)', color: 'var(--text-strong)', border: 'none', borderRadius: 4, padding: '0.2rem 0.55rem', fontSize: '0.66rem', cursor: 'pointer', fontFamily: LUFGA_BOLD, fontWeight: 700 },
   tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block', fontFamily: LUFGA_REGULAR },
 
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', fontFamily: LUFGA_REGULAR },
-  theadRow: { background: 'rgba(26,60,110,0.05)' },
+  theadRow: { background: 'var(--accent-soft)' },
   // Table headings → Lufga Bold
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700, color: '#444', textTransform: 'uppercase', fontSize: '0.62rem', letterSpacing: '0.04em', fontFamily: LUFGA_BOLD },
-  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-soft)', textTransform: 'uppercase', fontSize: '0.62rem', letterSpacing: '0.04em', fontFamily: LUFGA_BOLD },
+  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontFamily: LUFGA_REGULAR, fontWeight: 400, color: 'var(--text)' },
 
   bracketGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', alignItems: 'stretch' },
   bracketCol: { display: 'flex', flexDirection: 'column' },
   // Bracket column headers → Lufga Bold
-  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: '#000000', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f5f5f5', borderRadius: '4px 4px 0 0', border: '1px solid #d0d0d0', borderBottom: 'none', fontFamily: LUFGA_BOLD },
-  bracketColBody: { padding: '0.4rem', background: '#fafafa', borderRadius: '0 0 4px 4px', border: '1px solid #d0d0d0', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100, fontFamily: LUFGA_REGULAR },
+  bracketColHeader: { textAlign: 'center', padding: '0.4rem 0', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)', textTransform: 'uppercase', letterSpacing: '0.06em', background: 'var(--bg-muted)', borderRadius: '4px 4px 0 0', border: '1px solid var(--border)', borderBottom: 'none', fontFamily: LUFGA_BOLD },
+  bracketColBody: { padding: '0.4rem', background: 'var(--bg-soft)', borderRadius: '0 0 4px 4px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: 100, fontFamily: LUFGA_REGULAR },
   matchesGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' },
-  emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', fontStyle: 'italic', fontFamily: LUFGA_REGULAR },
-  matchCard: { background: 'white', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem', fontFamily: LUFGA_REGULAR },
-  matchLabel: { textAlign: 'center', fontSize: '0.62rem', color: '#888', marginBottom: '0.25rem', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
-  matchPlayer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.28rem 0.4rem', borderRadius: 3, fontFamily: LUFGA_REGULAR },
-  matchMeta: { textAlign: 'center', fontSize: '0.6rem', color: '#888', marginTop: '0.25rem', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
+  emptyCol: { padding: '1rem 0.5rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.7rem', fontStyle: 'italic', fontFamily: LUFGA_REGULAR },
+  matchCard: { background: 'var(--bg-surface-strong)', borderRadius: 6, padding: '0.5rem 0.6rem', fontSize: '0.74rem', fontFamily: LUFGA_REGULAR, border: '1px solid var(--border)' },
+  matchLabel: { textAlign: 'center', fontSize: '0.62rem', color: 'var(--muted)', marginBottom: '0.25rem', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
+  matchPlayer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.28rem 0.4rem', borderRadius: 3, fontFamily: LUFGA_REGULAR, color: 'var(--text)' },
+  matchMeta: { textAlign: 'center', fontSize: '0.6rem', color: 'var(--muted)', marginTop: '0.25rem', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
 
   podium: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.7rem', alignItems: 'end', marginBottom: '1.2rem', padding: '0.6rem 0' },
-  podiumGold:   { background: 'linear-gradient(180deg, #fff8e1, #ffecb3)', borderRadius: 8, padding: '1.2rem 0.5rem', textAlign: 'center', border: '2px solid #f9a825', order: 2, fontFamily: LUFGA_REGULAR },
-  podiumSilver: { background: 'linear-gradient(180deg, #fafafa, #eceff1)', borderRadius: 8, padding: '0.9rem 0.5rem', textAlign: 'center', border: '2px solid #b0bec5', order: 1, fontFamily: LUFGA_REGULAR },
-  podiumBronze: { background: 'linear-gradient(180deg, #fff3e0, #ffe0b2)', borderRadius: 8, padding: '0.7rem 0.5rem', textAlign: 'center', border: '2px solid #d84315', order: 3, fontFamily: LUFGA_REGULAR },
+  podiumGold:   { background: 'linear-gradient(180deg, rgba(249,168,37,0.18), rgba(249,168,37,0.08))', borderRadius: 8, padding: '1.2rem 0.5rem', textAlign: 'center', border: '2px solid #f9a825', order: 2, fontFamily: LUFGA_REGULAR },
+  podiumSilver: { background: 'linear-gradient(180deg, var(--bg-muted), var(--bg-soft))', borderRadius: 8, padding: '0.9rem 0.5rem', textAlign: 'center', border: '2px solid #b0bec5', order: 1, fontFamily: LUFGA_REGULAR },
+  podiumBronze: { background: 'linear-gradient(180deg, rgba(216,67,21,0.12), rgba(216,67,21,0.06))', borderRadius: 8, padding: '0.7rem 0.5rem', textAlign: 'center', border: '2px solid #d84315', order: 3, fontFamily: LUFGA_REGULAR },
   // Podium names are headings → Lufga Bold
-  podiumName:   { fontSize: '0.9rem', fontWeight: 700, color: '#1e1e2f', marginBottom: '0.2rem', fontFamily: LUFGA_BOLD },
-  podiumRank:   { fontSize: '0.7rem', fontWeight: 400, color: '#666', marginBottom: '0.3rem', fontFamily: LUFGA_REGULAR },
-  podiumPrize:  { fontSize: '0.7rem', color: '#1a3c6e', fontWeight: 400, fontFamily: LUFGA_REGULAR },
+  podiumName:   { fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.2rem', fontFamily: LUFGA_BOLD },
+  podiumRank:   { fontSize: '0.7rem', fontWeight: 400, color: 'var(--muted)', marginBottom: '0.3rem', fontFamily: LUFGA_REGULAR },
+  podiumPrize:  { fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 400, fontFamily: LUFGA_REGULAR },
 
   swBtn: { width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: LUFGA_REGULAR },
 
   modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 120 },
-  modalCard: { background: 'white', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.22)', fontFamily: LUFGA_REGULAR },
+  modalCard: { background: 'var(--bg-surface-strong)', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.32)', fontFamily: LUFGA_REGULAR },
   // Modal header is a heading → Lufga Bold
-  modalHeader: { background: '#1a3c6e', color: 'white', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0', fontFamily: LUFGA_BOLD },
-  modalClose: { background: 'none', border: 'none', color: 'white', fontSize: '1rem', cursor: 'pointer', fontFamily: LUFGA_REGULAR },
-  modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid #d0d0d0', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: '#fafafa', borderRadius: '0 0 8px 8px', fontFamily: LUFGA_REGULAR },
+  modalHeader: { background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0', fontFamily: LUFGA_BOLD },
+  modalClose: { background: 'none', border: 'none', color: 'var(--accent-contrast)', fontSize: '1rem', cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: 'var(--bg-muted)', borderRadius: '0 0 8px 8px', fontFamily: LUFGA_REGULAR },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  formLabel: { fontSize: '0.7rem', fontWeight: 400, color: '#555', fontFamily: LUFGA_REGULAR },
-  formInput: { padding: '0.32rem 0.55rem', border: '1px solid #d0d0d0', borderRadius: 4, fontSize: '0.75rem', fontFamily: LUFGA_REGULAR, fontWeight: 400, color: '#212121', width: '100%' },
+  formLabel: { fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-soft)', fontFamily: LUFGA_REGULAR },
+  formInput: { padding: '0.32rem 0.55rem', border: '1px solid var(--border)', borderRadius: 4, fontSize: '0.75rem', fontFamily: LUFGA_REGULAR, fontWeight: 400, color: 'var(--text)', background: 'var(--bg-surface)', width: '100%' },
 };
 
 export default TournamentsPage;

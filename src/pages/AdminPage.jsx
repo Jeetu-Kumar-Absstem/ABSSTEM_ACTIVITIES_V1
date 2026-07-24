@@ -122,7 +122,7 @@ const AdminPage = () => {
 
         {activeTab === 'registration-approval' && (
           <div>
-            <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: '#667', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               Pending requests: <strong style={{ fontWeight: 600 }}>{pendingRequests.length}</strong>
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -136,7 +136,7 @@ const AdminPage = () => {
                           padding: '10px 12px',
                           textAlign: 'left',
                           fontWeight: 600,
-                          color: '#444466',
+                          color: 'var(--text-soft)',
                           borderBottom: '1px solid rgba(200,210,230,0.3)',
                           fontFamily: "'Lufga', sans-serif",
                         }}
@@ -149,7 +149,7 @@ const AdminPage = () => {
                 <tbody>
                   {pendingRequests.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ padding: '18px 12px', textAlign: 'center', color: '#888' }}>
+                      <td colSpan="7" style={{ padding: '18px 12px', textAlign: 'center', color: 'var(--muted)' }}>
                         No registration requests are waiting for approval.
                       </td>
                     </tr>
@@ -158,7 +158,7 @@ const AdminPage = () => {
                       <tr key={row.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.22)' }}>
                         <td style={{ padding: '12px', fontFamily: "'Lufga', sans-serif" }}>
                           <strong style={{ fontWeight: 600 }}>{row.employee_id}</strong>
-                          <div style={{ fontSize: '0.66rem', color: '#888', marginTop: '2px', fontWeight: 400 }}>
+                          <div style={{ fontSize: '0.66rem', color: 'var(--muted)', marginTop: '2px', fontWeight: 400 }}>
                             {getEmployeeName(row.employee_id)}
                           </div>
                         </td>
@@ -174,7 +174,7 @@ const AdminPage = () => {
                               padding: '4px 10px',
                               borderRadius: '999px',
                               background: 'rgba(249,168,37,0.12)',
-                              color: '#b26a00',
+                              color: 'var(--warning)',
                               fontWeight: 600,
                               fontSize: '0.68rem',
                               fontFamily: "'Lufga', sans-serif",

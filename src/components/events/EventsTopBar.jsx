@@ -16,7 +16,7 @@ const EventsTopBar = ({ active }) => {
     <div
       className="clay-card"
       style={{
-        background: 'white',
+        background: 'var(--bg-surface-strong)',   // ✅ was: 'white'
         borderRadius: 32,
         padding: '8px 12px',
         marginBottom: '16px',
@@ -24,7 +24,8 @@ const EventsTopBar = ({ active }) => {
         gap: '6px',
         alignItems: 'center',
         flexWrap: 'wrap',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        boxShadow: 'var(--surface-shadow-soft)',  // ✅ was: '0 2px 8px rgba(0,0,0,0.04)'
+        border: '1px solid var(--border)',        // ✅ added for dark mode visibility
       }}
     >
       {TABS.map(tab => {
@@ -41,27 +42,27 @@ const EventsTopBar = ({ active }) => {
               padding: '8px 18px',
               margin: '0 4px',
               border: '2px solid',
-              borderColor: isActive ? '#1a3c6e' : 'rgba(200,210,230,0.5)',
+              borderColor: isActive ? 'var(--accent)' : 'var(--border)',          // ✅ was hardcoded
               borderRadius: 100,
-              background: isActive ? '#1a3c6e' : 'transparent',
-              color: isActive ? '#fff' : '#444466',
+              background: isActive ? 'var(--accent)' : 'transparent',            // ✅ was hardcoded
+              color: isActive ? 'var(--accent-contrast)' : 'var(--text-soft)',    // ✅ was hardcoded
               fontWeight: 700,
               fontSize: '0.78rem',
               fontFamily: '"Aeonik Pro", Arial, sans-serif',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              boxShadow: isActive ? '0 4px 14px rgba(26,60,110,0.35)' : 'none',
+              boxShadow: isActive ? '0 4px 14px var(--accent-glow)' : 'none',    // ✅ was hardcoded
             }}
             onMouseEnter={(e) => {
               if (!isActive) {
-                e.currentTarget.style.borderColor = '#1a3c6e';
-                e.currentTarget.style.color = '#1a3c6e';
+                e.currentTarget.style.borderColor = 'var(--accent)';
+                e.currentTarget.style.color = 'var(--accent)';
               }
             }}
             onMouseLeave={(e) => {
               if (!isActive) {
-                e.currentTarget.style.borderColor = 'rgba(200,210,230,0.5)';
-                e.currentTarget.style.color = '#444466';
+                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.color = 'var(--text-soft)';
               }
             }}
           >

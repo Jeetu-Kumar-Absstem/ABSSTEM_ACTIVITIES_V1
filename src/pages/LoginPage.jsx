@@ -307,10 +307,13 @@ const LoginPage = ({ onLogin }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    // Always light — login page is never affected by dark/light mode
     background: 'linear-gradient(135deg, #eef0f4 0%, #d5dbe8 100%)',
     padding: '20px',
-    position: 'relative',
-    zIndex: 1,
+    position: 'fixed',
+    inset: 0,
+    zIndex: 9999,
+    colorScheme: 'light',
     fontFamily: "'Lufga', sans-serif",
     fontWeight: 400,
   };

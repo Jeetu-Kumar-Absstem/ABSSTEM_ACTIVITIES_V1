@@ -34,9 +34,9 @@ const formatDate = (dateStr) => {
 };
 
 const RANK_STYLES = {
-  1: { bg: 'linear-gradient(180deg, #fff8e1, #ffecb3)', border: '#f9a825', icon: '🥇', label: 'Champion' },
-  2: { bg: 'linear-gradient(180deg, #fafafa, #eceff1)', border: '#b0bec5', icon: '🥈', label: 'Runner-Up' },
-  3: { bg: 'linear-gradient(180deg, #fff3e0, #ffe0b2)', border: '#d84315', icon: '🥉', label: '3rd Place' },
+  1: { bg: 'linear-gradient(180deg, rgba(249,168,37,0.18), rgba(249,168,37,0.08))', border: '#f9a825', icon: '🥇', label: 'Champion' },
+  2: { bg: 'linear-gradient(180deg, var(--bg-muted), var(--bg-soft))', border: '#b0bec5', icon: '🥈', label: 'Runner-Up' },
+  3: { bg: 'linear-gradient(180deg, rgba(216,67,21,0.12), rgba(216,67,21,0.06))', border: '#d84315', icon: '🥉', label: '3rd Place' },
 };
 
 const LeaderboardPage = () => {
@@ -182,7 +182,7 @@ const LeaderboardPage = () => {
   }, [filteredRows, showToast]);
 
   return (
-    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: '#212121' }}>
+    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
       <EventsTopBar active="leaderboard" />
 
       {/* Header strip */}
@@ -221,7 +221,7 @@ const LeaderboardPage = () => {
         <div className="clay-card" style={{ ...styles.card, marginBottom: 14 }}>
           <div style={styles.cardHeader}>
             <div style={styles.cardHeaderTitle}>🏅 Top 3 Podium</div>
-            <div style={{ fontSize: '0.7rem', color: '#080808' }}>Overall, all games combined</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text)' }}>Overall, all games combined</div>
           </div>
           <div style={styles.podium}>
             {podium[2] && (
@@ -240,7 +240,7 @@ const LeaderboardPage = () => {
       {/* Stats row */}
       <div style={styles.statsRow}>
         {[
-          { label: 'Players ranked',       value: stats.total,                        accent: '#1a3c6e', sub: stats.top ? `Top: ${stats.top.employee_name || stats.top.employee_id}` : 'No data yet' },
+          { label: 'Players ranked',       value: stats.total,                        accent: 'var(--accent)', sub: stats.top ? `Top: ${stats.top.employee_name || stats.top.employee_id}` : 'No data yet' },
           { label: 'Highest score',        value: stats.top ? stats.top.total_points : 0, accent: '#f9a825', sub: stats.top ? `${stats.top.employee_name || stats.top.employee_id}` : '—' },
           { label: 'Most wins',            value: stats.mostWins.wins || 0,           accent: '#1b5e20', sub: stats.mostWins.employee_name || '—' },
           { label: 'Most active',          value: stats.mostActive.participations || 0, accent: '#6a1b9a', sub: stats.mostActive.employee_name || '—' },
@@ -257,10 +257,10 @@ const LeaderboardPage = () => {
       </div>
 
       {/* Filter bar */}
-      <div className="clay-card" style={{ ...styles.card, marginBottom: 14,background:'#f4f7bf' }}>
+      <div className="clay-card" style={{ ...styles.card, marginBottom: 14 }}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>📋 Full Leaderboard</div>
-          <span style={{ fontSize: '0.7rem', color: '#888' }}>{filteredRows.length} of {(leaderboard || []).length} player(s)</span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{filteredRows.length} of {(leaderboard || []).length} player(s)</span>
         </div>
         <div style={styles.filterBar}>
           <input
@@ -295,7 +295,7 @@ const LeaderboardPage = () => {
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: '#888', padding: '1.4rem' }}>
+                  <td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1.4rem' }}>
                     No players match your filters yet. As matches and tournaments wrap up, leaderboard points will appear here.
                   </td>
                 </tr>
@@ -306,19 +306,19 @@ const LeaderboardPage = () => {
                   <tr
                     key={r.employee_id}
                     style={{
-                      borderBottom: '1px solid #eee',
-                      background: isMe ? '#fff8e1' : 'transparent',
+                      borderBottom: '1px solid var(--border)',
+                      background: isMe ? 'rgba(249,168,37,0.08)' : 'transparent',
                     }}
                   >
-                    <td style={{ ...styles.td, fontWeight: 600, color: r.rank <= 3 ? '#1a3c6e' : '#444', fontFamily: "'Lufga', sans-serif" }}>
+                    <td style={{ ...styles.td, fontWeight: 600, color: r.rank <= 3 ? 'var(--accent)' : 'var(--text-soft)', fontFamily: "'Lufga', sans-serif" }}>
                       {rankBadge}
                     </td>
                     <td style={styles.td}>
                       <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{r.employee_name || r.employee_id}</div>
-                      <div style={{ fontSize: '0.62rem', color: '#888', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
+                      <div style={{ fontSize: '0.62rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
                     </td>
                     <td style={styles.td}>{r.department || '—'}</td>
-                    <td style={{ ...styles.td, fontWeight: 600, color: '#1a3c6e', fontFamily: "'Lufga', sans-serif" }}>{r.total_points}</td>
+                    <td style={{ ...styles.td, fontWeight: 600, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>{r.total_points}</td>
                     <td style={styles.td}>
                       <div style={{ display: 'flex', gap: 4, fontSize: '0.7rem' }}>
                         <span title="Tournament wins">🥇 {r.tournament_wins || 0}</span>
@@ -332,11 +332,11 @@ const LeaderboardPage = () => {
                     <td style={styles.td}>{r.participations || 0}</td>
                     <td style={styles.td}>
                       {r.rule_violations > 0 || r.no_shows > 0 ? (
-                        <span style={{ ...styles.tinyChip, background: '#ffebee', color: '#c62828' }}>
+                        <span style={{ ...styles.tinyChip, background: 'rgba(229,57,53,0.10)', color: 'var(--danger)' }}>
                           {`V:${r.rule_violations || 0} · NS:${r.no_shows || 0}`}
                         </span>
                       ) : (
-                        <span style={{ color: '#888' }}>—</span>
+                        <span style={{ color: 'var(--muted)' }}>—</span>
                       )}
                     </td>
                     <td style={styles.td}>{formatDate(r.last_activity_at)}</td>
@@ -375,17 +375,17 @@ const PodiumCard = ({ row, pos, tall }) => {
         cursor: 'default',
       }}>
       <div style={{ fontSize: tall ? '2rem' : '1.4rem' }}>{style.icon}</div>
-      <div style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+      <div style={{ fontSize: '0.65rem', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
         {style.label}
       </div>
-      <div style={{ fontWeight: 600, fontSize: tall ? '1.05rem' : '0.95rem', color: '#1e1e2f', marginBottom: 6, fontFamily: "'Lufga', sans-serif" }}>
+      <div style={{ fontWeight: 600, fontSize: tall ? '1.05rem' : '0.95rem', color: 'var(--text-strong)', marginBottom: 6, fontFamily: "'Lufga', sans-serif" }}>
         {row.employee_name || row.employee_id}
       </div>
-      <div style={{ fontSize: '0.6rem', color: '#666', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{row.department || '—'}</div>
-      <div style={{ fontWeight: 600, color: '#1a3c6e', fontSize: tall ? '1.6rem' : '1.3rem', marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>
+      <div style={{ fontSize: '0.6rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{row.department || '—'}</div>
+      <div style={{ fontWeight: 600, color: 'var(--accent)', fontSize: tall ? '1.6rem' : '1.3rem', marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>
         {row.total_points}
       </div>
-      <div style={{ fontSize: '0.6rem', color: '#888', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>points</div>
+      <div style={{ fontSize: '0.6rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>points</div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4, fontSize: '0.6rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
         <span>🥇{row.tournament_wins || 0}</span>
         <span>W{row.match_wins || 0}</span>
@@ -401,7 +401,7 @@ const MetricCard = ({ label, value, sub, accent, hovered, onMouseEnter, onMouseL
     onMouseEnter={onMouseEnter}
     onMouseLeave={onMouseLeave}
     style={{
-      background: 'white',
+      background: 'var(--bg-surface)',
       borderRadius: 14,
       padding: '12px 16px',
       borderTop: `3px solid ${accent}`,
@@ -414,24 +414,24 @@ const MetricCard = ({ label, value, sub, accent, hovered, onMouseEnter, onMouseL
       cursor: 'default',
     }}
   >
-    <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</div>
+    <div style={{ fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</div>
     <div style={{ fontSize: '1.5rem', fontWeight: 600, color: accent, lineHeight: 1.1, marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>{value}</div>
-    <div style={{ fontSize: '0.6rem', color: '#888', marginTop: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{sub}</div>
+    <div style={{ fontSize: '0.6rem', color: 'var(--muted)', marginTop: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{sub}</div>
   </div>
 );
 
 const styles = {
-  card: { background: 'white', borderRadius: 16, padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid rgba(200,210,230,0.5)' },
+  card: { background: 'var(--bg-surface-strong)', borderRadius: 16, padding: '1rem', boxShadow: 'var(--surface-shadow-soft)', border: '1px solid var(--border)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' },
-  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 600, color: '#1e1e2f', fontFamily: "'Lufga', sans-serif" },
+  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" },
   outlineBtn: { background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.6rem', marginBottom: 14 },
   podium: { display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: '0.8rem', alignItems: 'end', padding: '0.4rem 0 0' },
   filterBar: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' },
-  filterInput: { padding: '0.32rem 0.6rem', border: '1px solid #d0d0d0', borderRadius: 4, fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: '#212121', background: 'white', minWidth: 130, flex: 1 },
+  filterInput: { padding: '0.32rem 0.6rem', border: '1px solid var(--border)', borderRadius: 4, fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)', background: 'var(--bg-surface)', minWidth: 130, flex: 1 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', fontFamily: "'Lufga', sans-serif" },
-  theadRow: { background: 'rgba(26,60,110,0.05)' },
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 600, color: '#444', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif" },
+  theadRow: { background: 'var(--accent-soft)' },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-soft)', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif" },
   td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
   tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block', fontFamily: "'Lufga', sans-serif" },
 };
