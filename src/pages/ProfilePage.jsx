@@ -286,7 +286,7 @@ const ProfilePage = () => {
       <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'rgba(255,255,255,0.92)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ fontSize: '0.85rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: '#1e1e2f' }}>
-            🏅 Issued Certificates
+            🏅 My Certificates
           </div>
           <div style={{ fontSize: '0.72rem', color: '#8888aa', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
             {certLoading ? 'Loading…' : `${certLog.length} certificate${certLog.length !== 1 ? 's' : ''} issued`}
@@ -309,14 +309,14 @@ const ProfilePage = () => {
             borderRadius: 16,
             border: '1px dashed #d0d0d0',
           }}>
-            No certificates issued yet.
+            No certificates issued yet. Participate in a tournament to earn one!
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
-                  {['Tournament', 'Game', 'Position', 'Period', 'Issued On', 'Issued By', 'Download'].map(h => (
+                  {['Tournament', 'Game', 'Certificate Type', 'Position', 'Period', 'Issued On', 'Download'].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -324,54 +324,104 @@ const ProfilePage = () => {
               <tbody>
                 {certLog.map((c) => {
                   const t = c.tournaments;
-                  const posLabel = POSITION_LABEL[c.position] || `${c.position}th`;
-                  const posAccent = POSITION_ACCENT[c.position] || '#666';
+
+                  // ── Certificate type display ──────────────────────────────
+                  // certificate_type is one of: participation | rank_1 | rank_2 | rank_3
+                  const certType  = c.certificate_type || 'participation';
+                  const isRank    = certType.startsWith('rank_');
+                  const certMeta  = CERT_TYPE_META[certType] || CERT_TYPE_META.participation;
+
+                  // Position badge (shown for rank certs; '—' for participation)
+                  const posLabel  = isRank
+                    ? (POSITION_LABEL[c.position] || `${c.position}th`)
+                    : '—';
+                  const posAccent = isRank
+                    ? (POSITION_ACCENT[c.position] || '#546e7a')
+                    : '#546e7a';
+
+                  const btnKey = c.id;
+
                   return (
                     <tr key={c.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
+
+                      {/* Tournament name */}
                       <td style={tdStyle}><strong>{t?.name || '—'}</strong></td>
+
+                      {/* Game */}
                       <td style={tdStyle}>{t?.game || '—'}</td>
+
+                      {/* Certificate type chip */}
                       <td style={tdStyle}>
                         <span style={{
-                          padding: '0.15rem 0.55rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          padding: '0.18rem 0.6rem',
                           borderRadius: 4,
                           fontSize: '0.68rem',
                           fontFamily: "'Lufga', sans-serif",
                           fontWeight: 700,
-                          background: `${posAccent}18`,
-                          color: posAccent,
+                          background: `${certMeta.accent}18`,
+                          color: certMeta.accent,
                           whiteSpace: 'nowrap',
-                        }}>{posLabel}</span>
+                        }}>
+                          {certMeta.icon} {certMeta.label}
+                        </span>
                       </td>
+
+                      {/* Position (rank certs only) */}
+                      <td style={tdStyle}>
+                        {isRank ? (
+                          <span style={{
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: 4,
+                            fontSize: '0.68rem',
+                            fontFamily: "'Lufga', sans-serif",
+                            fontWeight: 700,
+                            background: `${posAccent}18`,
+                            color: posAccent,
+                            whiteSpace: 'nowrap',
+                          }}>{posLabel}</span>
+                        ) : (
+                          <span style={{ color: '#bbb', fontSize: '0.68rem' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Tournament period */}
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: '#555' }}>
                         {formatDateShort(t?.start_date)}
                         {t?.end_date ? ` → ${formatDateShort(t.end_date)}` : ''}
                       </td>
+
+                      {/* Issued on */}
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: '#555' }}>
                         {formatDateShort(c.issued_at)}
                       </td>
-                      <td style={tdStyle}>{c.issued_by || '—'}</td>
+
+                      {/* Download button */}
                       <td style={tdStyle}>
                         <button
-                          disabled={certPrinting === c.id}
+                          disabled={certPrinting === btnKey}
                           onClick={async () => {
-                            setCertPrinting(c.id);
+                            setCertPrinting(btnKey);
                             const result = await generateCertificate({
-                              employeeName:   getEmployeeName(empId),
-                              employeeId:     empId,
-                              tournamentId:   c.tournament_id,
-                              tournamentName: t?.name || '',
-                              position:       c.position,
-                              issuedBy:       empId,
+                              employeeName:    getEmployeeName(empId),
+                              employeeId:      empId,
+                              tournamentId:    c.tournament_id,
+                              tournamentName:  t?.name || '',
+                              position:        c.position,
+                              certificateType: certType,   // ← drives which template is used
+                              issuedBy:        empId,
                             });
                             setCertPrinting(null);
                             if (result.success) {
-                              showToast('Certificate downloaded!');
+                              showToast(`${certMeta.label} certificate downloaded!`);
                             } else {
                               showToast(result.error || 'Failed to generate certificate', 'error');
                             }
                           }}
                           style={{
-                            background: certPrinting === c.id ? '#888' : '#1a3c6e',
+                            background: certPrinting === btnKey ? '#888' : certMeta.btnColor,
                             color: 'white',
                             border: 'none',
                             borderRadius: 4,
@@ -379,12 +429,13 @@ const ProfilePage = () => {
                             fontSize: '0.68rem',
                             fontFamily: "'Lufga', sans-serif",
                             fontWeight: 700,
-                            cursor: certPrinting === c.id ? 'wait' : 'pointer',
-                            opacity: certPrinting === c.id ? 0.7 : 1,
-                            minWidth: 80,
+                            cursor: certPrinting === btnKey ? 'wait' : 'pointer',
+                            opacity: certPrinting === btnKey ? 0.7 : 1,
+                            minWidth: 90,
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {certPrinting === c.id ? '⏳ Generating…' : '🏅 Download'}
+                          {certPrinting === btnKey ? '⏳ Generating…' : `${certMeta.icon} Download`}
                         </button>
                       </td>
                     </tr>
@@ -439,8 +490,16 @@ const tdStyle = {
   fontWeight: 400,
 };
 
-const POSITION_LABEL = { 1: '🥇 Champion', 2: '🥈 Runner-up', 3: '🥉 3rd Place' };
+const POSITION_LABEL  = { 1: '🥇 Champion', 2: '🥈 Runner-up', 3: '🥉 3rd Place' };
 const POSITION_ACCENT = { 1: '#f9a825', 2: '#78909c', 3: '#d84315' };
+
+// Drives icon, label, badge colour, and download button colour per certificate_type
+const CERT_TYPE_META = {
+  participation: { icon: '📜', label: 'Participation',  accent: '#546e7a', btnColor: '#546e7a' },
+  rank_1:        { icon: '🥇', label: 'Rank 1 — Gold',  accent: '#f9a825', btnColor: '#e65100' },
+  rank_2:        { icon: '🥈', label: 'Rank 2 — Silver',accent: '#78909c', btnColor: '#455a64' },
+  rank_3:        { icon: '🥉', label: 'Rank 3 — Bronze',accent: '#d84315', btnColor: '#bf360c' },
+};
 
 const formatDateShort = (d) => {
   if (!d) return '—';

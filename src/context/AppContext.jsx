@@ -2255,7 +2255,7 @@ const loadTournamentMatches = async () => {
     try {
       const { data, error } = await supabase
         .from('certificate_log')
-        .select('id, position, issued_at, issued_by, tournament_id, tournaments (id, name, game, start_date, end_date, status)')
+        .select('id, position, issued_at, issued_by, tournament_id, certificate_type, tournaments (id, name, game, start_date, end_date, status)')
         .eq('employee_id', employeeId)
         .order('issued_at', { ascending: false });
       if (error) {
@@ -2302,17 +2302,34 @@ const loadTournamentMatches = async () => {
       if (error) throw error;
 
       // ── Auto-issue certificates for every declared participant ──────────
-      // Wipe previous certificate_log rows for this tournament (mirrors the
-      // final_results delete above so re-declarations stay in sync), then
-      // insert one row per participant. Employees see the certificate in
-      // their profile immediately — no download required to trigger the record.
+      // Wipe previous certificate_log rows for this tournament then re-insert.
+      // Top-3 get TWO rows: participation (position=NULL) + rank cert.
+      // Everyone else gets ONE row: participation (position=NULL).
       await supabase.from('certificate_log').delete().eq('tournament_id', tournamentId);
-      const certRows = rows.map(r => ({
-        employee_id:   r.employee_id,
-        tournament_id: tournamentId,
-        position:      r.position,
-        issued_by:     submitter,
-      }));
+
+      const certRows = [];
+      for (const r of rows) {
+        // Every participant gets a participation certificate
+        certRows.push({
+          employee_id:      r.employee_id,
+          tournament_id:    tournamentId,
+          certificate_type: 'participation',
+          position:         null,
+          issued_by:        submitter,
+        });
+        // Top-3 additionally get a rank certificate
+        if ([1, 2, 3].includes(r.position)) {
+          const rankType = r.position === 1 ? 'rank_1' : r.position === 2 ? 'rank_2' : 'rank_3';
+          certRows.push({
+            employee_id:      r.employee_id,
+            tournament_id:    tournamentId,
+            certificate_type: rankType,
+            position:         r.position,
+            issued_by:        submitter,
+          });
+        }
+      }
+
       const { error: certErr } = await supabase.from('certificate_log').insert(certRows);
       if (certErr) console.error('certificate_log insert error:', certErr);
 

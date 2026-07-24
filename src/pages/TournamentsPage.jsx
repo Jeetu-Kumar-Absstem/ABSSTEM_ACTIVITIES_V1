@@ -1569,42 +1569,108 @@ const renderMatch = (m) => {
                     <td style={{ ...styles.td, fontWeight: 700, color: '#1a3c6e' , fontFamily: "'Lufga', sans-serif" }}>{r.points}</td>
                     <td style={styles.td}>{r.prize_description || '—'}</td>
                     <td style={styles.td}>
-                      {/* Admin: can download certificate for ANY participant.
-                          Non-admin: can only download their OWN certificate. */}
+                      {/* Admin: can download certificates for ANY participant.
+                          Non-admin: can only download their OWN certificates.
+                          Top-3 get TWO buttons (rank cert + participation cert).
+                          Others get ONE button (participation cert only). */}
                       {(isAdmin() || r.employee_id?.toUpperCase() === currentEmpId.toUpperCase()) ? (
-                        <button
-                          disabled={certPrinting === r.id}
-                          onClick={async () => {
-                            setCertPrinting(r.id);
-                            const result = await generateCertificate({
-                              employeeName:   getEmployeeName(r.employee_id),
-                              employeeId:     r.employee_id,
-                              tournamentId:   activeTournament,
-                              tournamentName: activeTournamentRecord?.name || '',
-                              position:       r.position,
-                              issuedBy:       currentEmpId,
-                            });
-                            setCertPrinting(null);
-                            if (result.success) {
-                              showToast(
-                                isAdmin() && r.employee_id?.toUpperCase() !== currentEmpId.toUpperCase()
-                                  ? `Certificate downloaded for ${getEmployeeName(r.employee_id)}!`
-                                  : 'Your certificate has been downloaded!'
-                              );
-                            } else {
-                              showToast(result.error || 'Failed to generate certificate', 'error');
-                            }
-                          }}
-                          style={{
-                            ...styles.tinyEnterBtn,
-                            background: certPrinting === r.id ? '#888' : '#1a3c6e',
-                            opacity: certPrinting === r.id ? 0.7 : 1,
-                            cursor: certPrinting === r.id ? 'wait' : 'pointer',
-                            minWidth: 90,
-                          }}
-                        >
-                          {certPrinting === r.id ? '⏳ Generating…' : '🏅 Download'}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+
+                          {/* ── Top-3: ONE button → downloads BOTH rank + participation PDFs
+                                        and writes TWO rows to certificate_log             ── */}
+                          {[1, 2, 3].includes(r.position) && (() => {
+                            const rankLabel = r.position === 1 ? '🥇 Rank 1' : r.position === 2 ? '🥈 Rank 2' : '🥉 Rank 3';
+                            const btnKey    = `${r.id}_both`;
+                            return (
+                              <button
+                                key="both"
+                                disabled={certPrinting === btnKey}
+                                onClick={async () => {
+                                  setCertPrinting(btnKey);
+                                  // certificateType='rank_and_participation' → hook downloads
+                                  // participation PDF first, then rank PDF, logs both rows:
+                                  //   (participation, position=NULL)
+                                  //   (rank_1/2/3,    position=1/2/3)
+                                  const result = await generateCertificate({
+                                    employeeName:    getEmployeeName(r.employee_id),
+                                    employeeId:      r.employee_id,
+                                    tournamentId:    activeTournament,
+                                    tournamentName:  activeTournamentRecord?.name || '',
+                                    position:        r.position,
+                                    certificateType: 'rank_and_participation',
+                                    issuedBy:        currentEmpId,
+                                  });
+                                  setCertPrinting(null);
+                                  if (result.success) {
+                                    showToast(
+                                      isAdmin() && r.employee_id?.toUpperCase() !== currentEmpId.toUpperCase()
+                                        ? `${rankLabel} + Participation certificates downloaded for ${getEmployeeName(r.employee_id)}!`
+                                        : `${rankLabel} + Participation certificates downloaded!`
+                                    );
+                                  } else {
+                                    showToast(result.error || 'Failed to generate certificates', 'error');
+                                  }
+                                }}
+                                style={{
+                                  ...styles.tinyEnterBtn,
+                                  background: certPrinting === btnKey ? '#888' : '#1a3c6e',
+                                  opacity: certPrinting === btnKey ? 0.7 : 1,
+                                  cursor: certPrinting === btnKey ? 'wait' : 'pointer',
+                                  minWidth: 110,
+                                  fontSize: '0.63rem',
+                                }}
+                              >
+                                {certPrinting === btnKey ? '⏳ Generating…' : `${rankLabel} + 📜`}
+                              </button>
+                            );
+                          })()}
+
+                          {/* ── Everyone (including top-3): participation cert alone ──
+                               Top-3 already got it via the button above on first download.
+                               This lets them re-download just the participation cert later. */}
+                          {(() => {
+                            const partKey = `${r.id}_participation`;
+                            return (
+                              <button
+                                key="participation"
+                                disabled={certPrinting === partKey}
+                                onClick={async () => {
+                                  setCertPrinting(partKey);
+                                  const result = await generateCertificate({
+                                    employeeName:    getEmployeeName(r.employee_id),
+                                    employeeId:      r.employee_id,
+                                    tournamentId:    activeTournament,
+                                    tournamentName:  activeTournamentRecord?.name || '',
+                                    position:        null,           // ← always null for participation
+                                    certificateType: 'participation',
+                                    issuedBy:        currentEmpId,
+                                  });
+                                  setCertPrinting(null);
+                                  if (result.success) {
+                                    showToast(
+                                      isAdmin() && r.employee_id?.toUpperCase() !== currentEmpId.toUpperCase()
+                                        ? `Participation certificate downloaded for ${getEmployeeName(r.employee_id)}!`
+                                        : 'Participation certificate downloaded!'
+                                    );
+                                  } else {
+                                    showToast(result.error || 'Failed to generate participation certificate', 'error');
+                                  }
+                                }}
+                                style={{
+                                  ...styles.tinyEnterBtn,
+                                  background: certPrinting === partKey ? '#888' : '#546e7a',
+                                  opacity: certPrinting === partKey ? 0.7 : 1,
+                                  cursor: certPrinting === partKey ? 'wait' : 'pointer',
+                                  minWidth: 110,
+                                  fontSize: '0.63rem',
+                                }}
+                              >
+                                {certPrinting === partKey ? '⏳…' : '📜 Participation'}
+                              </button>
+                            );
+                          })()}
+
+                        </div>
                       ) : (
                         <span
                           style={{ fontSize: '0.66rem', color: '#bbb' }}
@@ -1618,6 +1684,90 @@ const renderMatch = (m) => {
             </table>
           </div>
         </div>
+
+        {/* ── All Participants — Participation Certificates ─────────────────────
+            Every registered participant (including top-3) can grab their
+            participation cert here. Top-3 also have their rank cert above.   */}
+        {partsList.length > 0 && (
+          <div className="clay-card" style={{ ...styles.card, marginTop: '1rem' }}>
+            <div style={styles.cardHeader}>
+              <div style={styles.cardHeaderTitle}>📜 All Participants — Participation Certificates</div>
+              <span style={styles.recordCount}>{partsList.length} participant(s)</span>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: '#666', margin: '0 0 0.85rem 0', lineHeight: 1.55 }}>
+              Every registered participant can download their Certificate of Participation here.
+              {' '}Top‑3 finishers can additionally download their Rank certificate from the Final Results table above.
+            </p>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={styles.table}>
+                <thead>
+                  <tr style={styles.theadRow}>
+                    {['Employee ID', 'Name', 'Department', 'Certificate'].map(h => (
+                      <th key={h} style={styles.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {partsList.map((p) => {
+                    const canSee = isAdmin() || p.employee_id?.toUpperCase() === currentEmpId.toUpperCase();
+                    const btnKey = `part_${p.employee_id}_participation`;
+                    return (
+                      <tr key={p.id || p.employee_id} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ ...styles.td, color: '#666' }}>{p.employee_id}</td>
+                        <td style={styles.td}><strong>{getEmployeeName(p.employee_id)}</strong></td>
+                        <td style={styles.td}>{p.department || '—'}</td>
+                        <td style={styles.td}>
+                          {canSee ? (
+                            <button
+                              disabled={certPrinting === btnKey}
+                              onClick={async () => {
+                                setCertPrinting(btnKey);
+                                const result = await generateCertificate({
+                                  employeeName:    getEmployeeName(p.employee_id),
+                                  employeeId:      p.employee_id,
+                                  tournamentId:    activeTournament,
+                                  tournamentName:  activeTournamentRecord?.name || '',
+                                  position:        null,
+                                  certificateType: 'participation',
+                                  issuedBy:        currentEmpId,
+                                });
+                                setCertPrinting(null);
+                                if (result.success) {
+                                  showToast(
+                                    isAdmin() && p.employee_id?.toUpperCase() !== currentEmpId.toUpperCase()
+                                      ? `Participation certificate downloaded for ${getEmployeeName(p.employee_id)}!`
+                                      : 'Your participation certificate has been downloaded!'
+                                  );
+                                } else {
+                                  showToast(result.error || 'Failed to generate certificate', 'error');
+                                }
+                              }}
+                              style={{
+                                ...styles.tinyEnterBtn,
+                                background: certPrinting === btnKey ? '#888' : '#546e7a',
+                                opacity:    certPrinting === btnKey ? 0.7 : 1,
+                                cursor:     certPrinting === btnKey ? 'wait' : 'pointer',
+                                minWidth: 120,
+                              }}
+                            >
+                              {certPrinting === btnKey ? '⏳ Generating…' : '📜 Download'}
+                            </button>
+                          ) : (
+                            <span
+                              style={{ fontSize: '0.66rem', color: '#bbb' }}
+                              title="Certificate available only for your own record"
+                            >—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   };
