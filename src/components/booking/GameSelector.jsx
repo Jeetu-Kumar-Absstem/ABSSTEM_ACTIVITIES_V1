@@ -22,7 +22,7 @@ function getGameIcon(game) {
 const ACTIVE_STYLE = {
   background: 'var(--accent)',
   border: '2px solid var(--accent-strong)',
-  color: 'var(--text-strong)',
+  color: 'var(--accent-contrast)',
   boxShadow: '0 4px 14px rgba(26,60,110,0.35), 0 1px 3px rgba(0,0,0,0.1)',
 };
 
@@ -140,7 +140,7 @@ const GameSelector = () => {
               padding: '1px 8px',
               borderRadius: '12px',
               background: isSelected ? 'rgba(255,255,255,0.16)' : 'rgba(var(--accent-rgb),0.08)',
-              color: isSelected ? 'var(--text-strong)' : 'var(--text)',
+              color: isSelected ? 'var(--accent-contrast)' : 'var(--text)',
             }}>
               {bookingCount} booked
             </span>
@@ -167,7 +167,7 @@ const GameSelector = () => {
           onClick={handleRefresh}
           disabled={refreshing}
           style={{ opacity: refreshing ? 0.7 : 1, cursor: refreshing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-            backgroundColor:'#0d207e',color:'#ffffff'
+            background: 'var(--accent)', color: 'var(--accent-contrast)'
            }}
         >
           <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>🔄</span>
