@@ -3,11 +3,13 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { SLOTS } from '../../utils/constants';
 import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
 import useViewport from '../../hooks/useViewport';
 import BottomSheet from '../common/BottomSheet';
 
 const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBookings, maxPlayers, game }) => {
   const { currentUser } = useApp();
+  const { showToast } = useToast();
   const { isMobile } = useViewport();
 
   if (!isOpen) return null;
@@ -23,8 +25,14 @@ const BookSlotModal = ({ isOpen, onClose, onConfirm, day, slotId, currentBooking
   const isFull = gameBookings.length >= maxPlayers;
 
   const handleConfirm = async () => {
-    if (isFull) { alert('This slot is full!'); return; }
-    if (!employeeId) { alert('Your profile is missing an Employee ID'); return; }
+    if (isFull) {
+      showToast('This slot is full!', 'error');
+      return;
+    }
+    if (!employeeId) {
+      showToast('Your profile is missing an Employee ID', 'error');
+      return;
+    }
     const result = await onConfirm();
     if (result) onClose();
   };

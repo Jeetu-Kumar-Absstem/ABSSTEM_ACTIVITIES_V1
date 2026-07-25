@@ -7,6 +7,9 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
+import useViewport from '../hooks/useViewport';
+import usePressState from '../hooks/usePressState';
+import MobileTable from '../components/common/MobileTable';
 
 const lufgaFontStyle = `
   @font-face {
@@ -47,6 +50,7 @@ const LeaderboardPage = () => {
     currentUser,
   } = useApp();
   const { showToast } = useToast();
+  const { isMobile } = useViewport();
 
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -223,7 +227,7 @@ const LeaderboardPage = () => {
             <div style={styles.cardHeaderTitle}>🏅 Top 3 Podium</div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text)' }}>Overall, all games combined</div>
           </div>
-          <div style={styles.podium}>
+          <div style={{ ...styles.podium, gridTemplateColumns: isMobile ? '1fr' : '1fr 1.15fr 1fr' }} className={isMobile ? 'leaderboard-podium' : ''}>
             {podium[2] && (
               <PodiumCard row={podium[2]} pos={2} />
             )}
@@ -262,7 +266,7 @@ const LeaderboardPage = () => {
           <div style={styles.cardHeaderTitle}>📋 Full Leaderboard</div>
           <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{filteredRows.length} of {(leaderboard || []).length} player(s)</span>
         </div>
-        <div style={styles.filterBar}>
+        <div style={{ ...styles.filterBar, flexDirection: isMobile ? 'column' : 'row' }}>
           <input
             type="text"
             value={search}
@@ -284,67 +288,92 @@ const LeaderboardPage = () => {
         </div>
 
         <div style={{ overflowX: 'auto', marginTop: 8 }}>
-          <table style={styles.table}>
-            <thead>
-              <tr style={styles.theadRow}>
-                {['Rank','Player','Department','Pts','🏆🥈🥉','Match W/L/D','Part.','Violations','Last Active'].map((h) => (
-                  <th key={h} style={styles.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.length === 0 ? (
-                <tr>
-                  <td colSpan="9" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1.4rem' }}>
-                    No players match your filters yet. As matches and tournaments wrap up, leaderboard points will appear here.
-                  </td>
-                </tr>
-              ) : filteredRows.map((r) => {
-                const isMe = (r.employee_id || '').toUpperCase() === currentEmpId;
-                const rankBadge = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`;
-                return (
-                  <tr
-                    key={r.employee_id}
-                    style={{
-                      borderBottom: '1px solid var(--border)',
-                      background: isMe ? 'rgba(249,168,37,0.08)' : 'transparent',
-                    }}
-                  >
-                    <td style={{ ...styles.td, fontWeight: 600, color: r.rank <= 3 ? 'var(--accent)' : 'var(--text-soft)', fontFamily: "'Lufga', sans-serif" }}>
+          <MobileTable
+            columns={[
+              {
+                key: 'rank',
+                label: 'Rank',
+                hideOnCard: true,
+                render: (r) => {
+                  const rankBadge = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`;
+                  return (
+                    <span style={{ fontWeight: 600, color: r.rank <= 3 ? 'var(--accent)' : 'var(--text-soft)', fontFamily: "'Lufga', sans-serif" }}>
                       {rankBadge}
-                    </td>
-                    <td style={styles.td}>
+                    </span>
+                  );
+                },
+              },
+              {
+                key: 'player',
+                label: 'Player',
+                hideOnCard: true,
+                render: (r) => {
+                  const isMe = (r.employee_id || '').toUpperCase() === currentEmpId;
+                  return (
+                    <>
                       <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{r.employee_name || r.employee_id}</div>
                       <div style={{ fontSize: '0.62rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
-                    </td>
-                    <td style={styles.td}>{r.department || '—'}</td>
-                    <td style={{ ...styles.td, fontWeight: 600, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>{r.total_points}</td>
-                    <td style={styles.td}>
-                      <div style={{ display: 'flex', gap: 4, fontSize: '0.7rem' }}>
-                        <span title="Tournament wins">🥇 {r.tournament_wins || 0}</span>
-                        <span title="Tournament runner-up">🥈 {r.tournament_seconds || 0}</span>
-                        <span title="Tournament 3rd place">🥉 {r.tournament_thirds || 0}</span>
-                      </div>
-                    </td>
-                    <td style={{ ...styles.td, fontSize: '0.7rem' }}>
-                      {r.match_wins || 0} / {r.match_losses || 0} / {r.draws || 0}
-                    </td>
-                    <td style={styles.td}>{r.participations || 0}</td>
-                    <td style={styles.td}>
-                      {r.rule_violations > 0 || r.no_shows > 0 ? (
-                        <span style={{ ...styles.tinyChip, background: 'rgba(229,57,53,0.10)', color: 'var(--danger)' }}>
-                          {`V:${r.rule_violations || 0} · NS:${r.no_shows || 0}`}
-                        </span>
-                      ) : (
-                        <span style={{ color: 'var(--muted)' }}>—</span>
-                      )}
-                    </td>
-                    <td style={styles.td}>{formatDate(r.last_activity_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </>
+                  );
+                },
+              },
+              { key: 'department', label: 'Department', render: (r) => r.department || '—' },
+              { key: 'total_points', label: 'Pts', align: 'center', render: (r) => <strong style={{ color: 'var(--accent)' }}>{r.total_points}</strong> },
+              {
+                key: 'tournament_results',
+                label: '🏆🥈🥉',
+                render: (r) => (
+                  <div style={{ display: 'flex', gap: 4, fontSize: '0.7rem' }}>
+                    <span title="Tournament wins">🥇 {r.tournament_wins || 0}</span>
+                    <span title="Tournament runner-up">🥈 {r.tournament_seconds || 0}</span>
+                    <span title="Tournament 3rd place">🥉 {r.tournament_thirds || 0}</span>
+                  </div>
+                ),
+              },
+              {
+                key: 'match_record',
+                label: 'Match W/L/D',
+                render: (r) => (
+                  <span style={{ fontSize: '0.7rem' }}>
+                    {r.match_wins || 0} / {r.match_losses || 0} / {r.draws || 0}
+                  </span>
+                ),
+              },
+              { key: 'participations', label: 'Part.', align: 'center', render: (r) => r.participations || 0 },
+              {
+                key: 'violations',
+                label: 'Violations',
+                render: (r) =>
+                  r.rule_violations > 0 || r.no_shows > 0 ? (
+                    <span style={{ ...styles.tinyChip, background: 'rgba(229,57,53,0.10)', color: 'var(--danger)' }}>
+                      {`V:${r.rule_violations || 0} · NS:${r.no_shows || 0}`}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--muted)' }}>—</span>
+                  ),
+              },
+              { key: 'last_activity_at', label: 'Last Active', render: (r) => formatDate(r.last_activity_at) },
+            ]}
+            rows={filteredRows}
+            rowKey={(r) => r.employee_id}
+            emptyMessage="No players match your filters yet. As matches and tournaments wrap up, leaderboard points will appear here."
+            cardTitle={(r) => {
+              const isMe = (r.employee_id || '').toUpperCase() === currentEmpId;
+              const rankBadge = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`;
+              return (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>{rankBadge}</span>
+                  <span>{r.employee_name || r.employee_id}{isMe ? ' (You)' : ''}</span>
+                  <span style={{ marginLeft: 'auto', color: 'var(--accent)', fontWeight: 800 }}>{r.total_points} pts</span>
+                </span>
+              );
+            }}
+            cardSubtitle={(r) => (
+              <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                {r.employee_id} · {r.department || '—'}
+              </div>
+            )}
+          />
         </div>
       </div>
     </div>
@@ -352,12 +381,13 @@ const LeaderboardPage = () => {
 };
 
 const PodiumCard = ({ row, pos, tall }) => {
-  const [hovered, setHovered] = useState(false);
+  const { pressed, pressProps } = usePressState();
+  const hovered = pressed;
   const style = RANK_STYLES[pos] || RANK_STYLES[1];
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      {...pressProps}
+      className={`leaderboard-podium-rank${pos}`}
       style={{
         background: style.bg,
         borderTop: `3px solid ${style.border}`,

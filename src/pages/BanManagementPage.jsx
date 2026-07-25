@@ -1,26 +1,13 @@
 // src/pages/BanManagementPage.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../utils/supabase';
 import { GAMES } from '../utils/constants';
-
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
+import useViewport from '../hooks/useViewport';
+import MobileTable from '../components/common/MobileTable';
+import BottomSheet from '../components/common/BottomSheet';
 
 const normalizeGameValue = (value) =>
   String(value || '')
@@ -70,6 +57,7 @@ const isSameGame = (left, right, games = GAMES) => {
 const BanManagementPage = () => {
   const { bans, currentUser, isAdmin, addBan, liftBan, deleteBan, loadBans, games } = useApp();
   const { showToast } = useToast();
+  const { isMobile } = useViewport();
   const availableGames = games?.length > 0 ? games : GAMES;
   const [loading, setLoading] = useState(false);
   const [showBanModal, setShowBanModal] = useState(false);
@@ -79,7 +67,6 @@ const BanManagementPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedGameCheck, setSelectedGameCheck] = useState('');
 
-  // Load employees for dropdown
   const loadEmployees = async () => {
     try {
       const { data, error } = await supabase
@@ -89,7 +76,6 @@ const BanManagementPage = () => {
       if (error) throw error;
       setEmployees(data || []);
     } catch (err) {
-      // Mock data if table doesn't exist
       setEmployees([
         { id: 1, name: 'John Doe', employee_code: 'ABCD1234' },
         { id: 2, name: 'Jane Smith', employee_code: 'XYZW5678' },
@@ -101,21 +87,10 @@ const BanManagementPage = () => {
   };
 
   useEffect(() => {
-    const styleId = 'lufga-font-style';
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = lufgaFontStyle;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
-
-  useEffect(() => {
     loadEmployees();
     loadBans();
   }, []);
 
-  // Filter bans by game
   const getFilteredBans = () => {
     if (filterGame === 'all') return bans;
     return bans.filter((b) => isSameGame(b.game, filterGame, availableGames) || normalizeGameValue(b.game) === 'all games');
@@ -123,76 +98,68 @@ const BanManagementPage = () => {
 
   const filteredBans = getFilteredBans();
 
-  // Active bans (not expired)
-  const activeBans = filteredBans.filter(b => 
+  const activeBans = filteredBans.filter(b =>
     b.active !== false && new Date(b.until_date) > new Date()
   );
 
-  // Expired bans
-  const expiredBans = filteredBans.filter(b => 
+  const expiredBans = filteredBans.filter(b =>
     b.active === false || new Date(b.until_date) <= new Date()
   );
 
-  // Handle lift ban
   const handleLiftBan = async (banId) => {
     if (!isAdmin()) {
-      showToast('❌ Only admins can lift bans!', 'error');
+      showToast('Only admins can lift bans!', 'error');
       return;
     }
-    
-    if (!confirm('Are you sure you want to lift this ban?')) return;
-    
+    if (!window.confirm('Are you sure you want to lift this ban?')) return;
+
     setLoading(true);
     const result = await liftBan(banId);
     if (result.success) {
-      showToast('✅ Ban lifted successfully!', 'success');
+      showToast('Ban lifted successfully!', 'success');
       await loadBans();
     } else {
-      showToast('❌ ' + result.error, 'error');
+      showToast(result.error, 'error');
     }
     setLoading(false);
   };
 
-  // Handle delete ban
   const handleDeleteBan = async (banId) => {
     if (!isAdmin()) {
-      showToast('❌ Only admins can delete bans!', 'error');
+      showToast('Only admins can delete bans!', 'error');
       return;
     }
-    
-    if (!confirm('⚠️ Are you sure you want to permanently delete this ban?')) return;
-    
+    if (!window.confirm('Are you sure you want to permanently delete this ban?')) return;
+
     setLoading(true);
     const result = await deleteBan(banId);
     if (result.success) {
-      showToast('✅ Ban deleted successfully!', 'success');
+      showToast('Ban deleted successfully!', 'success');
       await loadBans();
     } else {
-      showToast('❌ ' + result.error, 'error');
+      showToast(result.error, 'error');
     }
     setLoading(false);
   };
 
-  // Handle issue ban
   const handleIssueBan = async (banData) => {
     if (!isAdmin()) {
-      showToast('❌ Only admins can issue bans!', 'error');
+      showToast('Only admins can issue bans!', 'error');
       return;
     }
 
     setLoading(true);
     const result = await addBan(banData);
     if (result.success) {
-      showToast('✅ Ban issued successfully!', 'success');
+      showToast('Ban issued successfully!', 'success');
       setShowBanModal(false);
       await loadBans();
     } else {
-      showToast('❌ ' + result.error, 'error');
+      showToast(result.error, 'error');
     }
     setLoading(false);
   };
 
-  // Check employee ban status
   const checkBanStatus = () => {
     if (!isAdmin()) {
       setCheckResult({
@@ -204,12 +171,12 @@ const BanManagementPage = () => {
 
     const empId = selectedEmployee;
     const game = selectedGameCheck;
-    
+
     if (!empId || !game) {
       setCheckResult({ type: 'info', message: 'Please select both employee and game.' });
       return;
     }
-    
+
     const employee = employees.find(e => e.id === parseInt(empId));
     if (!employee) {
       setCheckResult({ type: 'info', message: 'Employee not found.' });
@@ -218,7 +185,6 @@ const BanManagementPage = () => {
 
     const isCheckingAllGames = normalizeGameValue(game) === 'all games';
 
-    // Helper: find active ban for employee for a specific game (or All Games ban)
     const findActiveBanForGame = (gameName) => bans.find(b => {
       const isActive = b.active !== false && new Date(b.until_date) > new Date();
       if (!isActive) return false;
@@ -228,17 +194,13 @@ const BanManagementPage = () => {
     });
 
     if (isCheckingAllGames) {
-      // Check every game individually and collect banned / allowed lists
       const bannedGames = [];
       const allowedGames = [];
 
       availableGames.forEach(g => {
         const ban = findActiveBanForGame(g.name);
         if (ban) {
-          bannedGames.push({
-            game: g,
-            ban,
-          });
+          bannedGames.push({ game: g, ban });
         } else {
           allowedGames.push(g);
         }
@@ -247,7 +209,7 @@ const BanManagementPage = () => {
       if (bannedGames.length === 0) {
         setCheckResult({
           type: 'allowed',
-          message: `✅ ${employee.name} is ALLOWED to play All Games`,
+          message: `${employee.name} is ALLOWED to play All Games`,
           details: 'No active bans found for this employee.',
         });
       } else {
@@ -262,14 +224,13 @@ const BanManagementPage = () => {
 
         setCheckResult({
           type: 'banned',
-          message: `🚫 ${employee.name} has active bans on ${bannedGames.length} game(s)`,
+          message: `${employee.name} has active bans on ${bannedGames.length} game(s)`,
           details: `Employee ID: ${employee.employee_code}\n\nBANNED GAMES:\n${bannedLines}\n\nALLOWED GAMES:\n${allowedLines}`,
         });
       }
       return;
     }
 
-    // Specific game check
     const activeBan = findActiveBanForGame(game);
 
     if (activeBan) {
@@ -278,29 +239,18 @@ const BanManagementPage = () => {
         : resolveGameLabel(activeBan.game, availableGames);
       setCheckResult({
         type: 'banned',
-        message: `🚫 ${employee.name} is BANNED from ${resolveGameLabel(game, availableGames)}`,
+        message: `${employee.name} is BANNED from ${resolveGameLabel(game, availableGames)}`,
         details: `Employee ID: ${employee.employee_code}\nBan Scope: ${banScope}\nFrom: ${new Date(activeBan.from_date).toLocaleDateString()}\nUntil: ${new Date(activeBan.until_date).toLocaleDateString()}\nReason: ${activeBan.reason}`,
       });
     } else {
       setCheckResult({
         type: 'allowed',
-        message: `✅ ${employee.name} is ALLOWED to play ${resolveGameLabel(game, availableGames)}`,
+        message: `${employee.name} is ALLOWED to play ${resolveGameLabel(game, availableGames)}`,
         details: 'No active bans found for this employee and game.',
       });
     }
   };
 
-  // Check if employee is banned by employee_id
-  const isEmployeeBanned = (empId, game) => {
-    return bans.some(b => 
-      b.employee_id === empId &&
-      b.active !== false &&
-      new Date(b.until_date) > new Date() &&
-      (isSameGame(b.game, game, availableGames) || normalizeGameValue(b.game) === 'all games')
-    );
-  };
-
-  // Get ban status badge
   const getBanStatusBadge = (ban) => {
     const isActive = ban.active !== false && new Date(ban.until_date) > new Date();
     if (isActive) {
@@ -310,15 +260,27 @@ const BanManagementPage = () => {
     }
   };
 
+  // History table columns + rows
+  const historyRows = expiredBans.map(ban => ({
+    ...ban,
+    _gameLabel: resolveGameLabel(ban.game, availableGames),
+  }));
+  const historyColumns = [
+    { key: 'employee', label: 'Employee' },
+    { key: '_gameLabel', label: 'Game' },
+    { key: 'until_date', label: 'Until', render: (row) => new Date(row.until_date).toLocaleDateString() },
+    { key: 'active', label: 'Status', render: (row) => getBanStatusBadge(row) },
+  ];
+
   return (
     <div className="ban-management-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '8px', flexWrap: 'wrap' }}>
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif", margin: 0, flex: 1, minWidth: 0 }}>
           🚫 Ban Management ({bans.length} total)
         </h2>
         {isAdmin() && (
-          <button 
-            className="clay-btn clay-btn-red" 
+          <button
+            className="clay-btn clay-btn-red"
             onClick={() => setShowBanModal(true)}
             disabled={loading}
           >
@@ -330,11 +292,11 @@ const BanManagementPage = () => {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         {/* Active Bans */}
         <div className="clay-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif", margin: 0 }}>
               🔴 Active Bans ({activeBans.length})
             </h3>
           </div>
@@ -342,9 +304,9 @@ const BanManagementPage = () => {
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               Game:
-              <select 
-                className="clay-select" 
-                style={{ padding: '6px 14px', fontSize: '0.7rem', width: 'auto' }}
+              <select
+                className="clay-select"
+                style={{ padding: '6px 14px', fontSize: '0.7rem', width: 'auto', flex: 1 }}
                 value={filterGame}
                 onChange={(e) => setFilterGame(e.target.value)}
               >
@@ -365,10 +327,10 @@ const BanManagementPage = () => {
             </div>
           ) : (
             activeBans.map(ban => (
-              <div key={ban.id} className="clay-soft" style={{ 
-                padding: '12px 14px', 
-                borderRadius: '16px', 
-                marginBottom: '10px', 
+              <div key={ban.id} className="clay-soft" style={{
+                padding: '12px 14px',
+                borderRadius: '16px',
+                marginBottom: '10px',
                 borderLeft: '4px solid #e53935',
                 background: 'rgba(229,57,53,0.03)'
               }}>
@@ -394,16 +356,16 @@ const BanManagementPage = () => {
                 )}
                 {isAdmin() && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                    <button 
-                      className="clay-btn clay-btn-green" 
+                    <button
+                      className="clay-btn clay-btn-green"
                       style={{ fontSize: '0.6rem', padding: '4px 12px' }}
                       onClick={() => handleLiftBan(ban.id)}
                       disabled={loading}
                     >
                       ✓ Lift Ban
                     </button>
-                    <button 
-                      className="clay-btn" 
+                    <button
+                      className="clay-btn"
                       style={{ fontSize: '0.6rem', padding: '4px 12px', color: '#e53935' }}
                       onClick={() => handleDeleteBan(ban.id)}
                       disabled={loading}
@@ -428,36 +390,12 @@ const BanManagementPage = () => {
             📜 Ban History ({expiredBans.length})
           </h3>
           <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem', fontFamily: "'Lufga', sans-serif" }}>
-              <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-surface-strong)', zIndex: 2 }}>
-                <tr style={{ background: 'rgba(26,60,110,0.05)' }}>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Employee</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Game</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Until</th>
-                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expiredBans.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
-                      No ban history found.
-                    </td>
-                  </tr>
-                ) : (
-                  expiredBans.map(ban => (
-                    <tr key={ban.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{ban.employee}</td>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{resolveGameLabel(ban.game, availableGames)}</td>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{new Date(ban.until_date).toLocaleDateString()}</td>
-                      <td style={{ padding: '6px 8px', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text)' }}>
-                        {getBanStatusBadge(ban)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <MobileTable
+              columns={historyColumns}
+              rows={historyRows}
+              rowKey={(row) => row.id}
+              emptyMessage="No ban history found."
+            />
           </div>
         </div>
       </div>
@@ -467,14 +405,14 @@ const BanManagementPage = () => {
           <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>
             🔍 Quick Ban Check
           </h3>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '12px', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
             <div style={{ flex: 1, minWidth: '160px' }}>
               <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
                 Employee
               </label>
-              <select 
+              <select
                 id="ban-check-employee"
-                className="clay-select" 
+                className="clay-select"
                 style={{ padding: '8px 14px' }}
                 value={selectedEmployee}
                 onChange={(e) => setSelectedEmployee(e.target.value)}
@@ -489,9 +427,9 @@ const BanManagementPage = () => {
               <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>
                 Game
               </label>
-              <select 
+              <select
                 id="ban-check-game"
-                className="clay-select" 
+                className="clay-select"
                 style={{ padding: '8px 14px' }}
                 value={selectedGameCheck}
                 onChange={(e) => setSelectedGameCheck(e.target.value)}
@@ -503,25 +441,26 @@ const BanManagementPage = () => {
                 ))}
               </select>
             </div>
-            <button 
-              className="clay-btn clay-btn-primary" 
+            <button
+              className="clay-btn clay-btn-primary"
               onClick={checkBanStatus}
               disabled={!selectedEmployee || !selectedGameCheck}
+              style={{ width: isMobile ? '100%' : 'auto' }}
             >
               🔍 Check Status
             </button>
           </div>
-          
+
           {checkResult && (
             <div style={{ marginTop: '12px' }}>
-              <div className="clay-soft" style={{ 
-                padding: '12px 16px', 
-                borderRadius: '16px', 
+              <div className="clay-soft" style={{
+                padding: '12px 16px',
+                borderRadius: '16px',
                 borderLeft: `4px solid ${checkResult.type === 'banned' ? 'var(--danger)' : checkResult.type === 'allowed' ? 'var(--success)' : 'var(--muted)'}`,
                 background: checkResult.type === 'banned' ? 'rgba(229,57,53,0.08)' : checkResult.type === 'allowed' ? 'rgba(56,142,60,0.08)' : 'transparent'
               }}>
-                <div style={{ 
-                  fontWeight: 700, 
+                <div style={{
+                  fontWeight: 700,
                   color: checkResult.type === 'banned' ? 'var(--danger)' : checkResult.type === 'allowed' ? 'var(--success)' : 'var(--muted)',
                   fontFamily: "'Lufga', sans-serif"
                 }}>
@@ -545,7 +484,6 @@ const BanManagementPage = () => {
         </div>
       )}
 
-      {/* Issue Ban Modal */}
       {showBanModal && (
         <IssueBanModal
           employees={employees}
@@ -553,14 +491,16 @@ const BanManagementPage = () => {
           onSave={handleIssueBan}
           isAdmin={isAdmin()}
           loading={loading}
+          showToast={showToast}
         />
       )}
     </div>
   );
 };
 
-// Issue Ban Modal Component
-const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
+// Issue Ban Modal Component — BottomSheet on mobile, centered on desktop
+const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading, showToast }) => {
+  const { isMobile } = useViewport();
   const [formData, setFormData] = useState({
     employee: '',
     employee_id: '',
@@ -584,21 +524,144 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!isAdmin) {
-      alert('❌ Only admins can issue bans!');
+      showToast('Only admins can issue bans!', 'error');
       return;
     }
     if (!formData.employee || !formData.game || !formData.reason) {
-      alert('⚠️ Please fill all required fields!');
+      showToast('Please fill all required fields!', 'warning');
       return;
     }
-    
-    // Confirm before saving
-    if (confirm(`⚠️ Are you sure you want to ban ${formData.employee} from ${formData.game}?\n\nFrom: ${formData.from_date}\nUntil: ${formData.until_date}\nReason: ${formData.reason}`)) {
-      onSave(formData);
-    }
+    onSave(formData);
   };
 
-  return (
+  const formBody = (
+    <form onSubmit={handleSubmit}>
+      <div style={{
+        background: 'rgba(229,57,53,0.12)',
+        padding: '10px 14px',
+        borderRadius: '12px',
+        fontSize: '0.7rem',
+        color: 'var(--danger)',
+        marginBottom: '16px',
+        borderLeft: '3px solid var(--danger)'
+      }}>
+        ⚠️ Banned employees will be blocked from booking the selected game(s). This action is logged and the employee is notified.
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+          Employee <span style={{ color: 'var(--danger)' }}>*</span>
+        </label>
+        <select
+          className="clay-select"
+          value={formData.employee_id}
+          onChange={(e) => handleEmployeeChange(e.target.value)}
+          required
+          style={{ padding: '10px 14px' }}
+        >
+          <option value="">-- Select Employee --</option>
+          {employees.map(emp => (
+            <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_code})</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+          Game <span style={{ color: 'var(--danger)' }}>*</span>
+        </label>
+        <select
+          className="clay-select"
+          value={formData.game}
+          onChange={(e) => setFormData({ ...formData, game: e.target.value })}
+          required
+          style={{ padding: '10px 14px' }}
+        >
+          <option value="">-- Select Game --</option>
+          <option value="All Games">🚫 All Games</option>
+          {GAMES.map(game => (
+            <option key={game.id} value={game.name}>{game.icon} {game.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+            From Date <span style={{ color: 'var(--danger)' }}>*</span>
+          </label>
+          <input
+            type="date"
+            className="clay-input"
+            value={formData.from_date}
+            onChange={(e) => setFormData({ ...formData, from_date: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+            Until Date <span style={{ color: 'var(--danger)' }}>*</span>
+          </label>
+          <input
+            type="date"
+            className="clay-input"
+            value={formData.until_date}
+            onChange={(e) => setFormData({ ...formData, until_date: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
+          Reason <span style={{ color: 'var(--danger)' }}>*</span>
+        </label>
+        <textarea
+          className="clay-input"
+          value={formData.reason}
+          onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+          placeholder="Describe the reason for the ban..."
+          rows="3"
+          required
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+
+      <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(249,168,37,0.12)', borderRadius: '8px', fontSize: '0.65rem', color: 'var(--warning)' }}>
+        ⚠️ This action will ban <strong>{formData.employee || '[Employee]'}</strong> from <strong>{formData.game || '[Game]'}</strong>.
+        They will not be able to book slots until the ban expires.
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+        <button type="button" className="clay-btn" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="clay-btn clay-btn-red"
+          disabled={!isAdmin || loading}
+          style={{ opacity: isAdmin ? 1 : 0.5 }}
+        >
+          {loading ? '⏳ Processing...' : '🚫 Confirm Ban'}
+        </button>
+      </div>
+    </form>
+  );
+
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open
+        onClose={onClose}
+        title="🚫 Issue Ban"
+        icon="🚫"
+      >
+        {formBody}
+      </BottomSheet>
+    );
+  }
+
+  return createPortal(
     <div style={{
       position: 'fixed',
       inset: 0,
@@ -625,120 +688,10 @@ const IssueBanModal = ({ employees, onClose, onSave, isAdmin, loading }) => {
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>🚫 Issue Ban</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
         </div>
-
-        <div style={{ 
-          background: 'rgba(229,57,53,0.12)', 
-          padding: '10px 14px', 
-          borderRadius: '12px', 
-          fontSize: '0.7rem', 
-          color: 'var(--danger)',
-          marginBottom: '16px',
-          borderLeft: '3px solid var(--danger)'
-        }}>
-          ⚠️ Banned employees will be blocked from booking the selected game(s). This action is logged and the employee is notified.
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              Employee <span style={{ color: 'var(--danger)' }}>*</span>
-            </label>
-            <select
-              className="clay-select"
-              value={formData.employee_id}
-              onChange={(e) => handleEmployeeChange(e.target.value)}
-              required
-              style={{ padding: '10px 14px' }}
-            >
-              <option value="">-- Select Employee --</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_code})</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              Game <span style={{ color: 'var(--danger)' }}>*</span>
-            </label>
-            <select
-              className="clay-select"
-              value={formData.game}
-              onChange={(e) => setFormData({ ...formData, game: e.target.value })}
-              required
-              style={{ padding: '10px 14px' }}
-            >
-              <option value="">-- Select Game --</option>
-              <option value="All Games">🚫 All Games</option>
-              {GAMES.map(game => (
-                <option key={game.id} value={game.name}>{game.icon} {game.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-                From Date <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <input
-                type="date"
-                className="clay-input"
-                value={formData.from_date}
-                onChange={(e) => setFormData({ ...formData, from_date: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-                Until Date <span style={{ color: 'var(--danger)' }}>*</span>
-              </label>
-              <input
-                type="date"
-                className="clay-input"
-                value={formData.until_date}
-                onChange={(e) => setFormData({ ...formData, until_date: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              Reason <span style={{ color: 'var(--danger)' }}>*</span>
-            </label>
-            <textarea
-              className="clay-input"
-              value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              placeholder="Describe the reason for the ban..."
-              rows="3"
-              required
-              style={{ resize: 'vertical' }}
-            />
-          </div>
-
-          <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(249,168,37,0.12)', borderRadius: '8px', fontSize: '0.65rem', color: 'var(--warning)' }}>
-            ⚠️ This action will ban <strong>{formData.employee || '[Employee]'}</strong> from <strong>{formData.game || '[Game]'}</strong>. 
-            They will not be able to book slots until the ban expires.
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-            <button type="button" className="clay-btn" onClick={onClose}>
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              className="clay-btn clay-btn-red"
-              disabled={!isAdmin || loading}
-              style={{ opacity: isAdmin ? 1 : 0.5 }}
-            >
-              {loading ? '⏳ Processing...' : '🚫 Confirm Ban'}
-            </button>
-          </div>
-        </form>
+        {formBody}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext';
 import { useCertificate } from '../hooks/useCertificate';
 import { useToast } from '../context/ToastContext';
 import { GAMES } from '../utils/constants';
+import useViewport from '../hooks/useViewport';
+import MobileTable from '../components/common/MobileTable';
 
 const lufgaFontStyle = `
   @font-face {
@@ -58,6 +60,7 @@ const StatCard = ({ title, value, caption, accent = 'var(--accent)' }) => (
 const ProfilePage = () => {
   const { currentUser, setActiveTab, getPlayerGameStats, getCertificateLog, getEmployeeName } = useApp();
   const { generateCertificate } = useCertificate();
+  const { isMobile } = useViewport();
   const { showToast } = useToast();
   const [selectedGame, setSelectedGame] = useState('carrom');
   const [certLog, setCertLog] = useState([]);
@@ -175,7 +178,7 @@ const ProfilePage = () => {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: '16px', alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px, 320px) 1fr', gap: '16px', alignItems: 'stretch' }}>
         <div className="clay-card" style={{ padding: '22px', borderRadius: '28px', background: 'var(--bg-surface-strong)' }}>
           <div style={{ fontSize: '0.85rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)', marginBottom: '14px' }}>
             Outcome Split
@@ -183,8 +186,8 @@ const ProfilePage = () => {
           <div style={{ display: 'grid', placeItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '220px',
-                height: '220px',
+                width: isMobile ? '160px' : '220px',
+                height: isMobile ? '160px' : '220px',
                 borderRadius: '50%',
                 background: pieGradient,
                 position: 'relative',
@@ -196,8 +199,8 @@ const ProfilePage = () => {
                   position: 'absolute',
                   inset: '50%',
                   transform: 'translate(-50%, -50%)',
-                  width: '120px',
-                  height: '120px',
+                  width: isMobile ? '88px' : '120px',
+                  height: isMobile ? '88px' : '120px',
                   borderRadius: '50%',
                   background: 'var(--bg-surface-strong)',
                   display: 'grid',
@@ -252,34 +255,27 @@ const ProfilePage = () => {
          All Games Summary
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-            <thead>
-              <tr style={{ background: 'var(--accent-soft)' }}>
-                <th style={thStyle}>Game</th>
-                <th style={thStyle}>Played</th>
-                <th style={thStyle}>Wins</th>
-                <th style={thStyle}>Losses</th>
-                <th style={thStyle}>Draws</th>
-                <th style={thStyle}>Winning Streak</th>
-                <th style={thStyle}>Best Streak</th>
-                <th style={thStyle}>Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perGameRows.map((row) => (
-                <tr key={row.game.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-                  <td style={tdStyle}>{row.game.name}</td>
-                  <td style={tdStyle}>{row.gamesPlayed}</td>
-                  <td style={tdStyle}>{row.wins}</td>
-                  <td style={tdStyle}>{row.losses}</td>
-                  <td style={tdStyle}>{row.draws}</td>
-                  <td style={tdStyle}>{row.currentWinStreak}</td>
-                  <td style={tdStyle}>{row.bestWinStreak}</td>
-                  <td style={tdStyle}>{row.points}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <MobileTable
+            columns={[
+              { key: 'name', label: 'Game', render: (row) => row.game.name },
+              { key: 'gamesPlayed', label: 'Played', align: 'center' },
+              { key: 'wins', label: 'Wins', align: 'center', render: (row) => <strong style={{ color: 'var(--success)' }}>{row.wins}</strong> },
+              { key: 'losses', label: 'Losses', align: 'center', render: (row) => <strong style={{ color: 'var(--danger)' }}>{row.losses}</strong> },
+              { key: 'draws', label: 'Draws', align: 'center', render: (row) => <strong style={{ color: 'var(--warning)' }}>{row.draws}</strong> },
+              { key: 'currentWinStreak', label: 'Streak', align: 'center' },
+              { key: 'bestWinStreak', label: 'Best', align: 'center' },
+              { key: 'points', label: 'Points', align: 'center', render: (row) => <strong style={{ color: 'var(--accent)' }}>{row.points}</strong> },
+            ]}
+            rows={perGameRows}
+            rowKey={(row) => row.game.id}
+            emptyMessage="No games played yet."
+            cardTitle={(row) => row.game.name}
+            cardSubtitle={(row) => (
+              <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                {row.gamesPlayed} played · {row.points} pts
+              </div>
+            )}
+          />
         </div>
       </div>
 
@@ -314,136 +310,162 @@ const ProfilePage = () => {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--accent-soft)' }}>
-                  {['Tournament', 'Game', 'Certificate Type', 'Position', 'Period', 'Issued On', 'Download'].map(h => (
-                    <th key={h} style={thStyle}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {certLog.map((c) => {
-                  const t = c.tournaments;
-
-                  // ── Certificate type display ──────────────────────────────
-                  // certificate_type is one of: participation | rank_1 | rank_2 | rank_3
-                  const certType  = c.certificate_type || 'participation';
-                  const isRank    = certType.startsWith('rank_');
-                  const certMeta  = CERT_TYPE_META[certType] || CERT_TYPE_META.participation;
-
-                  // Position badge (shown for rank certs; '—' for participation)
-                  const posLabel  = isRank
-                    ? (POSITION_LABEL[c.position] || `${c.position}th`)
-                    : '—';
-                  const posAccent = isRank
-                    ? (POSITION_ACCENT[c.position] || '#546e7a')
-                    : '#546e7a';
-
-                  const btnKey = c.id;
-
-                  return (
-                    <tr key={c.id} style={{ borderBottom: '1px solid rgba(200,210,230,0.2)' }}>
-
-                      {/* Tournament name */}
-                      <td style={tdStyle}><strong>{t?.name || '—'}</strong></td>
-
-                      {/* Game */}
-                      <td style={tdStyle}>{t?.game || '—'}</td>
-
-                      {/* Certificate type chip */}
-                      <td style={tdStyle}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          padding: '0.18rem 0.6rem',
+            <MobileTable
+              columns={[
+                {
+                  key: 'tournament',
+                  label: 'Tournament',
+                  hideOnCard: true,
+                  render: (c) => <strong>{c.tournaments?.name || '—'}</strong>,
+                },
+                { key: 'game', label: 'Game', render: (c) => c.tournaments?.game || '—' },
+                {
+                  key: 'type',
+                  label: 'Type',
+                  render: (c) => {
+                    const certType = c.certificate_type || 'participation';
+                    const certMeta = CERT_TYPE_META[certType] || CERT_TYPE_META.participation;
+                    return (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                        padding: '0.18rem 0.6rem', borderRadius: 4, fontSize: '0.68rem',
+                        fontFamily: "'Lufga', sans-serif", fontWeight: 700,
+                        background: `${certMeta.accent}18`, color: certMeta.accent,
+                      }}>
+                        {certMeta.icon} {certMeta.label}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'position',
+                  label: 'Position',
+                  render: (c) => {
+                    const certType = c.certificate_type || 'participation';
+                    const isRank = certType.startsWith('rank_');
+                    if (!isRank) return <span style={{ color: 'var(--muted)' }}>—</span>;
+                    const posLabel = POSITION_LABEL[c.position] || `${c.position}th`;
+                    const posAccent = POSITION_ACCENT[c.position] || '#546e7a';
+                    return (
+                      <span style={{
+                        padding: '0.15rem 0.5rem', borderRadius: 4, fontSize: '0.68rem',
+                        fontFamily: "'Lufga', sans-serif", fontWeight: 700,
+                        background: `${posAccent}18`, color: posAccent,
+                      }}>{posLabel}</span>
+                    );
+                  },
+                },
+                {
+                  key: 'period',
+                  label: 'Period',
+                  render: (c) => `${formatDateShort(c.tournaments?.start_date)}${c.tournaments?.end_date ? ` → ${formatDateShort(c.tournaments.end_date)}` : ''}`,
+                },
+                { key: 'issued', label: 'Issued', render: (c) => formatDateShort(c.issued_at) },
+                {
+                  key: 'download',
+                  label: 'Download',
+                  render: (c) => {
+                    const certType = c.certificate_type || 'participation';
+                    const certMeta = CERT_TYPE_META[certType] || CERT_TYPE_META.participation;
+                    return (
+                      <button
+                        disabled={certPrinting === c.id}
+                        onClick={async () => {
+                          setCertPrinting(c.id);
+                          const result = await generateCertificate({
+                            employeeName:    getEmployeeName(empId),
+                            employeeId:      empId,
+                            tournamentId:    c.tournament_id,
+                            tournamentName:  c.tournaments?.name || '',
+                            position:        c.position,
+                            certificateType: certType,
+                            issuedBy:        empId,
+                          });
+                          setCertPrinting(null);
+                          if (result.success) {
+                            showToast(`${certMeta.label} certificate downloaded!`);
+                          } else {
+                            showToast(result.error || 'Failed to generate certificate', 'error');
+                          }
+                        }}
+                        style={{
+                          background: certPrinting === c.id ? '#888' : certMeta.btnColor,
+                          color: 'white',
+                          border: 'none',
                           borderRadius: 4,
+                          padding: '0.28rem 0.75rem',
                           fontSize: '0.68rem',
                           fontFamily: "'Lufga', sans-serif",
                           fontWeight: 700,
-                          background: `${certMeta.accent}18`,
-                          color: certMeta.accent,
+                          cursor: certPrinting === c.id ? 'wait' : 'pointer',
+                          opacity: certPrinting === c.id ? 0.7 : 1,
+                          minWidth: 90,
                           whiteSpace: 'nowrap',
-                        }}>
-                          {certMeta.icon} {certMeta.label}
-                        </span>
-                      </td>
-
-                      {/* Position (rank certs only) */}
-                      <td style={tdStyle}>
-                        {isRank ? (
-                          <span style={{
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: 4,
-                            fontSize: '0.68rem',
-                            fontFamily: "'Lufga', sans-serif",
-                            fontWeight: 700,
-                            background: `${posAccent}18`,
-                            color: posAccent,
-                            whiteSpace: 'nowrap',
-                          }}>{posLabel}</span>
-                        ) : (
-                          <span style={{ color: 'var(--muted)', fontSize: '0.68rem' }}>—</span>
-                        )}
-                      </td>
-
-                      {/* Tournament period */}
-                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>
-                        {formatDateShort(t?.start_date)}
-                        {t?.end_date ? ` → ${formatDateShort(t.end_date)}` : ''}
-                      </td>
-
-                      {/* Issued on */}
-                      <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: 'var(--text-soft)' }}>
-                        {formatDateShort(c.issued_at)}
-                      </td>
-
-                      {/* Download button */}
-                      <td style={tdStyle}>
-                        <button
-                          disabled={certPrinting === btnKey}
-                          onClick={async () => {
-                            setCertPrinting(btnKey);
-                            const result = await generateCertificate({
-                              employeeName:    getEmployeeName(empId),
-                              employeeId:      empId,
-                              tournamentId:    c.tournament_id,
-                              tournamentName:  t?.name || '',
-                              position:        c.position,
-                              certificateType: certType,   // ← drives which template is used
-                              issuedBy:        empId,
-                            });
-                            setCertPrinting(null);
-                            if (result.success) {
-                              showToast(`${certMeta.label} certificate downloaded!`);
-                            } else {
-                              showToast(result.error || 'Failed to generate certificate', 'error');
-                            }
-                          }}
-                          style={{
-                            background: certPrinting === btnKey ? '#888' : certMeta.btnColor,
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: 4,
-                            padding: '0.28rem 0.75rem',
-                            fontSize: '0.68rem',
-                            fontFamily: "'Lufga', sans-serif",
-                            fontWeight: 700,
-                            cursor: certPrinting === btnKey ? 'wait' : 'pointer',
-                            opacity: certPrinting === btnKey ? 0.7 : 1,
-                            minWidth: 90,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {certPrinting === btnKey ? '⏳ Generating…' : `${certMeta.icon} Download`}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        }}
+                      >
+                        {certPrinting === c.id ? '⏳' : '📥 Download'}
+                      </button>
+                    );
+                  },
+                },
+              ]}
+              rows={certLog}
+              rowKey={(c) => c.id}
+              emptyMessage="No certificates issued yet."
+              cardTitle={(c) => c.tournaments?.name || '—'}
+              cardSubtitle={(c) => {
+                const certType = c.certificate_type || 'participation';
+                const certMeta = CERT_TYPE_META[certType] || CERT_TYPE_META.participation;
+                return (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                    {certMeta.icon} {certMeta.label} · {c.tournaments?.game || '—'} · Issued {formatDateShort(c.issued_at)}
+                  </div>
+                );
+              }}
+              cardActions={(c) => {
+                const certType = c.certificate_type || 'participation';
+                const certMeta = CERT_TYPE_META[certType] || CERT_TYPE_META.participation;
+                return (
+                  <button
+                    disabled={certPrinting === c.id}
+                    onClick={async () => {
+                      setCertPrinting(c.id);
+                      const result = await generateCertificate({
+                        employeeName:    getEmployeeName(empId),
+                        employeeId:      empId,
+                        tournamentId:    c.tournament_id,
+                        tournamentName:  c.tournaments?.name || '',
+                        position:        c.position,
+                        certificateType: certType,
+                        issuedBy:        empId,
+                      });
+                      setCertPrinting(null);
+                      if (result.success) {
+                        showToast(`${certMeta.label} certificate downloaded!`);
+                      } else {
+                        showToast(result.error || 'Failed to generate certificate', 'error');
+                      }
+                    }}
+                    style={{
+                      background: certPrinting === c.id ? '#888' : certMeta.btnColor,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '0.28rem 0.75rem',
+                      fontSize: '0.68rem',
+                      fontFamily: "'Lufga', sans-serif",
+                      fontWeight: 700,
+                      cursor: certPrinting === c.id ? 'wait' : 'pointer',
+                      opacity: certPrinting === c.id ? 0.7 : 1,
+                      minWidth: 90,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {certPrinting === c.id ? '⏳ Generating…' : '📥 Download'}
+                  </button>
+                );
+              }}
+            />
           </div>
         )}
       </div>

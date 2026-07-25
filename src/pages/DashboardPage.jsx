@@ -9,6 +9,9 @@ import {
   getDayName,
   getWeekRange,
 } from '../utils/helpers';
+import useViewport from '../hooks/useViewport';
+import usePressState from '../hooks/usePressState';
+import MobileTable from '../components/common/MobileTable';
 
 const lufgaFontStyle = `
   @font-face {
@@ -63,6 +66,7 @@ const DashboardPage = () => {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const autoPlayRef = useRef(null);
   const dropdownRef = useRef(null);
+  const { isMobile } = useViewport();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -448,9 +452,9 @@ const DashboardPage = () => {
           </div>
 
           {/* Up Next For You - Matches Carousel */}
-          <div 
-            style={{ 
-              display: 'flex', 
+          <div
+            style={{
+              display: 'flex',
               alignItems: 'center',
               gap: '12px',
               background: 'var(--bg-surface)',
@@ -458,9 +462,11 @@ const DashboardPage = () => {
               padding: '12px 16px',
               backdropFilter: 'blur(8px)',
               border: '1px solid var(--border)',
-              minWidth: '260px',
-              maxWidth: '360px',
+              minWidth: isMobile ? 0 : '260px',
+              maxWidth: isMobile ? '100%' : '360px',
               position: 'relative',
+              width: isMobile ? '100%' : 'auto',
+              flex: isMobile ? '1 0 100%' : '0 0 auto',
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -817,8 +823,8 @@ const DashboardPage = () => {
         />
       </section>
 
-      {/* 80/20 Layout: Today's Bookings + Upcoming Events */}
-      <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
+      {/* Today's Bookings + Upcoming Events — stacks on mobile */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '80% 20%', gap: '14px' }}>
         {/* Today's Bookings - 80% with 5 slots per row */}
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
           <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
@@ -828,7 +834,7 @@ const DashboardPage = () => {
             {selectedGameRecord.name} on {currentDayName}
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '10px' }}>
             {SLOTS.map((slot) => {
               const players = (dayBookings[slot.id] || []).filter((booking) =>
                 String(booking.game) === String(selectedGameRecord.id) ||
@@ -963,8 +969,8 @@ const DashboardPage = () => {
         </section>
       </div>
 
-      {/* 80/20 Layout: Leaderboard + Quick Actions (Admin Only) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '80% 20%', gap: '14px' }}>
+      {/* Leaderboard + Quick Actions — stacks on mobile */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '80% 20%', gap: '14px' }}>
         {/* Leaderboard - 80% with colors */}
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
@@ -982,165 +988,106 @@ const DashboardPage = () => {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
-              <thead>
-                <tr style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-strong))', color: 'var(--accent-contrast)' }}>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Rank</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Employee</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Employee ID</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Department</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Played</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Wins</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Losses</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Draws</th>
-                  <th style={{ ...thStyle, color: 'white', padding: '10px 12px' }}>Points</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topLeaderboard.map((row, index) => {
-                  const rankColor = getRankColor(row.rank);
-                  const pointsColor = getPointsColor(row.points);
-                  const isTop3 = row.rank <= 3;
-                  return (
-                    <tr 
-                      key={`${row.employee_id || row.name}-${row.rank}`} 
-                      style={{ 
-                        borderBottom: '1px solid rgba(200,210,230,0.2)',
-                        background: isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, transparent)` : 'transparent',
-                        transition: 'background 0.2s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, rgba(111,156,255,0.08))` : 'var(--bg-muted)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = isTop3 ? `linear-gradient(90deg, ${rankColor.glow}, transparent)` : 'transparent';
-                      }}
-                    >
-                      <td style={{ ...tdStyle, padding: '8px 12px' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: rankColor.bg,
-                          color: rankColor.text,
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          fontWeight: 700,
-                          fontSize: '0.7rem',
-                          minWidth: '40px',
-                          boxShadow: `0 2px 8px ${rankColor.glow}`,
-                        }}>
-                          {getMedal(row.rank)}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', fontWeight: isTop3 ? 600 : 400 }}>
-                        <span style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px',
-                          color: isTop3 ? rankColor.text : 'var(--text-strong)',
-                        }}>
-                          {row.name}
-                          {isTop3 && (
-                            <span style={{ 
-                              fontSize: '0.55rem', 
-                              background: rankColor.bg,
-                              color: rankColor.text,
-                              padding: '1px 6px',
-                              borderRadius: '10px',
-                              fontWeight: 600,
-                            }}>
-                              {row.rank === 1 ? '🏆' : row.rank === 2 ? '🥈' : '🥉'}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', color: 'var(--text-soft)' }}>{row.employee_id || 'N/A'}</td>
-                      <td style={{ ...tdStyle, padding: '8px 12px' }}>
-                        <span style={{
-                          background: 'var(--bg-muted)',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.65rem',
-                          color: 'var(--text-soft)',
-                        }}>
-                          {row.department || 'General'}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          background: 'rgba(111,156,255,0.18)',
-                          padding: '2px 10px',
-                          borderRadius: '12px',
-                          color: 'var(--accent)',
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}>
-                          {row.gamesPlayed}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          background: 'rgba(46,125,50,0.18)',
-                          padding: '2px 10px',
-                          borderRadius: '12px',
-                          color: 'var(--success)',
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}>
-                          {row.wins}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          background: 'rgba(229,57,53,0.18)',
-                          padding: '2px 10px',
-                          borderRadius: '12px',
-                          color: 'var(--danger)',
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}>
-                          {row.losses}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          background: 'rgba(249,168,37,0.18)',
-                          padding: '2px 10px',
-                          borderRadius: '12px',
-                          color: 'var(--warning)',
-                          fontWeight: 600,
-                          fontSize: '0.7rem',
-                        }}>
-                          {row.draws}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, padding: '8px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          background: `linear-gradient(135deg, ${pointsColor}, ${pointsColor}dd)`,
-                          color: 'var(--accent-contrast)',
-                          padding: '4px 14px',
-                          borderRadius: '20px',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          display: 'inline-block',
-                          boxShadow: `0 2px 8px ${pointsColor}44`,
-                        }}>
-                          {row.points}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {topLeaderboard.length === 0 && (
-                  <tr>
-                    <td colSpan="9" style={{ padding: '18px', textAlign: 'center', color: 'var(--muted)' }}>
-                      No employees found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <MobileTable
+              columns={[
+                {
+                  key: 'rank',
+                  label: 'Rank',
+                  hideOnCard: true,
+                  render: (row) => {
+                    const rankColor = getRankColor(row.rank);
+                    return (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: rankColor.bg,
+                        color: rankColor.text,
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontWeight: 700,
+                        fontSize: '0.7rem',
+                        minWidth: '40px',
+                        boxShadow: `0 2px 8px ${rankColor.glow}`,
+                      }}>
+                        {getMedal(row.rank)}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'name',
+                  label: 'Employee',
+                  hideOnCard: true,
+                  render: (row) => {
+                    const rankColor = getRankColor(row.rank);
+                    const isTop3 = row.rank <= 3;
+                    return (
+                      <span style={{ fontWeight: isTop3 ? 600 : 400, color: isTop3 ? rankColor.text : 'var(--text-strong)' }}>
+                        {row.name}
+                      </span>
+                    );
+                  },
+                },
+                { key: 'employee_id', label: 'Emp ID', render: (row) => row.employee_id || 'N/A' },
+                { key: 'department', label: 'Dept', render: (row) => row.department || 'General' },
+                { key: 'gamesPlayed', label: 'Played', align: 'center' },
+                { key: 'wins', label: 'W', align: 'center', render: (row) => <strong style={{ color: 'var(--success)' }}>{row.wins}</strong> },
+                { key: 'losses', label: 'L', align: 'center', render: (row) => <strong style={{ color: 'var(--danger)' }}>{row.losses}</strong> },
+                { key: 'draws', label: 'D', align: 'center', render: (row) => <strong style={{ color: 'var(--warning)' }}>{row.draws}</strong> },
+                {
+                  key: 'points',
+                  label: 'Points',
+                  align: 'center',
+                  render: (row) => {
+                    const pointsColor = getPointsColor(row.points);
+                    return (
+                      <span style={{
+                        background: `linear-gradient(135deg, ${pointsColor}, ${pointsColor}dd)`,
+                        color: 'var(--accent-contrast)',
+                        padding: '4px 14px',
+                        borderRadius: '20px',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        display: 'inline-block',
+                        boxShadow: `0 2px 8px ${pointsColor}44`,
+                      }}>
+                        {row.points}
+                      </span>
+                    );
+                  },
+                },
+              ]}
+              rows={topLeaderboard}
+              rowKey={(row) => `${row.employee_id || row.name}-${row.rank}`}
+              emptyMessage="No employees found."
+              cardTitle={(row) => {
+                const rankColor = getRankColor(row.rank);
+                const isTop3 = row.rank <= 3;
+                return (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: rankColor.bg,
+                      color: rankColor.text,
+                      padding: '3px 8px',
+                      borderRadius: '14px',
+                      fontWeight: 700,
+                      fontSize: '0.7rem',
+                      minWidth: '36px',
+                    }}>{getMedal(row.rank)}</span>
+                    <span style={{ color: isTop3 ? rankColor.text : 'inherit' }}>{row.name}</span>
+                  </span>
+                );
+              }}
+              cardSubtitle={(row) => (
+                <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                  {row.employee_id || 'N/A'} · {row.department || 'General'}
+                </div>
+              )}
+            />
           </div>
         </section>
 
@@ -1179,12 +1126,11 @@ const DashboardPage = () => {
 };
 
 const QuickActionButton = ({ icon, label, onClick }) => {
-  const [hovered, setHovered] = useState(false);
+  const { pressed, pressProps } = usePressState();
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      {...pressProps}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -1192,7 +1138,7 @@ const QuickActionButton = ({ icon, label, onClick }) => {
         padding: '8px 12px',
         borderRadius: '10px',
         border: '1px solid var(--border)',
-        background: hovered ? 'var(--accent-soft)' : 'transparent',
+        background: pressed ? 'var(--accent-soft)' : 'transparent',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         width: '100%',
@@ -1209,11 +1155,11 @@ const QuickActionButton = ({ icon, label, onClick }) => {
 };
 
 const MetricCard = ({ label, value, caption, accent }) => {
-  const [hovered, setHovered] = React.useState(false);
+  const { pressed, pressProps } = usePressState();
+  const hovered = pressed;
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      {...pressProps}
       style={{
         padding: '18px 20px',
         borderRadius: '24px',

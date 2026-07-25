@@ -3,9 +3,13 @@
 // Renders a top tab bar (Events Calendar / Tournaments / Leaderboard) plus
 // a full month calendar, an Upcoming Events list and a Past Events table.
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import EventsTopBar from '../components/events/EventsTopBar';
+import useViewport from '../hooks/useViewport';
+import MobileTable from '../components/common/MobileTable';
+import BottomSheet from '../components/common/BottomSheet';
 
 const lufgaFontStyle = `
   @font-face {
@@ -86,6 +90,7 @@ const EventsCalendarPage = () => {
     currentUser,
   } = useApp();
   const { showToast } = useToast();
+  const { isMobile } = useViewport();
 
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -251,7 +256,7 @@ const EventsCalendarPage = () => {
       <EventsTopBar active="eventsCalendar" />
 
       {/* Stats row */}
-      <div style={styles.statsRow}>
+      <div className="events-stats-grid" style={styles.statsRow}>
         {[
           { label: 'Total Events',  val: totalEvents,      color: 'var(--accent)', sub: 'This year' },
           { label: 'Upcoming',      val: upcomingCount,   color: '#f9a825', sub: 'Future' },
@@ -285,7 +290,7 @@ const EventsCalendarPage = () => {
         ))}
       </div>
 
-      <div style={styles.gridLayout}>
+      <div style={{ ...styles.gridLayout, gridTemplateColumns: isMobile ? '1fr' : '1fr 320px' }}>
         {/* Calendar */}
         <div>
           <div style={styles.calendarCard}>
@@ -321,6 +326,7 @@ const EventsCalendarPage = () => {
                   }}
                   style={{
                     ...styles.calendarCell,
+                    ...(isMobile ? { minHeight: 56, padding: '0.2rem' } : {}),
                     background: cell.other ? 'var(--bg-surface-strong)' : cell.isToday ? 'rgba(var(--accent-rgb),0.12)' : cell.evs.length ? 'rgba(249,168,37,0.08)' : 'var(--bg-surface-strong)',
                     cursor: cell.other ? 'default' : 'pointer',
                   }}
@@ -437,56 +443,58 @@ const EventsCalendarPage = () => {
           <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{pastCount} event(s)</div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' }}>
-            <thead>
-              <tr style={{ background: 'rgba(var(--accent-rgb),0.08)' }}>
-                <th style={styles.th}>Event</th>
-                <th style={styles.th}>Date</th>
-                <th style={styles.th}>Type</th>
-                <th style={styles.th}>Venue</th>
-                <th style={styles.th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pastEvents.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)' }}>
-                    No past events recorded yet.
-                  </td>
-                </tr>
-              ) : pastEvents.map((ev) => {
-                const status = STATUS_BADGE[ev.event_status] || STATUS_BADGE.completed;
-                const type = EVENT_TYPE_STYLE[ev.event_type] || EVENT_TYPE_STYLE.company;
-                return (
-                  <tr key={ev.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{ev.title}</div>
-                      {ev.organizer && <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>by {ev.organizer}</div>}
-                    </td>
-                    <td style={styles.td}>{formatDateRange(ev)}</td>
-                    <td style={styles.td}><span style={{ ...type, ...styles.tableChip }}>{ev.event_type}</span></td>
-                    <td style={styles.td}>{ev.venue || '—'}</td>
-                    <td style={styles.td}><span style={{ ...status, ...styles.tableChip }}>{status.label}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <MobileTable
+            columns={[
+              {
+                key: 'title',
+                label: 'Event',
+                hideOnCard: true,
+                render: (ev) => (
+                  <>
+                    <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{ev.title}</div>
+                    {ev.organizer && <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>by {ev.organizer}</div>}
+                  </>
+                ),
+              },
+              { key: 'date', label: 'Date', render: (ev) => formatDateRange(ev) },
+              {
+                key: 'event_type',
+                label: 'Type',
+                render: (ev) => {
+                  const type = EVENT_TYPE_STYLE[ev.event_type] || EVENT_TYPE_STYLE.company;
+                  return <span style={{ ...type, ...styles.tableChip }}>{ev.event_type}</span>;
+                },
+              },
+              { key: 'venue', label: 'Venue', render: (ev) => ev.venue || '—' },
+              {
+                key: 'event_status',
+                label: 'Status',
+                render: (ev) => {
+                  const status = STATUS_BADGE[ev.event_status] || STATUS_BADGE.completed;
+                  return <span style={{ ...status, ...styles.tableChip }}>{status.label}</span>;
+                },
+              },
+            ]}
+            rows={pastEvents}
+            rowKey={(ev) => ev.id}
+            emptyMessage="No past events recorded yet."
+            cardTitle={(ev) => ev.title}
+            cardSubtitle={(ev) => (
+              <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                📅 {formatDateRange(ev)} {ev.organizer ? `· by ${ev.organizer}` : ''}
+              </div>
+            )}
+          />
         </div>
       </div>
 
       {/* Add Event Modal */}
-      {showAddModal && (
-        <div onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
-             style={styles.modalBackdrop}>
-          <div style={styles.modalCard}>
-            <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Add New Event</h3>
-              <button onClick={() => setShowAddModal(false)} style={styles.modalClose}>✕</button>
-            </div>
+      {showAddModal && (() => {
+        const formBody = (
+          <>
             <div style={{ padding: '1rem' }}>
-              <div style={styles.formGrid}>
-                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+              <div style={{ ...styles.formGrid, gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr' }}>
+                <div style={{ ...styles.formRow, gridColumn: isMobile ? 'auto' : 'span 2' }}>
                   <label style={styles.formLabel}>Event Title <span style={{ color: '#e53935' }}>*</span></label>
                   <input style={styles.formInput} value={form.title}
                          onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
@@ -512,7 +520,7 @@ const EventsCalendarPage = () => {
                   <input style={styles.formInput} type="time" value={form.end_time}
                          onChange={(e) => setForm(f => ({ ...f, end_time: e.target.value }))} />
                 </div>
-                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                <div style={{ ...styles.formRow, gridColumn: isMobile ? 'auto' : 'span 2' }}>
                   <label style={styles.formLabel}>Event Type <span style={{ color: '#e53935' }}>*</span></label>
                   <select style={styles.formInput} value={form.event_type}
                           onChange={(e) => setForm(f => ({ ...f, event_type: e.target.value }))}>
@@ -544,7 +552,7 @@ const EventsCalendarPage = () => {
                   <input style={styles.formInput} type="number" min="1" value={form.max_participants}
                          onChange={(e) => setForm(f => ({ ...f, max_participants: e.target.value }))} />
                 </div>
-                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                <div style={{ ...styles.formRow, gridColumn: isMobile ? 'auto' : 'span 2' }}>
                   <label style={styles.formLabel}>Description</label>
                   <textarea style={{ ...styles.formInput, minHeight: 60, resize: 'vertical' }}
                             value={form.description}
@@ -556,34 +564,36 @@ const EventsCalendarPage = () => {
               <button onClick={() => setShowAddModal(false)} style={styles.outlineBtn}>Cancel</button>
               <button onClick={saveEvent} style={styles.navyBtn}>Save Event</button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        );
+
+        if (isMobile) {
+          return (
+            <BottomSheet open onClose={() => setShowAddModal(false)} title="Add New Event" icon="📅">
+              {formBody}
+            </BottomSheet>
+          );
+        }
+
+        return createPortal(
+          <div onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
+               style={styles.modalBackdrop}>
+            <div style={styles.modalCard}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Add New Event</h3>
+                <button onClick={() => setShowAddModal(false)} style={styles.modalClose}>✕</button>
+              </div>
+              {formBody}
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* Event details modal */}
-      {selectedEvent && (
-        <div onClick={(e) => { if (e.target === e.currentTarget) setSelectedEvent(null); }}
-             style={styles.modalBackdrop}>
-          <div style={{ ...styles.modalCard, maxWidth: 520 }}>
-            <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>
-                {EVENT_TYPE_STYLE[selectedEvent.event_type] && (
-                  <span style={{
-                    ...EVENT_TYPE_STYLE[selectedEvent.event_type],
-                    padding: '0.18rem 0.5rem',
-                    borderRadius: 4,
-                    marginRight: 8,
-                    fontSize: '0.65rem',
-                    textTransform: 'uppercase',
-                    verticalAlign: 'middle',
-                  }}>
-                    {selectedEvent.event_type}
-                  </span>
-                )}
-                {selectedEvent.title}
-              </h3>
-              <button onClick={() => setSelectedEvent(null)} style={styles.modalClose}>✕</button>
-            </div>
+      {selectedEvent && (() => {
+        const detailsBody = (
+          <>
             <div style={{ padding: '1rem', fontSize: '0.78rem' }}>
               <DetailRow label="Date" value={formatDateRange(selectedEvent)} />
               {formatTimeRange(selectedEvent) && <DetailRow label="Time" value={formatTimeRange(selectedEvent)} />}
@@ -605,9 +615,51 @@ const EventsCalendarPage = () => {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        );
+
+        if (isMobile) {
+          return (
+            <BottomSheet
+              open
+              onClose={() => setSelectedEvent(null)}
+              title={selectedEvent.title}
+              icon="📅"
+            >
+              {detailsBody}
+            </BottomSheet>
+          );
+        }
+
+        return createPortal(
+          <div onClick={(e) => { if (e.target === e.currentTarget) setSelectedEvent(null); }}
+               style={styles.modalBackdrop}>
+            <div style={{ ...styles.modalCard, maxWidth: 520 }}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>
+                  {EVENT_TYPE_STYLE[selectedEvent.event_type] && (
+                    <span style={{
+                      ...EVENT_TYPE_STYLE[selectedEvent.event_type],
+                      padding: '0.18rem 0.5rem',
+                      borderRadius: 4,
+                      marginRight: 8,
+                      fontSize: '0.65rem',
+                      textTransform: 'uppercase',
+                      verticalAlign: 'middle',
+                    }}>
+                      {selectedEvent.event_type}
+                    </span>
+                  )}
+                  {selectedEvent.title}
+                </h3>
+                <button onClick={() => setSelectedEvent(null)} style={styles.modalClose}>✕</button>
+              </div>
+              {detailsBody}
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
     </div>
   );
 };

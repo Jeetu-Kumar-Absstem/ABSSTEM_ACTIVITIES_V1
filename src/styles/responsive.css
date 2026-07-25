@@ -264,3 +264,350 @@
   }
   .match-result-team-cell { padding: 6px 8px !important; }
 }
+
+/* ────────────────────────────────────────────────────────────────
+ * MOBILE APP SHELL (Capacitor Android + iOS web app safe areas)
+ * Appended below the legacy rules; nothing above is modified.
+ * ──────────────────────────────────────────────────────────────── */
+
+/* Safe-area insets (Capacitor / iOS notch / home indicator) */
+:root {
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+}
+
+/* On mobile the page itself is allowed to scroll under the WebView. */
+html, body, #root { height: 100%; }
+body {
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* App shell — mobile column layout */
+@media (max-width: 767px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh; /* dynamic vh for mobile browsers */
+  }
+}
+
+/* Mobile top app bar (sticky under the status bar) */
+.app-topbar-mobile { display: none; }
+
+@media (max-width: 767px) {
+  .app-topbar-mobile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    padding-top: max(8px, var(--safe-top));
+    background: var(--bg-surface-strong);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 1500;
+    flex-shrink: 0;
+  }
+  .app-topbar-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    font-family: 'Lufga', sans-serif;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Bottom nav (mobile) — hidden on desktop */
+.app-bottom-nav { display: none; }
+
+@media (max-width: 767px) {
+  .app-bottom-nav {
+    display: flex;
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1500;
+    background: var(--bg-surface-strong);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    padding: 6px 4px;
+    padding-bottom: max(6px, var(--safe-bottom));
+    gap: 4px;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+    flex-shrink: 0;
+  }
+  .app-bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 4px 6px;
+    border: none;
+    background: transparent;
+    border-radius: 12px;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.65rem;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .app-bottom-nav-item:active { background: var(--accent-soft); }
+  .app-bottom-nav-item--active {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .app-bottom-nav-item-icon { font-size: 1.25rem; line-height: 1; }
+  .app-bottom-nav-item-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* Hide the legacy desktop topbar/clay-app-bar on phones */
+@media (max-width: 767px) {
+  .topbar-clay { display: none !important; }
+}
+
+/* Mobile body padding: respect safe-areas + room for sticky bar */
+@media (max-width: 767px) {
+  .app-body { padding: 0 !important; }
+  .app-main {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding: 12px !important;
+    padding-left:  max(12px, var(--safe-left))  !important;
+    padding-right: max(12px, var(--safe-right)) !important;
+    min-height: 0 !important;
+    background-image: none !important;
+  }
+  .app-main-inner { padding: 0 !important; }
+  .app-footer { display: none !important; }
+}
+
+/* Slightly tighter bottom-sheet on tall phones */
+@media (max-width: 767px) {
+  .bottom-sheet-footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Tighter StatsRow on mobile (less wasted whitespace) */
+@media (max-width: 767px) {
+  .stats-row-grid {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .stats-row-grid > * { padding: 10px 12px !important; }
+}
+
+/* Booking page: make DateNavigator / GameSelector sticky under top app bar */
+@media (max-width: 767px) {
+  .booking-controls-sticky {
+    position: sticky;
+    top: 56px; /* approx topbar-mobile height */
+    z-index: 1400;
+    background: var(--bg-surface);
+    backdrop-filter: blur(8px);
+    padding: 8px 4px;
+    margin: -8px -4px 8px;
+    border-radius: 16px;
+  }
+}
+
+/* Generic helper: stack a 2-col grid on mobile */
+@media (max-width: 767px) {
+  .stack-mobile { grid-template-columns: 1fr !important; }
+  .stack-mobile-2col { grid-template-columns: repeat(2, 1fr) !important; }
+  .full-width-mobile { width: 100% !important; }
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .show-mobile-only { display: none !important; }
+}
+
+/* MobileTable: card list view (used by MobileTable component on phones) */
+.mobile-table-list { display: flex; flex-direction: column; gap: 12px; }
+.mobile-table-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--surface-shadow-soft);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: default;
+}
+.mobile-table-card--clickable { cursor: pointer; }
+.mobile-table-card--clickable:active {
+  transform: scale(0.99);
+  box-shadow: var(--surface-shadow);
+}
+.mobile-table-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.mobile-table-card-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.mobile-table-card-value {
+  font-size: 0.85rem;
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+.mobile-table-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-family: 'Lufga', sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mobile-table-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.mobile-table-empty {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Hide legacy table on mobile, show only cards */
+@media (max-width: 767px) {
+  .mobile-table-desktop { display: none !important; }
+}
+@media (min-width: 768px) {
+  .mobile-table-mobile { display: none !important; }
+}
+
+/* EventsCalendar: 2x3 stat grid on mobile */
+@media (max-width: 767px) {
+  .events-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Leaderboard podium: stack on very narrow phones */
+@media (max-width: 599px) {
+  .leaderboard-podium {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    gap: 12px !important;
+  }
+  .leaderboard-podium-rank1,
+  .leaderboard-podium-rank2,
+  .leaderboard-podium-rank3 {
+    grid-row: auto !important;
+    grid-column: auto !important;
+    transform: none !important;
+    order: 0;
+  }
+  .leaderboard-podium-rank1 { order: 2; }
+  .leaderboard-podium-rank2 { order: 1; }
+  .leaderboard-podium-rank3 { order: 3; }
+}
+
+/* Tournaments bracket: vertical timeline on mobile (alternative to grid) */
+@media (max-width: 767px) {
+  .tournament-bracket-grid {
+    display: none !important;
+  }
+  .tournament-bracket-timeline {
+    display: flex !important;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+@media (min-width: 768px) {
+  .tournament-bracket-timeline { display: none !important; }
+}
+
+.tournament-bracket-timeline { display: none; }
+.tournament-timeline-round {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tournament-timeline-round-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 0 0 4px 4px;
+}
+.tournament-timeline-match {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--surface-shadow-soft);
+  position: relative;
+}
+.tournament-timeline-team {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--text);
+  padding: 4px 0;
+}
+.tournament-timeline-team--winner { font-weight: 700; color: var(--accent); }
+.tournament-timeline-team--loser { color: var(--muted); }
+.tournament-timeline-team--tbd { color: var(--muted-strong); font-style: italic; }
+.tournament-timeline-team-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+.tournament-timeline-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+.tournament-timeline-status {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+

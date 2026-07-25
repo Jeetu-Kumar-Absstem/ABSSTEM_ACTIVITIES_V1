@@ -1,30 +1,17 @@
 // src/pages/RulesPage.jsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { GAMES } from '../utils/constants';
+import useViewport from '../hooks/useViewport';
+import BottomSheet from '../components/common/BottomSheet';
 
-
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
 
 const RulesPage = () => {
   const { rules, isAdmin, addRule, updateRule, deleteRule, loadRules } = useApp();
   const { showToast } = useToast();
+  const { isMobile } = useViewport();
   const [filter, setFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
@@ -36,17 +23,6 @@ const RulesPage = () => {
     game: 'General'
   });
 
-  // Inject Lufga font into document head
-  useEffect(() => {
-    const styleId = 'lufga-font-style';
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = lufgaFontStyle;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
-
   useEffect(() => {
     const fetchRules = async () => {
       setLoading(true);
@@ -56,14 +32,13 @@ const RulesPage = () => {
     fetchRules();
   }, []);
 
-  const filtered = filter === 'all' 
-    ? rules 
+  const filtered = filter === 'all'
+    ? rules
     : rules.filter(r => r.game === filter || r.game === 'General');
 
   const handleAddRule = () => {
-    // CHECK: Only admin can add rules
     if (!isAdmin()) {
-      showToast('❌ Only admins can add rules!', 'error');
+      showToast('Only admins can add rules!', 'error');
       return;
     }
     setEditingRule(null);
@@ -77,9 +52,8 @@ const RulesPage = () => {
   };
 
   const handleEditRule = (rule) => {
-    // CHECK: Only admin can edit rules
     if (!isAdmin()) {
-      showToast('❌ Only admins can edit rules!', 'error');
+      showToast('Only admins can edit rules!', 'error');
       return;
     }
     setEditingRule(rule);
@@ -93,37 +67,35 @@ const RulesPage = () => {
   };
 
   const handleDeleteRule = async (ruleId) => {
-    // CHECK: Only admin can delete rules
     if (!isAdmin()) {
-      showToast('❌ Only admins can delete rules!', 'error');
+      showToast('Only admins can delete rules!', 'error');
       return;
     }
-    if (!confirm('⚠️ Are you sure you want to delete this rule permanently?')) return;
-    
+    if (!window.confirm('Are you sure you want to delete this rule permanently?')) return;
+
     const result = await deleteRule(ruleId);
     if (result.success) {
-      showToast('✅ Rule deleted successfully!', 'success');
+      showToast('Rule deleted successfully!', 'success');
       await loadRules();
     } else {
-      showToast('❌ ' + result.error, 'error');
+      showToast(result.error, 'error');
     }
   };
 
   const handleSaveRule = async (e) => {
     e.preventDefault();
-    // CHECK: Only admin can save rules
     if (!isAdmin()) {
-      showToast('❌ Only admins can save rules!', 'error');
+      showToast('Only admins can save rules!', 'error');
       return;
     }
 
     if (!formData.rule_description.trim()) {
-      showToast('Please enter rule description!', 'error');
+      showToast('Please enter rule description!', 'warning');
       return;
     }
 
     if (!formData.created_by.trim()) {
-      showToast('Please enter creator name!', 'error');
+      showToast('Please enter creator name!', 'warning');
       return;
     }
 
@@ -136,17 +108,17 @@ const RulesPage = () => {
     }
 
     if (result.success) {
-      showToast(editingRule ? '✅ Rule updated successfully!' : '✅ Rule added successfully!', 'success');
+      showToast(editingRule ? 'Rule updated successfully!' : 'Rule added successfully!', 'success');
       setShowModal(false);
       setEditingRule(null);
       await loadRules();
     } else {
-      showToast('❌ ' + result.error, 'error');
+      showToast(result.error, 'error');
     }
     setLoading(false);
   };
 
-  if (loading) {
+  if (loading && rules.length === 0) {
     return (
       <div className="clay-card" style={{ textAlign: 'center', padding: '40px', fontFamily: "'Lufga', sans-serif" }}>
         <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⏳</div>
@@ -155,11 +127,89 @@ const RulesPage = () => {
     );
   }
 
+  const formBody = (
+    <form onSubmit={handleSaveRule}>
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+          Rule Description <span style={{ color: 'var(--danger)' }}>*</span>
+        </label>
+        <textarea
+          className="clay-input"
+          value={formData.rule_description}
+          onChange={(e) => setFormData({ ...formData, rule_description: e.target.value })}
+          placeholder="Enter rule description..."
+          rows="3"
+          required
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+            Created At <span style={{ color: 'var(--danger)' }}>*</span>
+          </label>
+          <input
+            type="date"
+            className="clay-input"
+            value={formData.created_at}
+            onChange={(e) => setFormData({ ...formData, created_at: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+            Game
+          </label>
+          <select
+            className="clay-select"
+            value={formData.game}
+            onChange={(e) => setFormData({ ...formData, game: e.target.value })}
+          >
+            <option value="General">General (All)</option>
+            {GAMES.map(g => (
+              <option key={g.id} value={g.name}>{g.icon} {g.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+          Created By <span style={{ color: 'var(--danger)' }}>*</span>
+        </label>
+        <input
+          className="clay-input"
+          value={formData.created_by}
+          onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
+          placeholder="Admin name"
+          required
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+        <button type="button" className="clay-btn" onClick={() => setShowModal(false)}>
+          Cancel
+        </button>
+        <button type="submit" className="clay-btn clay-btn-primary" disabled={loading}>
+          {loading ? '⏳ Saving...' : '💾 Save Rule'}
+        </button>
+      </div>
+    </form>
+  );
+
+  const ruleActionButtonStyle = {
+    padding: '4px 10px',
+    fontSize: '0.65rem',
+    minWidth: '32px',
+    minHeight: '32px',
+  };
+
   return (
-    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
+    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
       <div className="clay-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif", margin: 0, flex: 1, minWidth: 0 }}>
             Activity Rules ({rules.length})
           </h2>
           {isAdmin() ? (
@@ -173,10 +223,10 @@ const RulesPage = () => {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-          <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', width: isMobile ? '100%' : 'auto' }}>
             Game:
-            <select className="clay-select" style={{ padding: '6px 14px', fontSize: '0.7rem', width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select className="clay-select" style={{ padding: '6px 14px', fontSize: '0.7rem', flex: 1 }} value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="all">All Games</option>
               <option value="General">General (All)</option>
               {GAMES.map(g => (
@@ -184,14 +234,14 @@ const RulesPage = () => {
               ))}
             </select>
           </label>
-          <button 
-            className="clay-btn" 
+          <button
+            className="clay-btn"
             style={{ fontSize: '0.7rem' }}
             onClick={async () => {
               setLoading(true);
               await loadRules();
               setLoading(false);
-              showToast('🔄 Rules refreshed!', 'success');
+              showToast('Rules refreshed!', 'success');
             }}
           >
             🔄 Refresh
@@ -201,17 +251,17 @@ const RulesPage = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto' }}>
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)' }}>
-              No rules found. {isAdmin() ? 'Click "Add Rule" to create one.' : 'Contact admin to add rules.'}
+              No rules found. {isAdmin() ? 'Tap "+ Add Rule" to create one.' : 'Contact admin to add rules.'}
             </div>
           ) : (
             filtered.map(rule => (
-              <div key={rule.id} className="clay-soft" style={{ 
-                padding: '12px 16px', 
-                borderRadius: '16px', 
-                borderLeft: `4px solid ${rule.game === 'General' ? 'var(--accent)' : 'var(--warning)'}` 
+              <div key={rule.id} className="clay-soft" style={{
+                padding: '12px 16px',
+                borderRadius: '16px',
+                borderLeft: `4px solid ${rule.game === 'General' ? 'var(--accent)' : 'var(--warning)'}`
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text)' }}>{rule.rule_description}</div>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '0.6rem', color: 'var(--muted)', flexWrap: 'wrap' }}>
                       <span>📅 {rule.created_at || 'N/A'}</span>
@@ -221,19 +271,21 @@ const RulesPage = () => {
                   </div>
                   {isAdmin() && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                      <button 
-                        className="clay-btn" 
-                        style={{ padding: '2px 8px', fontSize: '0.6rem' }} 
+                      <button
+                        className="clay-btn"
+                        style={ruleActionButtonStyle}
                         onClick={() => handleEditRule(rule)}
                         title="Edit Rule"
+                        aria-label="Edit rule"
                       >
                         ✏️
                       </button>
-                      <button 
-                        className="clay-btn" 
-                        style={{ padding: '2px 8px', fontSize: '0.6rem', color: '#e53935' }} 
+                      <button
+                        className="clay-btn"
+                        style={{ ...ruleActionButtonStyle, color: '#e53935' }}
                         onClick={() => handleDeleteRule(rule.id)}
                         title="Delete Rule"
+                        aria-label="Delete rule"
                       >
                         🗑️
                       </button>
@@ -246,7 +298,7 @@ const RulesPage = () => {
         </div>
       </div>
 
-      {/* Right sidebar */}
+      {/* Right sidebar (collapses below rules on mobile) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div className="clay-card">
           <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>📋 Recent Violations</h3>
@@ -281,8 +333,18 @@ const RulesPage = () => {
         </div>
       </div>
 
-      {/* Add/Edit Rule Modal */}
-      {showModal && (
+      {showModal && isMobile && (
+        <BottomSheet
+          open
+          onClose={() => setShowModal(false)}
+          title={editingRule ? '✏️ Edit Rule' : '📝 Add New Rule'}
+          icon="📜"
+        >
+          {formBody}
+        </BottomSheet>
+      )}
+
+      {showModal && !isMobile && createPortal(
         <div style={{
           position: 'fixed',
           inset: 0,
@@ -311,77 +373,10 @@ const RulesPage = () => {
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
             </div>
-
-            <form onSubmit={handleSaveRule}>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
-                  Rule Description <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
-                <textarea
-                  className="clay-input"
-                  value={formData.rule_description}
-                  onChange={(e) => setFormData({ ...formData, rule_description: e.target.value })}
-                  placeholder="Enter rule description..."
-                  rows="3"
-                  required
-                  style={{ resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
-                    Created At <span style={{ color: 'var(--danger)' }}>*</span>
-                  </label>
-                  <input
-                    type="date"
-                    className="clay-input"
-                    value={formData.created_at}
-                    onChange={(e) => setFormData({ ...formData, created_at: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
-                    Game
-                  </label>
-                  <select
-                    className="clay-select"
-                    value={formData.game}
-                    onChange={(e) => setFormData({ ...formData, game: e.target.value })}
-                  >
-                    <option value="General">General (All)</option>
-                    {GAMES.map(g => (
-                      <option key={g.id} value={g.name}>{g.icon} {g.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
-                  Created By <span style={{ color: 'var(--danger)' }}>*</span>
-                </label>
-                <input
-                  className="clay-input"
-                  value={formData.created_by}
-                  onChange={(e) => setFormData({ ...formData, created_by: e.target.value })}
-                  placeholder="Admin name"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" className="clay-btn" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="clay-btn clay-btn-primary" disabled={loading}>
-                  {loading ? '⏳ Saving...' : '💾 Save Rule'}
-                </button>
-              </div>
-            </form>
+            {formBody}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

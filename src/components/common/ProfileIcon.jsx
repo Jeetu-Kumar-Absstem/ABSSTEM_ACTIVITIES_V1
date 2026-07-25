@@ -1,10 +1,14 @@
 // src/components/common/ProfileIcon.jsx
+// Avatar + account menu. On mobile it opens as a BottomSheet titled "Account",
+// mirroring the BookSlotModal pattern. On desktop it stays as a dropdown panel.
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabase';
 import { useToast } from '../../context/ToastContext';
 import { useApp } from '../../context/AppContext';
 import { LogOut } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import BottomSheet from './BottomSheet';
+import useViewport from '../../hooks/useViewport';
 
 const ProfileIcon = ({ user, onLogout }) => {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -12,6 +16,7 @@ const ProfileIcon = ({ user, onLogout }) => {
   const dropdownRef = useRef(null);
   const { showToast } = useToast();
   const { setActiveTab, isAdmin } = useApp();
+  const { isMobile } = useViewport();
 
   useEffect(() => {
     if (user) {
@@ -21,15 +26,15 @@ const ProfileIcon = ({ user, onLogout }) => {
   }, [user]);
 
   useEffect(() => {
+    if (isMobile) return; // BottomSheet handles outside-tap itself
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isMobile]);
 
   const handleLogout = async () => {
     try {
@@ -45,24 +50,123 @@ const ProfileIcon = ({ user, onLogout }) => {
 
   const getInitials = () => userName.charAt(0).toUpperCase();
 
-  const menuItemStyle = {
-    padding: '8px 16px',
-    fontSize: '0.8rem',
-    color: 'var(--text-soft)',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'background 0.15s ease',
+  const handleMyProfile = () => {
+    setShowDropdown(false);
+    setActiveTab('profile');
+  };
+  const handleAdmin = () => {
+    setShowDropdown(false);
+    setActiveTab('admin');
+  };
+  const handleSettings = () => {
+    setShowDropdown(false);
+    setActiveTab('settings');
   };
 
-  const hoverIn = (event) => {
-    event.currentTarget.style.background = 'var(--drawer-hover)';
-  };
+  const accountContent = (
+    <div>
+      <div style={{ padding: '0 4px 12px 4px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-strong)' }}>
+          {userName}
+        </div>
+        <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '2px' }}>
+          {user?.email || 'Employee'}
+        </div>
+        {user?.user_metadata?.emp_id && (
+          <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>
+            ID: {user.user_metadata.emp_id}
+          </div>
+        )}
+      </div>
 
-  const hoverOut = (event) => {
-    event.currentTarget.style.background = 'transparent';
-  };
+      <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {isAdmin() && (
+          <button
+            type="button"
+            onClick={handleAdmin}
+            className="drawer-item"
+            style={{ width: '100%', textAlign: 'left' }}
+          >
+            <span className="drawer-item-icon" aria-hidden>🛡️</span>
+            <span className="drawer-item-label">Admin</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleMyProfile}
+          className="drawer-item"
+          style={{ width: '100%', textAlign: 'left' }}
+        >
+          <span className="drawer-item-icon" aria-hidden>👤</span>
+          <span className="drawer-item-label">My Profile</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleSettings}
+          className="drawer-item"
+          style={{ width: '100%', textAlign: 'left' }}
+        >
+          <span className="drawer-item-icon" aria-hidden>⚙️</span>
+          <span className="drawer-item-label">Settings</span>
+        </button>
+      </div>
+
+      <div style={{ padding: '8px 4px 4px' }}>
+        <ThemeToggle compact onAfterToggle={() => setShowDropdown(false)} />
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border)', padding: '4px 0 0', marginTop: '8px' }}>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="drawer-item drawer-item--danger"
+          style={{ width: '100%', textAlign: 'left' }}
+        >
+          <LogOut size={16} strokeWidth={2} />
+          <span className="drawer-item-label">Logout</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        <div
+          className="clay-soft"
+          onClick={() => setShowDropdown(true)}
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            background: 'var(--accent-soft)',
+            fontWeight: 700,
+            fontSize: '1rem',
+            color: 'var(--accent)',
+            border: '1px solid var(--border)',
+            transition: 'all 0.2s ease',
+            userSelect: 'none',
+          }}
+          title={userName}
+        >
+          {getInitials()}
+        </div>
+        <BottomSheet
+          open={showDropdown}
+          onClose={() => setShowDropdown(false)}
+          title="Account"
+          icon="👤"
+          ariaLabel="Account menu"
+        >
+          {accountContent}
+        </BottomSheet>
+      </>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', zIndex: 9999 }} ref={dropdownRef}>
@@ -107,78 +211,7 @@ const ProfileIcon = ({ user, onLogout }) => {
             border: '1px solid var(--border)',
           }}
         >
-          <div style={{ padding: '0 16px 12px 16px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-strong)' }}>
-              {userName}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '2px' }}>
-              {user?.email || 'Employee'}
-            </div>
-            {user?.user_metadata?.emp_id && (
-              <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>
-                ID: {user.user_metadata.emp_id}
-              </div>
-            )}
-          </div>
-
-          <div style={{ padding: '4px 0' }}>
-            {isAdmin() && (
-              <div
-                onClick={() => {
-                  setShowDropdown(false);
-                  setActiveTab('admin');
-                }}
-                style={menuItemStyle}
-                onMouseEnter={hoverIn}
-                onMouseLeave={hoverOut}
-              >
-                🛡️ Admin
-              </div>
-            )}
-            <div
-              onClick={() => {
-                setShowDropdown(false);
-                setActiveTab('profile');
-              }}
-              style={menuItemStyle}
-              onMouseEnter={hoverIn}
-              onMouseLeave={hoverOut}
-            >
-              👤 My Profile
-            </div>
-            <div
-              onClick={() => {
-                setShowDropdown(false);
-                setActiveTab('settings');
-              }}
-              style={menuItemStyle}
-              onMouseEnter={hoverIn}
-              onMouseLeave={hoverOut}
-            >
-              ⚙ Settings
-            </div>
-          </div>
-
-          <div style={{ padding: '8px 12px 0 12px' }}>
-            <ThemeToggle compact onAfterToggle={() => setShowDropdown(false)} />
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border)', padding: '4px 0', marginTop: '8px' }}>
-            <div
-              onClick={handleLogout}
-              style={{
-                ...menuItemStyle,
-                color: 'var(--danger)',
-              }}
-              onMouseEnter={(event) => {
-                event.currentTarget.style.background = 'rgba(229, 57, 53, 0.08)';
-              }}
-              onMouseLeave={hoverOut}
-            >
-              <LogOut size={16} strokeWidth={2} />
-              <span>Logout</span>
-            </div>
-          </div>
+          {accountContent}
         </div>
       )}
     </div>

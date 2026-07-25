@@ -11,6 +11,9 @@ import {
   groupMatchesByRound,
   normalizeTournamentFormat,
 } from '../utils/tournamentFixtures';
+import useViewport from '../hooks/useViewport';
+import MobileTable from '../components/common/MobileTable';
+import BottomSheet from '../components/common/BottomSheet';
 
 
 const lufgaFontStyle = `
@@ -31,13 +34,10 @@ const lufgaFontStyle = `
 `;
 
 // Confirm-delete modal (admin action on a tournament).
-const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
-  <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
-    <div style={{ ...styles.modalCard, maxWidth: 420 }}>
-      <div style={{ ...styles.modalHeader, background: '#c62828' }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Delete Tournament</h3>
-        <button onClick={onCancel} style={styles.modalClose}>✕</button>
-      </div>
+const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => {
+  const { isMobile } = useViewport();
+  const body = (
+    <>
       <div style={{ padding: '1rem', fontSize: '0.78rem', color: 'var(--text)' }}>
         <p style={{ margin: '0 0 0.5rem 0' }}>
           Are you sure you want to delete <strong>{tournament?.name}</strong> ({tournament?.code})?
@@ -50,13 +50,34 @@ const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => (
         <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
         <button onClick={onConfirm} style={styles.dangerBtn}>🗑 Delete</button>
       </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <BottomSheet open onClose={onCancel} title="Delete Tournament" icon="🗑">
+        {body}
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
+      <div style={{ ...styles.modalCard, maxWidth: 420 }}>
+        <div style={{ ...styles.modalHeader, background: '#c62828' }}>
+          <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Delete Tournament</h3>
+          <button onClick={onCancel} style={styles.modalClose}>✕</button>
+        </div>
+        {body}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Batch-register modal: pick one or more active tournaments in a single click.
 const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pendingByTournament, isAdminUser, onCancel, onSubmit }) => {
   // Open, accepting-registration, not-full, not-already-registered.
+  const { isMobile } = useViewport();
   const eligible = tournaments.filter(t => {
     if (t.status === 'completed' || t.status === 'cancelled') return false;
     if (t.registration_open === false) return false;
@@ -78,6 +99,79 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
     return next;
   });
 
+  const body = (
+    <>
+      <div style={{ padding: '1rem' }}>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', marginBottom: '0.6rem' }}>
+          One registration per person per tournament. Tick all tournaments you'd like to join — you can pick one or many.
+        </div>
+        {eligible.length === 0 ? (
+          <div style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem' }}>
+            No open tournaments available — either you're already registered or they're all full.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            {eligible.map(t => {
+              const parts = partsByTournament[t.id] || [];
+              const isSel = selected.has(t.id);
+              return (
+                <label
+                  key={t.id}
+                  style={{
+                    display: 'flex', gap: '0.6rem', alignItems: 'center',
+                    padding: '0.55rem 0.7rem', borderRadius: 6,
+                    border: `1px solid ${isSel ? 'var(--accent)' : 'var(--border)'}`,
+                    background: isSel ? 'var(--accent-soft)' : 'var(--bg-muted)',
+                    cursor: 'pointer', fontSize: '0.75rem',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSel}
+                    onChange={() => toggle(t.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-strong)' , fontFamily: "'Lufga', sans-serif" }}>{t.name}</div>
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-soft)' }}>
+                      {t.code} · {t.game} · {t.format.replace('_', ' ')} · {formatDate(t.start_date)}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.66rem', color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
+                    {parts.length} / {t.max_participants}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div style={styles.modalFooter}>
+        <span style={{ flex: 1, fontSize: '0.7rem', color: 'var(--text-soft)' }}>
+          {selected.size} selected
+        </span>
+        <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
+        <button
+          onClick={() => onSubmit([...selected])}
+          disabled={selected.size === 0 || !currentEmpId}
+          style={{
+            ...styles.navyBtn,
+            opacity: selected.size === 0 || !currentEmpId ? 0.5 : 1,
+            cursor: selected.size === 0 || !currentEmpId ? 'not-allowed' : 'pointer',
+          }}
+        >{isAdminUser ? 'Register' : 'Request'}</button>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <BottomSheet open onClose={onCancel} title="🏆 Register for Tournaments" icon="🏆">
+        {body}
+      </BottomSheet>
+    );
+  }
+
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }} style={styles.modalBackdrop}>
       <div style={{ ...styles.modalCard, maxWidth: 560 }}>
@@ -85,66 +179,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
           <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>🏆 Register for Tournaments</h3>
           <button onClick={onCancel} style={styles.modalClose}>✕</button>
         </div>
-        <div style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', marginBottom: '0.6rem' }}>
-            One registration per person per tournament. Tick all tournaments you'd like to join — you can pick one or many.
-          </div>
-          {eligible.length === 0 ? (
-            <div style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem' }}>
-              No open tournaments available — either you're already registered or they're all full.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '0.5rem' }}>
-              {eligible.map(t => {
-                const parts = partsByTournament[t.id] || [];
-                const isSel = selected.has(t.id);
-                return (
-                  <label
-                    key={t.id}
-                    style={{
-                      display: 'flex', gap: '0.6rem', alignItems: 'center',
-                      padding: '0.55rem 0.7rem', borderRadius: 6,
-                      border: `1px solid ${isSel ? 'var(--accent)' : 'var(--border)'}`,
-                      background: isSel ? 'var(--accent-soft)' : 'var(--bg-muted)',
-                      cursor: 'pointer', fontSize: '0.75rem',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSel}
-                      onChange={() => toggle(t.id)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text-strong)' , fontFamily: "'Lufga', sans-serif" }}>{t.name}</div>
-                      <div style={{ fontSize: '0.66rem', color: 'var(--text-soft)' }}>
-                        {t.code} · {t.game} · {t.format.replace('_', ' ')} · {formatDate(t.start_date)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.66rem', color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
-                      {parts.length} / {t.max_participants}
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div style={styles.modalFooter}>
-          <span style={{ flex: 1, fontSize: '0.7rem', color: 'var(--text-soft)' }}>
-            {selected.size} selected
-          </span>
-            <button onClick={onCancel} style={styles.outlineBtn}>Cancel</button>
-          <button
-            onClick={() => onSubmit([...selected])}
-            disabled={selected.size === 0 || !currentEmpId}
-            style={{
-              ...styles.navyBtn,
-              opacity: selected.size === 0 || !currentEmpId ? 0.5 : 1,
-              cursor: selected.size === 0 || !currentEmpId ? 'not-allowed' : 'pointer',
-            }}
-          >{isAdminUser ? 'Register' : 'Request'}</button>
-        </div>
+        {body}
       </div>
     </div>
   );
@@ -216,6 +251,7 @@ const TournamentsPage = () => {
   } = useApp();
   const { showToast } = useToast();
   const { generateCertificate } = useCertificate();
+  const { isMobile } = useViewport();
   const [certPrinting, setCertPrinting] = useState(null); // tracks which row is printing
 
   const [sub, setSub] = useState('active');
@@ -3268,11 +3304,11 @@ const styles = {
   // Headings → Lufga Bold (weight 700)
   cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', fontFamily: LUFGA_BOLD },
   recordCount: { fontSize: '0.7rem', color: 'var(--muted)', fontFamily: LUFGA_REGULAR, fontWeight: 400 },
-  navyBtn: { background: 'var(--accent)', color: 'var(--text-strong)', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  navyBtn: { background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
   outlineBtn: { background: 'var(--bg-surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
-  dangerBtn: { background: 'var(--danger)', color: 'var(--text-strong)', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  dangerBtn: { background: 'var(--danger)', color: '#ffffff', border: 'none', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: LUFGA_REGULAR },
   tinyIconBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 4, padding: '0.18rem 0.4rem', margin: '0 2px', cursor: 'pointer', fontSize: '0.7rem', fontFamily: LUFGA_REGULAR },
-  tinyEnterBtn: { background: 'var(--accent)', color: 'var(--text-strong)', border: 'none', borderRadius: 4, padding: '0.2rem 0.55rem', fontSize: '0.66rem', cursor: 'pointer', fontFamily: LUFGA_BOLD, fontWeight: 700 },
+  tinyEnterBtn: { background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: 4, padding: '0.2rem 0.55rem', fontSize: '0.66rem', cursor: 'pointer', fontFamily: LUFGA_BOLD, fontWeight: 700 },
   tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block', fontFamily: LUFGA_REGULAR },
 
   table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', fontFamily: LUFGA_REGULAR },
@@ -3307,8 +3343,8 @@ const styles = {
   modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 120 },
   modalCard: { background: 'var(--bg-surface-strong)', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.32)', fontFamily: LUFGA_REGULAR },
   // Modal header is a heading → Lufga Bold
-  modalHeader: { background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0', fontFamily: LUFGA_BOLD },
-  modalClose: { background: 'none', border: 'none', color: 'var(--accent-contrast)', fontSize: '1rem', cursor: 'pointer', fontFamily: LUFGA_REGULAR },
+  modalHeader: { background: 'var(--accent)', color: '#ffffff', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0', fontFamily: LUFGA_BOLD },
+  modalClose: { background: 'none', border: 'none', color: '#ffffff', fontSize: '1rem', cursor: 'pointer', fontFamily: LUFGA_REGULAR },
   modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: 'var(--bg-muted)', borderRadius: '0 0 8px 8px', fontFamily: LUFGA_REGULAR },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
