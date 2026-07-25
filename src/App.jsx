@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
 import Toast from './components/common/Toast';
@@ -43,23 +43,28 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      // If we landed on /reset-password,
-      // let ResetPasswordPage handle the session.
-      if (window.location.pathname === '/reset-password') {
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        // If we landed on /reset-password,
+        // let ResetPasswordPage handle the session.
+        if (window.location.pathname === '/reset-password') {
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user && !session.user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          setUser(null);
+        } else {
+          setUser(session?.user || null);
+        }
+
         setLoading(false);
-        return;
-      }
-
-      if (session?.user && !session.user.email_confirmed_at) {
-        await supabase.auth.signOut();
-        setUser(null);
-      } else {
-        setUser(session?.user || null);
-      }
-
-      setLoading(false);
-    });
+      })
+      .catch((error) => {
+        console.error('Error fetching Supabase session:', error);
+        setLoading(false);
+      });
 
     const {
       data: { subscription },
@@ -100,7 +105,7 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AppProvider key={user?.id || 'guest'}>
         <ToastProvider>
           <Suspense fallback={<PageLoader />}>
@@ -137,7 +142,7 @@ function App() {
           <Toast />
         </ToastProvider>
       </AppProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

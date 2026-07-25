@@ -10,6 +10,35 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Absstem Activities" />
     <title>Absstem Activities</title>
+    <script>
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        var message = [
+          'Message: ' + msg,
+          'URL: ' + url,
+          'Line: ' + lineNo,
+          'Column: ' + columnNo,
+          'Error object: ' + JSON.stringify(error)
+        ].join(' - ');
+        console.error("GLOBAL ERROR: " + message);
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100%';
+        div.style.background = 'red';
+        div.style.color = 'white';
+        div.style.zIndex = '999999';
+        div.style.padding = '10px';
+        div.style.fontSize = '12px';
+        div.style.wordBreak = 'break-all';
+        div.innerText = "JS Error: " + message;
+        document.body.appendChild(div);
+        return false;
+      };
+      window.onunhandledrejection = function(event) {
+        console.error("UNHANDLED REJECTION: " + event.reason);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>
