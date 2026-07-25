@@ -190,11 +190,13 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
       <div
         style={{
           display: 'flex',
+          flexDirection: collapsed ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
           padding: collapsed ? '0 0 16px 0' : '0 8px 20px 8px',
           borderBottom: '1px solid var(--border)',
           marginBottom: '16px',
+          gap: collapsed ? '8px' : '0',
         }}
       >
         {!collapsed ? (
@@ -232,15 +234,15 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                 background: 'transparent',
                 border: 'none',
                 color: 'var(--accent)',
-                fontSize: '20px',
+                fontSize: '16px',
                 cursor: 'pointer',
                 padding: '4px',
                 opacity: 0.7,
-                width: '100%',
                 display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                marginTop: '8px',
               }}
+              title="Expand sidebar"
             >
               ▶
             </button>
