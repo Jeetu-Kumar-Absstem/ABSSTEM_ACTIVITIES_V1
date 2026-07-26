@@ -109,6 +109,18 @@ const ProfileIcon = ({ user, onLogout }) => {
           <span className="drawer-item-icon" aria-hidden>⚙️</span>
           <span className="drawer-item-label">Settings</span>
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowDropdown(false);
+            setActiveTab('reports');
+          }}
+          className="drawer-item"
+          style={{ width: '100%', textAlign: 'left' }}
+        >
+          <span className="drawer-item-icon" aria-hidden>📊</span>
+          <span className="drawer-item-label">Reports</span>
+        </button>
       </div>
 
       <div style={{ padding: '8px 4px 4px' }}>

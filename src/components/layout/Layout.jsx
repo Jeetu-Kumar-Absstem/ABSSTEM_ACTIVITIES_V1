@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Sidebar from './Sidebar';
 import MobileDrawer from './MobileDrawer';
 import BottomNav from './BottomNav';
+import ProfileIcon from '../common/ProfileIcon';
 import useViewport from '../../hooks/useViewport';
 import { useApp } from '../../context/AppContext';
 
@@ -113,6 +114,9 @@ const Layout = ({ children, user, onLogout }) => {
             <span className="hamburger-bar" />
           </button>
           <h1 className="app-topbar-title">{pageTitle}</h1>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <ProfileIcon user={user} onLogout={onLogout} />
+          </div>
         </header>
 
         {/* Page content */}

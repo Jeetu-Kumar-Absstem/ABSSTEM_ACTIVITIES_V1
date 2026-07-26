@@ -29,25 +29,25 @@
 .hamburger-btn {
   display: inline-flex; flex-direction: column; justify-content: center; gap: 4px;
   width: 40px; height: 40px; padding: 8px;
-  background: rgba(255,255,255,0.5);
-  border: 1px solid rgba(200,210,230,0.5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.hamburger-btn:hover { background: rgba(255,255,255,0.8); }
+.hamburger-btn:hover { background: var(--accent-soft); }
 .hamburger-btn:focus-visible {
-  outline: 3px solid rgba(43,59,107,0.35); outline-offset: 2px;
+  outline: 3px solid var(--accent-glow); outline-offset: 2px;
 }
 .hamburger-bar {
   display: block; width: 100%; height: 2px; border-radius: 2px;
-  background: #1a3c6e; transition: transform .2s ease, opacity .2s ease;
+  background: var(--accent); transition: transform .2s ease, opacity .2s ease;
 }
 
 /* ── Drawer ────────────────────────────────────────────────── */
 .drawer-backdrop {
   position: fixed; inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(2px);
   z-index: 200000;
   animation: drawer-fade-in .25s ease;
@@ -55,7 +55,7 @@
 .drawer-panel {
   position: absolute; top: 0; left: 0; bottom: 0;
   width: min(82vw, 320px);
-  background: rgba(255,255,255,0.96);
+  background: var(--drawer-bg);
   backdrop-filter: blur(12px);
   box-shadow: 8px 0 24px rgba(0,0,0,0.12);
   display: flex; flex-direction: column;
@@ -64,37 +64,37 @@
 }
 .drawer-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 4px 8px 12px; border-bottom: 1px solid rgba(200,210,230,0.5);
+  padding: 4px 8px 12px; border-bottom: 1px solid var(--border);
 }
-.drawer-title { font-weight: 700; color: #1a3c6e; font-size: 0.95rem; }
+.drawer-title { font-weight: 700; color: var(--accent); font-size: 0.95rem; }
 .drawer-close {
   width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(255,255,255,0.6);
-  border: 1px solid rgba(200,210,230,0.5);
-  font-size: 1rem; color: #1a3c6e; cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  font-size: 1rem; color: var(--accent); cursor: pointer;
 }
-.drawer-close:hover { background: rgba(255,255,255,0.9); }
-.drawer-close:focus-visible { outline: 3px solid rgba(43,59,107,0.35); outline-offset: 2px; }
+.drawer-close:hover { background: var(--accent-soft); }
+.drawer-close:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 2px; }
 
 .drawer-nav { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 12px 0; overflow-y: auto; }
-.drawer-footer { border-top: 1px solid rgba(200,210,230,0.5); padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.drawer-footer { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 
 .drawer-item {
   display: flex; align-items: center; gap: 12px;
   min-height: 48px;
   padding: 10px 14px; border: none; background: transparent;
   border-radius: 16px; cursor: pointer;
-  font-family: inherit; font-size: 0.95rem; color: #1e1e2f;
+  font-family: inherit; font-size: 0.95rem; color: var(--text);
   text-align: left; transition: background .15s ease, transform .1s ease;
 }
-.drawer-item:hover  { background: rgba(43,59,107,0.06); }
+.drawer-item:hover  { background: var(--drawer-hover); }
 .drawer-item:active { transform: scale(0.98); }
-.drawer-item:focus-visible { outline: 3px solid rgba(43,59,107,0.35); outline-offset: 2px; }
+.drawer-item:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 2px; }
 .drawer-item--active {
-  background: linear-gradient(135deg, rgba(43,59,107,0.10), rgba(0,137,123,0.08));
-  color: #1a3c6e; font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent); font-weight: 600;
 }
-.drawer-item--danger { color: #c62828; }
+.drawer-item--danger { color: var(--danger); }
 .drawer-item--danger:hover { background: rgba(229,57,53,0.08); }
 .drawer-item-icon  { font-size: 1.1rem; width: 24px; text-align: center; }
 .drawer-item-label { font-size: 0.95rem; }
@@ -199,7 +199,7 @@
 .bottom-sheet-panel {
   width: 100%;
   max-width: 480px;
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--bg-surface-strong);
   backdrop-filter: blur(12px);
   border-radius: 24px 24px 0 0;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
@@ -209,29 +209,29 @@
 }
 .bottom-sheet-grabber {
   width: 40px; height: 4px;
-  background: rgba(26, 60, 110, 0.18);
+  background: var(--accent-glow);
   border-radius: 999px;
   margin: 10px auto 0;
 }
 .bottom-sheet-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 18px 8px;
-  border-bottom: 1px solid rgba(200, 210, 230, 0.3);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   gap: 10px;
 }
-.bottom-sheet-title { margin: 0; font-size: 1rem; font-weight: 600; color: #1e1e2f; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bottom-sheet-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .bottom-sheet-close {
   width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(200, 210, 230, 0.5);
-  font-size: 1rem; color: #1a3c6e; cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  font-size: 1rem; color: var(--accent); cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
 }
-.bottom-sheet-close:hover { background: rgba(255, 255, 255, 0.9); }
+.bottom-sheet-close:hover { background: var(--accent-soft); }
 .bottom-sheet-close:focus-visible {
-  outline: 3px solid rgba(43, 59, 107, 0.35); outline-offset: 2px;
+  outline: 3px solid var(--accent-glow); outline-offset: 2px;
 }
 .bottom-sheet-body {
   padding: 14px 18px;
@@ -241,8 +241,8 @@
 }
 .bottom-sheet-footer {
   padding: 12px 18px;
-  border-top: 1px solid rgba(200, 210, 230, 0.3);
-  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface-strong);
   display: flex; gap: 10px; justify-content: flex-end;
   flex-shrink: 0;
   padding-bottom: max(12px, env(safe-area-inset-bottom));

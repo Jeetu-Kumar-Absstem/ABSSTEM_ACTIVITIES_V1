@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import absstemLogo from './assets/absstem_game_light_logo.png';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
 import Toast from './components/common/Toast';
@@ -30,8 +31,8 @@ const PageLoader = () => (
         textAlign: 'center',
       }}
     >
-      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⏳</div>
-      <div style={{ fontSize: '0.9rem', color: '#444466' }}>
+      <img src={absstemLogo} alt="Absstem Logo" className="splash-logo" />
+      <div style={{ fontSize: '0.9rem', color: '#444466', marginTop: '16px' }}>
         Loading...
       </div>
     </div>
@@ -41,8 +42,14 @@ const PageLoader = () => (
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [minLoadingFinished, setMinLoadingFinished] = useState(false);
 
   useEffect(() => {
+    // Force minimum loading duration of 1.5 seconds
+    const timer = setTimeout(() => {
+      setMinLoadingFinished(true);
+    }, 1500);
+
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
         // If we landed on /reset-password,
@@ -93,14 +100,17 @@ function App() {
       setUser(session?.user || null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleLogin = (userData) => setUser(userData);
   const handleLogout = () => setUser(null);
 
   // Initial authentication loading
-  if (loading) {
+  if (loading || !minLoadingFinished) {
     return <PageLoader />;
   }
 

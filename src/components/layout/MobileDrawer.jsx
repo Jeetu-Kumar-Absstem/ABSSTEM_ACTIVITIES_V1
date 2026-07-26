@@ -106,43 +106,7 @@ const MobileDrawer = ({ open, onClose, user, onLogout }) => {
           {EVENTS.map((it) => (
             <DrawerItem key={it.id} item={it} active={activeTab === it.id} onClick={navigate} />
           ))}
-
-          {user && (
-            <>
-              <DrawerDivider label="Account" />
-              {ACCOUNT.map((it) => (
-                <DrawerItem key={it.id} item={it} active={activeTab === it.id} onClick={navigate} />
-              ))}
-              {isAdmin && isAdmin() && (
-                <DrawerItem
-                  item={{ id: 'admin', label: 'Admin', icon: '🛡️' }}
-                  active={activeTab === 'admin'}
-                  onClick={navigate}
-                />
-              )}
-              {activeTab === 'reports' || (
-                <DrawerItem
-                  item={{ id: 'reports', label: 'Reports', icon: '📊' }}
-                  active={activeTab === 'reports'}
-                  onClick={navigate}
-                />
-              )}
-            </>
-          )}
         </nav>
-
-        {user && (
-          <footer className="drawer-footer">
-            <button
-              type="button"
-              className="drawer-item drawer-item--danger"
-              onClick={handleLogout}
-            >
-              <span className="drawer-item-icon" aria-hidden>⎋</span>
-              <span className="drawer-item-label">Logout</span>
-            </button>
-          </footer>
-        )}
       </aside>
     </div>
   );
