@@ -13,6 +13,81 @@ import useViewport from '../hooks/useViewport';
 import usePressState from '../hooks/usePressState';
 import MobileTable from '../components/common/MobileTable';
 
+const QuickActionItem = ({ icon, label, color, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px',
+      padding: '16px 8px',
+      borderRadius: '20px',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border)',
+      cursor: 'pointer',
+      boxShadow: 'var(--surface-shadow-soft)',
+      flex: 1,
+      minWidth: 0,
+    }}
+  >
+    <div style={{
+      width: '44px',
+      height: '44px',
+      borderRadius: '12px',
+      background: color,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '1.6rem',
+    }}>
+      {icon}
+    </div>
+    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text)', textAlign: 'center', fontFamily: "'Lufga', sans-serif" }}>
+      {label}
+    </span>
+  </button>
+);
+
+const OverviewCard = ({ icon, label, value, caption, borderColor, iconBg }) => (
+  <div style={{
+    background: 'var(--bg-surface)',
+    borderRadius: '24px',
+    padding: '16px',
+    border: '1px solid var(--border)',
+    borderLeft: `5px solid ${borderColor}`,
+    boxShadow: 'var(--surface-shadow-soft)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{
+        width: '36px',
+        height: '36px',
+        borderRadius: '50%',
+        background: iconBg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '1.1rem'
+      }}>
+        {icon}
+      </div>
+      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+    </div>
+    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", lineHeight: 1 }}>
+      {value}
+    </div>
+    <div style={{ fontSize: '0.65rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 500 }}>
+      {caption}
+    </div>
+  </div>
+);
+
 const lufgaFontStyle = `
   @font-face {
     font-family: 'Lufga';
@@ -39,6 +114,27 @@ if (typeof document !== 'undefined') {
     document.head.appendChild(styleTag);
   }
 }
+
+// Color palette for leaderboard ranks
+const getRankColor = (rank) => {
+  const colors = {
+    1: { bg: '#FFD700', text: '#8B6914', glow: 'rgba(255,215,0,0.3)' },
+    2: { bg: '#C0C0C0', text: '#6B6B6B', glow: 'rgba(192,192,192,0.3)' },
+    3: { bg: '#CD7F32', text: '#6B3A2A', glow: 'rgba(205,127,50,0.3)' },
+  };
+  return colors[rank] || { bg: '#e8edf5', text: '#444466', glow: 'rgba(200,210,230,0.2)' };
+};
+
+const getPointsColor = (points) => {
+  if (points >= 10) return '#1b5e20';
+  if (points >= 5) return '#f9a825';
+  return '#c62828';
+};
+
+const getMedal = (rank) => {
+  const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+  return medals[rank] || `#${rank}`;
+};
 
 const DashboardPage = () => {
   const {
@@ -73,17 +169,6 @@ const DashboardPage = () => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowGameDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Resume auto-play when user clicks away
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsAutoPlaying(true);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -371,28 +456,235 @@ const DashboardPage = () => {
   // Get current match
   const currentMatch = upcomingMatches.length > 0 ? upcomingMatches[currentMatchIndex] : null;
 
-  // Color palette for leaderboard ranks
-  const getRankColor = (rank) => {
-    const colors = {
-      1: { bg: '#FFD700', text: '#8B6914', glow: 'rgba(255,215,0,0.3)' },
-      2: { bg: '#C0C0C0', text: '#6B6B6B', glow: 'rgba(192,192,192,0.3)' },
-      3: { bg: '#CD7F32', text: '#6B3A2A', glow: 'rgba(205,127,50,0.3)' },
-    };
-    return colors[rank] || { bg: '#e8edf5', text: '#444466', glow: 'rgba(200,210,230,0.2)' };
-  };
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '16px 8px', background: 'var(--bg)', minHeight: '100%' }}>
+        {/* Top Header - Greeting & Game Selector */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.4rem' }}>👋</span>
+              <div style={{ fontSize: '1.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)' }}>
+                Welcome back, <span style={{ color: 'var(--accent)' }}>{getUserDisplayName()}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Lufga', sans-serif" }}>
+              <span>📅</span>
+              <span>{formatDate(currentDate)}</span>
+            </div>
+          </div>
 
-  const getPointsColor = (points) => {
-    if (points >= 10) return '#1b5e20';
-    if (points >= 5) return '#f9a825';
-    return '#c62828';
-  };
+          {/* Game Selector Pill */}
+          <div style={{ position: 'relative', flexShrink: 0 }} ref={dropdownRef}>
+            <button
+              onClick={() => setShowGameDropdown(!showGameDropdown)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                borderRadius: '999px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                fontSize: '0.85rem',
+                fontFamily: "'Lufga', sans-serif",
+                fontWeight: 600,
+                color: 'var(--text)',
+                boxShadow: 'var(--surface-shadow-soft)',
+              }}
+            >
+              <span>{selectedGameRecord?.icon || '🎯'}</span>
+              <span>{selectedGameRecord?.name}</span>
+              <span style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>▼</span>
+            </button>
+            {showGameDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                background: 'var(--bg-surface-strong)',
+                border: '1px solid var(--border)',
+                borderRadius: '16px',
+                boxShadow: 'var(--surface-shadow)',
+                zIndex: 2000,
+                minWidth: '140px',
+                overflow: 'hidden'
+              }}>
+                {games.map(game => (
+                  <div
+                    key={game.id}
+                    onClick={() => {
+                      setSelectedGame(String(game.id));
+                      setShowGameDropdown(false);
+                    }}
+                    style={{
+                      padding: '12px 16px',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid var(--border)',
+                      background: String(selectedGame) === String(game.id) ? 'var(--accent-soft)' : 'transparent',
+                      color: 'var(--text)',
+                    }}
+                  >
+                    {game.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </header>
 
-  const getMedal = (rank) => {
-    const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
-    return medals[rank] || `#${rank}`;
-  };
+        {/* Upcoming Match Card */}
+        <section
+          style={{
+            padding: '20px',
+            borderRadius: '24px',
+            background: 'var(--bg-surface)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--surface-shadow-soft)',
+            cursor: 'pointer'
+          }}
+          onClick={() => setActiveTab('booking')}
+        >
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '14px',
+            background: 'var(--accent-soft)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.4rem',
+            color: 'var(--accent)'
+          }}>
+            📅
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>
+              Upcoming Match
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '2px', fontFamily: "'Lufga', sans-serif" }}>
+              {upcomingMatches.length > 0 ? currentMatch.title : 'No matches today'}
+            </div>
+          </div>
+          <div style={{ color: 'var(--accent)', fontSize: '1.2rem' }}>›</div>
+        </section>
 
-  return (
+        {/* Quick Actions Grid */}
+        <section>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+            Quick Actions
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+            <QuickActionItem icon="📅" label="Book Court" color="rgba(59, 130, 246, 0.1)" onClick={() => setActiveTab('booking')} />
+            <QuickActionItem icon="📋" label="My Bookings" color="rgba(16, 185, 129, 0.1)" onClick={() => setActiveTab('booking')} />
+            <QuickActionItem icon="🏆" label="Tournaments" color="rgba(245, 158, 11, 0.1)" onClick={() => setActiveTab('tournaments')} />
+            <QuickActionItem icon="🎉" label="Events" color="rgba(236, 72, 153, 0.1)" onClick={() => setActiveTab('eventsCalendar')} />
+          </div>
+        </section>
+
+        {/* Overview Section - 2x2 Grid */}
+        <section>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+            Overview
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <OverviewCard
+              icon="📅"
+              label="TODAY'S BOOKINGS"
+              value={selectedGameBookings.length}
+              caption={`${selectedGameRecord.name} bookings`}
+              borderColor="#3b82f6"
+              iconBg="rgba(59, 130, 246, 0.1)"
+            />
+            <OverviewCard
+              icon="👥"
+              label="AVAILABLE SLOTS"
+              value={availableSlotsCount}
+              caption={`${availableSlotsCount} slots available`}
+              borderColor="#10b981"
+              iconBg="rgba(16, 185, 129, 0.1)"
+            />
+            <OverviewCard
+              icon="🛡️"
+              label="ACTIVE BANS"
+              value={activeBanCount}
+              caption="No active bans"
+              borderColor="#ef4444"
+              iconBg="rgba(239, 68, 68, 0.1)"
+            />
+            <OverviewCard
+              icon="🤴"
+              label="GAME MASTERS"
+              value="2"
+              caption="Active masters"
+              borderColor="#8b5cf6"
+              iconBg="rgba(139, 92, 246, 0.1)"
+            />
+          </div>
+        </section>
+
+        {/* Today's Bookings Section */}
+        <section style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--surface-shadow-soft)' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+            Today's bookings
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {SLOTS.map((slot) => {
+              const players = (dayBookings[slot.id] || []).filter((booking) =>
+                String(booking.game) === String(selectedGameRecord.id) ||
+                booking.game === selectedGameRecord.name ||
+                String(booking.game).toLowerCase() === String(selectedGameRecord.name || '').toLowerCase()
+              );
+              const isFull = players.length >= maxPerSlot;
+              const hasBooking = players.length > 0;
+
+              return (
+                <div
+                  key={slot.id}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '16px',
+                    background: isFull ? 'var(--danger-soft)' : hasBooking ? 'var(--accent-soft)' : 'var(--bg-muted)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)' }}>{slot.label}</div>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>{slot.time}</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, marginTop: '4px', color: isFull ? 'var(--danger)' : 'var(--accent)' }}>
+                    {players.length}/{maxPerSlot}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Leaderboard Section */}
+        <section style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--surface-shadow-soft)' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+            Leaderboard
+          </h3>
+          <MobileTable
+            rows={topLeaderboard}
+            rowKey={(row) => `${row.employee_id || row.name}-${row.rank}`}
+            columns={[
+              { key: 'rank', label: 'Rank', render: (row) => getMedal(row.rank) },
+              { key: 'name', label: 'Employee' },
+              { key: 'points', label: 'Points', align: 'center' }
+            ]}
+          />
+        </section>
+
+        <div style={{ height: '20px' }} />
+      </div>
+    );
+  } else {
+    // Desktop View
+    return (
     <div style={{ display: 'grid', gap: '18px' }}>
       {/* Header Section - Clean with only background color */}
       <div
@@ -439,13 +731,6 @@ const DashboardPage = () => {
     <span style={{ fontSize: '1.75rem' }}>👋</span>
   </span>
 </div>
-            
-            {/* <div style={{ fontSize: '0.75rem', color: '#6a6a8a', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>
-              PLANNING DASHBOARD
-            </div> */}
-            {/* <h1 style={{ margin: '2px 0 4px', fontSize: '1.6rem', lineHeight: 1.1, fontWeight: 700, color: '#1a1a2e' }}>
-              Employee activity at a glance
-            </h1> */}
             <div style={{ fontSize: '0.8rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
               {formatDate(currentDate)} • Week: {weekLabel}
             </div>
@@ -1122,7 +1407,8 @@ const DashboardPage = () => {
         ) : null}
       </div>
     </div>
-  );
+    );
+  }
 };
 
 const QuickActionButton = ({ icon, label, onClick }) => {
