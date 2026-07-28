@@ -97,8 +97,8 @@ const Layout = ({ children, user, onLogout }) => {
   const shellBgImage = themeMode === 'dark' ? bgImageDark : bgImageLight;
   const pageTitle = TAB_TITLES[activeTab] || 'Absstem';
 
-  // ── MOBILE SHELL: top app bar + content + bottom nav ─────────────────
-  if (isMobile) {
+  // ── MOBILE/TABLET SHELL: top app bar + content + bottom nav ─────────
+  if (!isDesktop) {
     return (
       <div className="app-shell" style={{ display: 'flex', flexDirection: 'column' }}>
         {/* Mobile top app bar */}

@@ -10,6 +10,7 @@ import EventsTopBar from '../components/events/EventsTopBar';
 import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
 import BottomSheet from '../components/common/BottomSheet';
+import CalendarIcon from '../components/common/CalendarIcon';
 
 const lufgaFontStyle = `
   @font-face {
@@ -371,7 +372,9 @@ const EventsCalendarPage = () => {
         {/* Sidebar: Upcoming + Past */}
         <div>
           <div style={styles.sideCard}>
-            <div style={styles.sideHeader}>📅 Upcoming Events</div>
+            <div style={{ ...styles.sideHeader, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarIcon size="20px" /> Upcoming Events
+            </div>
             {upcomingEvents.length === 0 ? (
               <div style={styles.sideEmpty}>No upcoming events scheduled.</div>
             ) : (
@@ -421,7 +424,9 @@ const EventsCalendarPage = () => {
                       </div>
                     </div>
                     <div style={styles.sideItemMeta}>
-                      <span>📅 {formatDateRange(ev)}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CalendarIcon size="12px" date={ev.start_date} /> {formatDateRange(ev)}
+                      </span>
                       {formatTimeRange(ev) && <span>⏰ {formatTimeRange(ev)}</span>}
                     </div>
                     <div style={styles.sideItemMeta}>
@@ -569,7 +574,7 @@ const EventsCalendarPage = () => {
 
         if (isMobile) {
           return (
-            <BottomSheet open onClose={() => setShowAddModal(false)} title="Add New Event" icon="📅">
+            <BottomSheet open onClose={() => setShowAddModal(false)} title="Add New Event" icon={<CalendarIcon size="24px" />}>
               {formBody}
             </BottomSheet>
           );
@@ -624,7 +629,7 @@ const EventsCalendarPage = () => {
               open
               onClose={() => setSelectedEvent(null)}
               title={selectedEvent.title}
-              icon="📅"
+              icon={<CalendarIcon size="24px" date={selectedEvent.start_date} />}
             >
               {detailsBody}
             </BottomSheet>

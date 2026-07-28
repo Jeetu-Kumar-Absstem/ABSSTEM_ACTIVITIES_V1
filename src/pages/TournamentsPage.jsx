@@ -14,6 +14,7 @@ import {
 import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
 import BottomSheet from '../components/common/BottomSheet';
+import CalendarIcon from '../components/common/CalendarIcon';
 
 
 const lufgaFontStyle = `
@@ -166,7 +167,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
 
   if (isMobile) {
     return (
-      <BottomSheet open onClose={onCancel} title="🏆 Register for Tournaments" icon="🏆">
+      <BottomSheet open onClose={onCancel} title="🏆 Register for Tournaments" icon={<CalendarIcon size="24px" />}>
         {body}
       </BottomSheet>
     );
@@ -3255,7 +3256,9 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
 
         <div className="clay-card" style={styles.card}>
           <div style={styles.cardHeader}>
-            <div style={styles.cardHeaderTitle}>📅 Today's Match Schedule</div>
+            <div style={styles.cardHeaderTitle}>
+          <CalendarIcon size="18px" /> Today's Match Schedule
+        </div>
           </div>
           <div style={{ maxHeight: 220, overflowY: 'auto' }}>
             {todaySchedule.length === 0 ? (

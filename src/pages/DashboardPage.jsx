@@ -12,6 +12,7 @@ import {
 import useViewport from '../hooks/useViewport';
 import usePressState from '../hooks/usePressState';
 import MobileTable from '../components/common/MobileTable';
+import CalendarIcon from '../components/common/CalendarIcon';
 
 const QuickActionItem = ({ icon, label, color, onClick }) => (
   <button
@@ -469,7 +470,7 @@ const DashboardPage = () => {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              <span>📅</span>
+              <CalendarIcon size="16px" date={currentDate} />
               <span>{formatDate(currentDate)}</span>
             </div>
           </div>
@@ -560,7 +561,7 @@ const DashboardPage = () => {
             fontSize: '1.4rem',
             color: 'var(--accent)'
           }}>
-            📅
+            <CalendarIcon size="32px" date={currentDate} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>
@@ -579,7 +580,7 @@ const DashboardPage = () => {
             Quick Actions
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-            <QuickActionItem icon="📅" label="Book Court" color="rgba(59, 130, 246, 0.1)" onClick={() => setActiveTab('booking')} />
+            <QuickActionItem icon={<CalendarIcon size="28px" date={currentDate} />} label="Book Court" color="rgba(59, 130, 246, 0.1)" onClick={() => setActiveTab('booking')} />
             <QuickActionItem icon="📋" label="My Bookings" color="rgba(16, 185, 129, 0.1)" onClick={() => setActiveTab('booking')} />
             <QuickActionItem icon="🏆" label="Tournaments" color="rgba(245, 158, 11, 0.1)" onClick={() => setActiveTab('tournaments')} />
             <QuickActionItem icon="🎉" label="Events" color="rgba(236, 72, 153, 0.1)" onClick={() => setActiveTab('eventsCalendar')} />
@@ -593,7 +594,7 @@ const DashboardPage = () => {
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <OverviewCard
-              icon="📅"
+              icon={<CalendarIcon size="24px" date={currentDate} />}
               label="TODAY'S BOOKINGS"
               value={selectedGameBookings.length}
               caption={`${selectedGameRecord.name} bookings`}
@@ -1388,7 +1389,7 @@ const DashboardPage = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <QuickActionButton 
-                icon="📅" 
+                icon={<CalendarIcon size="20px" date={currentDate} />}
                 label="Create Slot Booking" 
                 onClick={() => setActiveTab('booking')}
               />
