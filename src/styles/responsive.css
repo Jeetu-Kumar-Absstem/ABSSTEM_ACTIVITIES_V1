@@ -332,57 +332,103 @@ body {
   }
 }
 
-/* Bottom nav (mobile) — hidden on desktop */
-.app-bottom-nav { display: none; }
+/* Modern Floating Pill Bottom Nav (Mobile) */
+.bottom-nav-container { display: none; }
 
 @media (max-width: 991px) {
-  .app-bottom-nav {
-    display: flex;
+  .bottom-nav-container {
+    display: block;
     position: fixed;
-    bottom: 0;
+    bottom: max(20px, var(--safe-bottom));
     left: 0;
     right: 0;
     z-index: 1500;
-    background: var(--bg-surface-strong);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid var(--border);
-    padding: 6px 4px;
-    padding-bottom: max(6px, var(--safe-bottom));
-    gap: 4px;
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
-    flex-shrink: 0;
+    padding: 0 20px;
+    pointer-events: none; /* Allow clicks through the container */
   }
-  .app-bottom-nav-item {
+
+  .app-bottom-nav-pill {
+    pointer-events: auto; /* Enable clicks on the pill itself */
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: var(--bg-surface-strong);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 10px 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  .nav-pill-item {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
-    min-height: 52px;
-    padding: 4px 6px;
     border: none;
     background: transparent;
-    border-radius: 12px;
+    padding: 6px 0;
     color: var(--muted);
-    font: inherit;
     font-size: 0.65rem;
     font-weight: 600;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
   }
-  .app-bottom-nav-item:active { background: var(--accent-soft); }
-  .app-bottom-nav-item--active {
+
+  .nav-pill-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+  }
+
+  .nav-pill-item--active {
     color: var(--accent);
-    background: var(--accent-soft);
   }
-  .app-bottom-nav-item-icon { font-size: 1.25rem; line-height: 1; }
-  .app-bottom-nav-item-label {
-    font-size: 0.6rem;
-    letter-spacing: 0.02em;
+
+  .nav-pill-item--active .nav-pill-icon {
+    transform: scale(1.15) translateY(-2px);
   }
+
+  .nav-pill-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.01em;
+    transition: all 0.3s ease;
+  }
+
+  .nav-pill-item--active .nav-pill-label {
+    font-weight: 700;
+    transform: translateY(-1px);
+  }
+
+  .nav-pill-dot {
+    position: absolute;
+    bottom: -2px;
+    width: 4px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: dotPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  @keyframes dotPop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+}
+
+@media (max-width: 991px) {
+  .app-bottom-nav { display: none !important; } /* Hide legacy if still present */
 }
 
 /* Hide the legacy desktop topbar/clay-app-bar on phones/tablets */
@@ -400,7 +446,7 @@ body {
     padding-top: calc(64px + var(--safe-top)) !important;
     padding-left:  max(12px, var(--safe-left))  !important;
     padding-right: max(12px, var(--safe-right)) !important;
-    padding-bottom: calc(80px + var(--safe-bottom)) !important;
+    padding-bottom: calc(100px + var(--safe-bottom)) !important;
     min-height: 0 !important;
     background-image: none !important;
     width: 100%;
