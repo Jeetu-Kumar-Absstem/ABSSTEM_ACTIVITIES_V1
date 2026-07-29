@@ -464,13 +464,15 @@ const DashboardPage = () => {
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.4rem' }}>👋</span>
+              
               <div style={{ fontSize: '1.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)' }}>
                 Welcome back, <span style={{ color: 'var(--accent)' }}>{getUserDisplayName()}</span>
+                <span style={{ fontSize: '1.4rem' }}>👋</span>
               </div>
+              
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Lufga', sans-serif" }}>
-              <CalendarIcon size="16px" date={currentDate} />
+              {/* <CalendarIcon size="16px" date={currentDate} /> */}
               <span>{formatDate(currentDate)}</span>
             </div>
           </div>
