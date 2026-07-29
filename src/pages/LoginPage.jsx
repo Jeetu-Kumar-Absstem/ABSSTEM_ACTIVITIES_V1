@@ -1,9 +1,10 @@
 // src/pages/LoginPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import absstemLogo from '../assets/absstem_game_light_logo.png';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../context/ToastContext';
 import { validateEmpId, formatEmpId, validatePassword } from '../utils/validators';
+import { Check } from 'lucide-react';
 
 const lufgaFontStyle = `
   @font-face {
@@ -79,6 +80,7 @@ const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
 const LoginPage = ({ onLogin }) => {
   const [empId, setEmpId] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
@@ -96,7 +98,48 @@ const LoginPage = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const [showRememberPrompt, setShowRememberPrompt] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState([]);
+
+  const MAX_SAVED_ACCOUNTS = 5;
+  const STORAGE_KEY = 'remember_accounts';
+
   const { showToast } = useToast();
+
+  const getSavedAccounts = () => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  };
+
+  const handleEmpIdFocus = () => {
+    const accounts = getSavedAccounts();
+    if (accounts.length > 0 && !empId) {
+      setSavedAccounts(accounts);
+      setShowRememberPrompt(true);
+    }
+  };
+
+  const handleSelectAccount = (account) => {
+    setEmpId(account.empId);
+    setPassword(account.password);
+    setRememberMe(true);
+    setShowRememberPrompt(false);
+  };
+
+  const handleForgetAccount = (e, empIdToRemove) => {
+    e.stopPropagation();
+    const updated = getSavedAccounts().filter(a => a.empId !== empIdToRemove);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setSavedAccounts(updated);
+    if (updated.length === 0) setShowRememberPrompt(false);
+  };
+
+  const handleDismissRemembered = () => {
+    setShowRememberPrompt(false);
+  };
 
   const handleEmpIdChange = (e) => {
     const rawValue = e.target.value;
@@ -158,6 +201,23 @@ const LoginPage = ({ onLogin }) => {
         await supabase.auth.signOut();
         setLoginError('Please confirm your email address before logging in.');
         return;
+      }
+
+      // Save or remove from multi-account store
+      if (rememberMe) {
+        const accounts = getSavedAccounts();
+        const existing = accounts.findIndex(a => a.empId === empId);
+        if (existing >= 0) {
+          accounts[existing].password = password; // update password if changed
+        } else {
+          if (accounts.length >= MAX_SAVED_ACCOUNTS) accounts.shift(); // drop oldest
+          accounts.push({ empId, password });
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+      } else {
+        // Remove this account from saved list if it was there
+        const accounts = getSavedAccounts().filter(a => a.empId !== empId);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
       }
 
       showToast('Welcome back!', 'success');
@@ -576,6 +636,7 @@ const LoginPage = ({ onLogin }) => {
               type="text"
               value={empId}
               onChange={handleEmpIdChange}
+              onFocus={!isRegister ? handleEmpIdFocus : undefined}
               // placeholder="e.g., ABC1234"
               maxLength="9"
               style={{
@@ -586,6 +647,95 @@ const LoginPage = ({ onLogin }) => {
               }}
               required
             />
+
+            {/* Multi-account saved credentials dropdown */}
+            {!isRegister && showRememberPrompt && (
+              <div style={{
+                marginTop: '8px',
+                borderRadius: '16px',
+                background: 'rgba(255,255,255,0.95)',
+                border: '1px solid rgba(26, 60, 110, 0.18)',
+                boxShadow: '0 4px 20px rgba(26,60,110,0.10)',
+                overflow: 'hidden',
+              }}>
+                {/* Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  borderBottom: '1px solid rgba(26,60,110,0.08)',
+                  background: 'rgba(26,60,110,0.04)',
+                }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#1a3c6e' }}>
+                    💾 Saved accounts ({savedAccounts.length}/{MAX_SAVED_ACCOUNTS})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDismissRemembered}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#aaa', fontSize: '0.75rem', lineHeight: 1, padding: '0 2px',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Account rows */}
+                {savedAccounts.map((account, i) => (
+                  <div
+                    key={account.empId}
+                    onClick={() => handleSelectAccount(account)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '9px 12px',
+                      cursor: 'pointer',
+                      borderBottom: i < savedAccounts.length - 1 ? '1px solid rgba(26,60,110,0.06)' : 'none',
+                      transition: 'background 0.12s',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,60,110,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <div style={{
+                        width: '30px', height: '30px', borderRadius: '50%',
+                        background: 'rgba(26,60,110,0.12)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.7rem', fontWeight: 700, color: '#1a3c6e', flexShrink: 0,
+                      }}>
+                        {account.empId.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1a3c6e', fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                          {account.empId}
+                        </div>
+                        <div style={{ fontSize: '0.6rem', color: '#9090aa', marginTop: '1px' }}>
+                          {'•'.repeat(8)}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleForgetAccount(e, account.empId)}
+                      title="Forget this account"
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#cc4444', fontSize: '0.65rem', padding: '4px 6px',
+                        borderRadius: '6px', fontFamily: 'inherit', flexShrink: 0,
+                        opacity: 0.7,
+                      }}
+                    >
+                      Forget
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{
               fontSize: '0.6rem',
               color: '#8888aa',
@@ -682,6 +832,36 @@ const LoginPage = ({ onLogin }) => {
                   {password === confirmPassword ? '✅ Passwords match' : '⚠️ Passwords do not match'}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Remember Me — login only */}
+          {!isRegister && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', marginTop: '4px' }}>
+              <div
+                onClick={() => setRememberMe((v) => !v)}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '6px',
+                  border: rememberMe ? '2px solid #1a3c6e' : '2px solid rgba(180,190,210,0.8)',
+                  background: rememberMe ? '#1a3c6e' : 'rgba(240,243,250,0.85)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+              >
+                {rememberMe && <Check size={12} color="#fff" strokeWidth={3} />}
+              </div>
+              <span
+                onClick={() => setRememberMe((v) => !v)}
+                style={{ fontSize: '0.78rem', color: '#555577', cursor: 'pointer', userSelect: 'none' }}
+              >
+                Remember me
+              </span>
             </div>
           )}
 

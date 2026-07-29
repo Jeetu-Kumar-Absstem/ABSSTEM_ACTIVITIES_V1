@@ -4,5 +4,6 @@
     - `[x]` Create the prominent Points and Streak cards
     - `[x]` Redesign the Game Selector and Info section
     - `[x]` Style the Certificates section as modern cards
+    - `[x]` Add "Generating PDF" animation to download buttons
 - `[x]` Verify design consistency in both light and dark modes
 - `[x]` Test PDF/Certificate download functionality remains intact

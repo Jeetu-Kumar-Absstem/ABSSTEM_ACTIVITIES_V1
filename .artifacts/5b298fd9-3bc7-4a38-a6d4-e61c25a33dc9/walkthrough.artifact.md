@@ -11,6 +11,7 @@ The Profile Page has been redesigned to be modern, mobile-first, and visually pr
 - **Dynamic Game Selector**: Improved the game selection dropdown with custom icons and better styling.
 - **Certificate Cards**: Migrated from a table-based list to a modern card-based layout for certificates. Each card clearly shows the tournament name, type, position, and period, with a prominent download button.
 - **Enhanced Summaries**: Improved the mobile view of the "All Games Summary" table to show detailed stats in a clean card format.
+- **Loading Animations**: Added a "Generating PDF..." state with a spinning loader icon to the "Download Profile" and "Download Certificate" buttons to provide clear feedback during the generation process.
 
 ### 🛠 Technical Enhancements
 - **Lucide Icons**: Integrated `lucide-react` icons throughout the page for a more professional and consistent look.

@@ -21,7 +21,8 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
-  Target
+  Target,
+  Loader2
 } from 'lucide-react';
 
 const lufgaFontStyle = `
@@ -142,7 +143,16 @@ const ProfilePage = () => {
 
             <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
               <button className="clay-btn" onClick={handleDownloadProfile} disabled={profileLoading} style={{ gap: '10px', padding: '10px 24px' }}>
-                <Download size={18} /> Download Profile
+                {profileLoading ? (
+                  <>
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                    Generating PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download size={18} /> Download Profile
+                  </>
+                )}
               </button>
               <button className="clay-btn clay-btn-primary" onClick={() => setActiveTab('booking')} style={{ gap: '10px', padding: '10px 24px' }}>
                 Back to Booking
@@ -351,7 +361,16 @@ const ProfilePage = () => {
                           boxShadow: '0 8px 16px rgba(var(--accent-rgb), 0.25)'
                         }}
                       >
-                        {certPrinting === c.id ? 'Generating PDF...' : <><Download size={18} /> Download Certificate</>}
+                        {certPrinting === c.id ? (
+                          <>
+                            <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
+                            Generating PDF...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={18} /> Download Certificate
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
