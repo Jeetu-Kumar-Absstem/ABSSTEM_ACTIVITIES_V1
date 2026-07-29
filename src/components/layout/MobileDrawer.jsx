@@ -106,7 +106,7 @@ const MobileDrawer = ({ open, onClose, user: propUser, onLogout }) => {
             </div>
             <div className="drawer-greeting-container">
               <h2 className="drawer-greeting">Hello, {userName} 👋</h2>
-              <span className="drawer-role">Game Master</span>
+              {/* <span className="drawer-role">Game Master</span>/ */}
             </div>
           </div>
           <button
