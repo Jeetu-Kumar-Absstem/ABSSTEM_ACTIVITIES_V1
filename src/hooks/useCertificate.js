@@ -18,6 +18,7 @@
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { supabase } from '../utils/supabase';
+import { usePdf } from './usePdf';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PAGE_HEIGHT = 528.914;
@@ -75,37 +76,6 @@ const centreX = (text, font, size) => {
   return (PAGE_WIDTH - w) / 2;
 };
 
-// Build and download a single filled certificate PDF
-const buildAndDownload = async (templateFile, fields, downloadName) => {
-  const templateBytes = await fetchTemplate(templateFile);
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const page = pdfDoc.getPages()[0];
-
-  for (const field of fields) {
-    const text = field.text;
-    if (!text) continue;
-    page.drawText(text, {
-      x:    centreX(text, boldFont, field.size),
-      y:    field.y,
-      size: field.size,
-      font: boldFont,
-      color: field.color,
-    });
-  }
-
-  const pdfBytes = await pdfDoc.save();
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = downloadName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
-
 // Log to certificate_log table (non-fatal)
 // Uses plain INSERT — duplicate downloads are silently ignored via error code 23505.
 // This avoids needing UPDATE RLS permission that upsert requires.
@@ -130,6 +100,30 @@ const logCertificate = async ({ employeeId, tournamentId, certificateType, posit
 
 // ── Main hook ────────────────────────────────────────────────────────────────
 export const useCertificate = () => {
+  const { downloadPdf } = usePdf();
+
+  // Build and download a single filled certificate PDF
+  const buildAndDownload = async (templateFile, fields, downloadName) => {
+    const templateBytes = await fetchTemplate(templateFile);
+    const pdfDoc = await PDFDocument.load(templateBytes);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const page = pdfDoc.getPages()[0];
+
+    for (const field of fields) {
+      const text = field.text;
+      if (!text) continue;
+      page.drawText(text, {
+        x: centreX(text, boldFont, field.size),
+        y: field.y,
+        size: field.size,
+        font: boldFont,
+        color: field.color,
+      });
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    return downloadPdf(pdfBytes, downloadName);
+  };
 
   /**
    * generateCertificate

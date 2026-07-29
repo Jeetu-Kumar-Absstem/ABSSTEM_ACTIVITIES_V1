@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useCertificate } from '../hooks/useCertificate';
+import { useProfilePdf } from '../hooks/useProfilePdf';
 import { useToast } from '../context/ToastContext';
 import { GAMES } from '../utils/constants';
 import useViewport from '../hooks/useViewport';
@@ -60,12 +61,14 @@ const StatCard = ({ title, value, caption, accent = 'var(--accent)' }) => (
 const ProfilePage = () => {
   const { currentUser, setActiveTab, getPlayerGameStats, getCertificateLog, getEmployeeName } = useApp();
   const { generateCertificate } = useCertificate();
+  const { generateProfileSummary } = useProfilePdf();
   const { isMobile } = useViewport();
   const { showToast } = useToast();
   const [selectedGame, setSelectedGame] = useState('carrom');
   const [certLog, setCertLog] = useState([]);
   const [certLoading, setCertLoading] = useState(true);
   const [certPrinting, setCertPrinting] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const userName = currentUser?.user_metadata?.name || currentUser?.email?.split('@')[0] || 'User';
   const empId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.user_metadata?.empId || '';
@@ -122,9 +125,31 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          <button className="clay-btn clay-btn-primary" onClick={() => setActiveTab('booking')}>
-            Back to Booking
-          </button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              className="clay-btn clay-btn-secondary"
+              disabled={profileLoading}
+              onClick={async () => {
+                setProfileLoading(true);
+                const result = await generateProfileSummary({
+                  user: currentUser,
+                  stats: perGameRows,
+                });
+                setProfileLoading(false);
+                if (result.success) {
+                  showToast('Profile summary downloaded!');
+                } else {
+                  showToast(result.error || 'Failed to download profile', 'error');
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              {profileLoading ? '⏳' : '📄'} Download Profile
+            </button>
+            <button className="clay-btn clay-btn-primary" onClick={() => setActiveTab('booking')}>
+              Back to Booking
+            </button>
+          </div>
         </div>
       </div>
 
