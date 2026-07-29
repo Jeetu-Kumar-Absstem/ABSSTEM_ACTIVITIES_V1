@@ -45,7 +45,7 @@ const QuickActionItem = ({ icon, label, color, onClick }) => (
     }}>
       {icon}
     </div>
-    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text)', textAlign: 'center' }}>
+    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text)', textAlign: 'center', fontFamily: "'Lufga', sans-serif" }}>
       {label}
     </span>
   </button>
@@ -76,7 +76,7 @@ const OverviewCard = ({ icon, label, value, caption, borderColor, iconBg }) => (
       }}>
         {icon}
       </div>
-      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+      <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: "'Lufga', sans-serif" }}>
         {label}
       </div>
     </div>
@@ -438,7 +438,7 @@ const DashboardPage = () => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-strong)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
                 Welcome back, <span style={{ color: 'var(--accent)' }}>{getUserDisplayName()}</span>
                 <span style={{ fontSize: '1.4rem' }}>👋</span>
               </div>
@@ -463,10 +463,10 @@ const DashboardPage = () => {
                 border: '1px solid var(--border)',
                 background: 'var(--bg-surface)',
                 fontSize: '0.85rem',
-
                 fontWeight: 600,
                 color: 'var(--text)',
                 boxShadow: 'var(--surface-shadow-soft)',
+                fontFamily: "'Lufga', sans-serif",
               }}
             >
               <span>{selectedGameRecord?.icon || '🎯'}</span>
@@ -542,7 +542,7 @@ const DashboardPage = () => {
             <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' }}>
               Upcoming Match
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '2px', fontFamily: "'Lufga', sans-serif" }}>
               {upcomingMatches.length > 0 ? currentMatch.title : 'No matches today'}
             </div>
           </div>
@@ -551,7 +551,7 @@ const DashboardPage = () => {
 
         {/* Quick Actions Grid */}
         <section>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
             Quick Actions
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
@@ -564,7 +564,7 @@ const DashboardPage = () => {
 
         {/* Overview Section - 2x2 Grid */}
         <section>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
             Overview
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -605,7 +605,7 @@ const DashboardPage = () => {
 
         {/* Today's Bookings Section */}
         <section style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--surface-shadow-soft)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
             Today's bookings
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -641,7 +641,7 @@ const DashboardPage = () => {
 
         {/* Leaderboard Section */}
         <section style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--surface-shadow-soft)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
             Leaderboard
           </h3>
           <MobileTable
@@ -1453,8 +1453,8 @@ const MetricCard = ({ label, value, caption, accent }) => {
           color: hovered ? 'var(--text)' : 'var(--muted)',
           textTransform: 'uppercase', 
           letterSpacing: '0.08em',
-
           fontWeight: 700,
+          fontFamily: "'Lufga', sans-serif",
         }}>
           {label}
         </div>
@@ -1462,14 +1462,14 @@ const MetricCard = ({ label, value, caption, accent }) => {
 
       <div style={{ 
         fontSize: '2.2rem',
-
-        fontWeight: 700, 
+        fontWeight: 700,
         color: hovered ? 'var(--text-strong)' : accent,
         lineHeight: 1,
         letterSpacing: '-0.02em',
         marginBottom: '2px',
         position: 'relative',
         zIndex: 1,
+        fontFamily: "'Lufga', sans-serif",
       }}>
         {value}
       </div>
@@ -1481,6 +1481,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
         color: hovered ? 'var(--text-soft)' : 'var(--text-soft)',
         position: 'relative',
         zIndex: 1,
+        fontFamily: "'Lufga', sans-serif",
       }}>
         {caption}
       </div>

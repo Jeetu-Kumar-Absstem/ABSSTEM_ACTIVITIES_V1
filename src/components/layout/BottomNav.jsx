@@ -2,6 +2,7 @@
 // Modern floating pill-style bottom navigation.
 import React from 'react';
 import useViewport from '../../hooks/useViewport';
+import useScrollDirection from '../../hooks/useScrollDirection';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
@@ -33,11 +34,12 @@ const isInGroup = (groupKey, activeTab) => {
 const BottomNav = () => {
   const { isMobile } = useViewport();
   const { activeTab, setActiveTab } = useApp();
+  const isVisible = useScrollDirection();
 
   if (!isMobile) return null;
 
   return (
-    <div className="bottom-nav-container">
+    <div className={`bottom-nav-container ${!isVisible ? 'bottom-nav-container--hidden' : ''}`}>
       <nav className="app-bottom-nav-pill" aria-label="Primary navigation">
         {NAV_ITEMS.map((item) => {
           const isActive = isInGroup(item.label, activeTab);
