@@ -1,38 +1,48 @@
+// src/hooks/usePdf.js
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-/**
- * Hook providing a unified way to download PDF files on Web and Mobile (Capacitor).
- */
 export const usePdf = () => {
-  /**
-   * downloadPdf
-   * @param {Uint8Array} pdfBytes - The PDF data
-   * @param {string} fileName - Suggestion name (e.g. "profile.pdf")
-   */
   const downloadPdf = async (pdfBytes, fileName) => {
     try {
       if (Capacitor.isNativePlatform()) {
-        // --- MOBILE (Android/iOS) ---
-        // Convert Uint8Array to Base64 (Filesystem.writeFile requires base64)
+        // Convert Uint8Array to Base64
         const base64Data = btoa(
           pdfBytes.reduce((data, byte) => data + String.fromCharCode(byte), '')
         );
 
-        // Save to cache directory
-        const result = await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data,
-          directory: Directory.Cache,
-        });
+        // ✅ Step 1: Request storage permission at runtime
+        const permission = await Filesystem.requestPermissions();
+        if (permission.publicStorage !== 'granted') {
+          return { success: false, error: 'Storage permission denied by user.' };
+        }
 
-        // Trigger native share sheet to let user save or open
+        // ✅ Step 2: Write to Downloads folder
+        let result;
+        try {
+          result = await Filesystem.writeFile({
+            path: `Downloads/${fileName}`,
+            data: base64Data,
+            directory: Directory.ExternalStorage,
+            recursive: true,
+          });
+        } catch (writeErr) {
+          // Fallback to Documents directory if ExternalStorage fails
+          console.warn('[usePdf] ExternalStorage failed, falling back to Documents:', writeErr);
+          result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Documents,
+            recursive: true,
+          });
+        }
+
+        // ✅ Step 3: Share sheet so user can open in PDF viewer
         await Share.share({
           title: fileName,
-          text: 'Here is your PDF document.',
           url: result.uri,
-          dialogTitle: 'Open or Save PDF',
+          dialogTitle: 'PDF saved — open or share',
         });
 
         return { success: true };
