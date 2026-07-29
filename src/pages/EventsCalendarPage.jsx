@@ -67,6 +67,7 @@ const EventsCalendarPage = () => {
   const {
     events,
     getUpcomingEvents,
+    getOngoingEvents,
     getPastEvents,
     addEvent,
     deleteEvent,
@@ -100,6 +101,7 @@ const EventsCalendarPage = () => {
   // context. After addEvent/deleteEvent, AppContext already refreshes the list.
 
   const upcomingEvents = useMemo(() => getUpcomingEvents(), [getUpcomingEvents, events]);
+  const ongoingEvents = useMemo(() => getOngoingEvents(), [getOngoingEvents, events]);
   const pastEvents = useMemo(() => getPastEvents(), [getPastEvents, events]);
 
   const eventsByDate = useMemo(() => {
@@ -116,6 +118,7 @@ const EventsCalendarPage = () => {
   // Stats for the top row
   const totalEvents = events.length;
   const upcomingCount = upcomingEvents.length;
+  const ongoingCount = ongoingEvents.length;
   const pastCount = pastEvents.length;
   const tournamentCount = events.filter(e => e.event_type === 'tournament').length;
   const outstationCount = events.filter(e => e.event_type === 'outstation').length;
@@ -229,9 +232,10 @@ const EventsCalendarPage = () => {
       <EventsTopBar active="eventsCalendar" />
 
       {/* Stats row */}
-      <div className="events-stats-grid" style={styles.statsRow}>
+      <div className="events-stats-grid" style={{ ...styles.statsRow, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(140px, 1fr))' }}>
         {[
           { label: 'Total Events',  val: totalEvents,      color: 'var(--accent)', sub: 'This year' },
+          { label: 'Ongoing',       val: ongoingCount,    color: 'var(--warning)', sub: 'Active now' },
           { label: 'Upcoming',      val: upcomingCount,   color: '#f9a825', sub: 'Future' },
           { label: 'Completed',     val: pastCount,       color: '#00897b', sub: 'This year' },
           { label: 'Tournaments',   val: tournamentCount, color: '#6a1b9a', sub: 'All time' },
@@ -341,8 +345,74 @@ const EventsCalendarPage = () => {
           </div>
         </div>
 
-        {/* Sidebar: Upcoming + Past */}
-        <div>
+        {/* Sidebar: Ongoing + Upcoming */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {ongoingEvents.length > 0 && (
+            <div style={styles.sideCard}>
+              <div style={{ ...styles.sideHeader, background: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CalendarIcon size="20px" /> Ongoing Events
+              </div>
+              {ongoingEvents.map((ev) => {
+                const status = STATUS_BADGE[ev.event_status] || STATUS_BADGE.ongoing;
+                const type = EVENT_TYPE_STYLE[ev.event_type] || EVENT_TYPE_STYLE.company;
+                const isPending = eventToDelete?.id === ev.id;
+                return (
+                  <div
+                    key={ev.id}
+                    style={{
+                      ...styles.sideItem,
+                      background: isPending ? 'rgba(229,57,53,0.08)' : 'transparent',
+                      borderLeft: isPending ? '3px solid var(--danger)' : '3px solid transparent',
+                    }}
+                    onClick={() => {
+                      if (isPending) setEventToDelete(null);
+                      else setSelectedEvent(ev);
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.4rem' }}>
+                      <div style={styles.sideItemTitle}>{ev.title}</div>
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                        <span style={{ ...type, ...styles.miniChip }}>{ev.event_type}</span>
+                        {isAdmin() && (
+                          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                            {isPending ? (
+                              <>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                                  style={styles.miniBtn}
+                                >Cancel</button>
+                                <button
+                                  onClick={(e) => requestDeleteFromCard(e, ev)}
+                                  style={{ ...styles.miniBtn, background: 'var(--danger)', color: '#fff', borderColor: 'var(--danger)' }}
+                                >Confirm</button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={(e) => requestDeleteFromCard(e, ev)}
+                                title="Delete this event"
+                                style={styles.miniDeleteBtn}
+                              >🗑</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={styles.sideItemMeta}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CalendarIcon size="12px" date={ev.start_date} /> {formatDateRange(ev)}
+                      </span>
+                      {formatTimeRange(ev) && <span>⏰ {formatTimeRange(ev)}</span>}
+                    </div>
+                    <div style={styles.sideItemMeta}>
+                      <span style={{ ...status, ...styles.statusChip }}>{status.label}</span>
+                      {ev.venue && <span>📍 {ev.venue}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div style={styles.sideCard}>
             <div style={{ ...styles.sideHeader, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CalendarIcon size="20px" /> Upcoming Events
@@ -375,24 +445,28 @@ const EventsCalendarPage = () => {
                       <div style={styles.sideItemTitle}>{ev.title}</div>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
                         <span style={{ ...type, ...styles.miniChip }}>{ev.event_type}</span>
-                        {isAdmin() && (
-                          <button
-                            onClick={(e) => requestDeleteFromCard(e, ev)}
-                            title={isPending ? 'Click again to confirm delete' : 'Delete this event'}
-                            style={{
-                              background: isPending ? 'var(--danger)' : 'transparent',
-                              color: isPending ? 'var(--text-strong)' : 'var(--danger)',
-                              border: `1px solid ${isPending ? 'var(--danger)' : 'rgba(229,57,53,0.24)'}`,
-                              borderRadius: 4,
-                              padding: '0.1rem 0.35rem',
-                              fontSize: '0.66rem',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontFamily: 'inherit',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >{isPending ? '✓ Confirm' : '🗑'}</button>
-                        )}
+                {isAdmin() && (
+                  <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                    {isPending ? (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                          style={styles.miniBtn}
+                        >Cancel</button>
+                        <button
+                          onClick={(e) => requestDeleteFromCard(e, ev)}
+                          style={{ ...styles.miniBtn, background: 'var(--danger)', color: '#fff', borderColor: 'var(--danger)' }}
+                        >Confirm</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={(e) => requestDeleteFromCard(e, ev)}
+                        title="Delete this event"
+                        style={styles.miniDeleteBtn}
+                      >🗑</button>
+                    )}
+                  </div>
+                )}
                       </div>
                     </div>
                     <div style={styles.sideItemMeta}>
@@ -451,14 +525,120 @@ const EventsCalendarPage = () => {
                   return <span style={{ ...status, ...styles.tableChip }}>{status.label}</span>;
                 },
               },
+              ...(isAdmin() ? [{
+                key: 'actions',
+                label: 'Action',
+                align: 'center',
+                hideOnCard: true,
+                render: (ev) => {
+                  const isPending = eventToDelete?.id === ev.id;
+                  return (
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                      {isPending ? (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                            style={{
+                              background: 'var(--bg-muted)',
+                              color: 'var(--text)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 4,
+                              padding: '4px 8px',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >Cancel</button>
+                          <button
+                            onClick={(e) => requestDeleteFromCard(e, ev)}
+                            style={{
+                              background: 'var(--danger)',
+                              color: '#fff',
+                              border: '1px solid var(--danger)',
+                              borderRadius: 4,
+                              padding: '4px 8px',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >Confirm</button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={(e) => requestDeleteFromCard(e, ev)}
+                          style={{
+                            background: 'transparent',
+                            color: 'var(--danger)',
+                            border: '1px solid rgba(229,57,53,0.3)',
+                            borderRadius: 4,
+                            padding: '4px 8px',
+                            fontSize: '0.7rem',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >🗑 Delete</button>
+                      )}
+                    </div>
+                  );
+                }
+              }] : [])
             ]}
             rows={pastEvents}
             rowKey={(ev) => ev.id}
+            onRowClick={(ev) => setSelectedEvent(ev)}
             emptyMessage="No past events recorded yet."
             cardTitle={(ev) => ev.title}
             cardSubtitle={(ev) => (
               <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
                 📅 {formatDateRange(ev)} {ev.organizer ? `· by ${ev.organizer}` : ''}
+              </div>
+            )}
+            cardActions={(ev) => isAdmin() && (
+              <div style={{ textAlign: 'right', marginTop: '8px' }}>
+                {eventToDelete?.id === ev.id ? (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                      style={{
+                        background: 'var(--bg-muted)',
+                        color: 'var(--text)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 4,
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={(e) => requestDeleteFromCard(e, ev)}
+                      style={{
+                        background: 'var(--danger)',
+                        color: '#fff',
+                        border: '1px solid var(--danger)',
+                        borderRadius: 4,
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >Confirm Delete</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => requestDeleteFromCard(e, ev)}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      border: '1px solid rgba(229,57,53,0.3)',
+                      borderRadius: 4,
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >🗑 Delete Event</button>
+                )}
               </div>
             )}
           />
@@ -747,6 +927,14 @@ const styles = {
   sideItemTitle: { fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.2rem' },
   sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: 'var(--text-soft)', marginTop: '0.2rem', fontWeight: 500 },
   miniChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 400, textTransform: 'capitalize' },
+  miniBtn: {
+    background: 'var(--bg-muted)', color: 'var(--text)', border: '1px solid var(--border)',
+    borderRadius: 4, padding: '0.1rem 0.4rem', fontSize: '0.66rem', cursor: 'pointer', fontWeight: 600,
+  },
+  miniDeleteBtn: {
+    background: 'transparent', color: 'var(--danger)', border: '1px solid rgba(229,57,53,0.24)',
+    borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.66rem', cursor: 'pointer', fontWeight: 600,
+  },
   statusChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 600 },
   tableChip: { padding: '0.1rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, textTransform: 'capitalize' },
 

@@ -2499,6 +2499,27 @@ const loadTournamentMatches = async () => {
   };
 
   // ── Derived helpers for Events / Tournaments / Leaderboard ──────────────
+  const getOngoingEvents = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return events
+      .filter(e => {
+        if (!e.is_published) return false;
+        if (e.event_status === 'cancelled' || e.event_status === 'completed') return false;
+        const start = e.start_date ? new Date(e.start_date) : null;
+        if (!start) return false;
+        start.setHours(0, 0, 0, 0);
+        const end = e.end_date ? new Date(e.end_date) : null;
+        if (end) end.setHours(0, 0, 0, 0);
+
+        if (end) {
+          return start <= today && end >= today;
+        }
+        return start.getTime() === today.getTime();
+      })
+      .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
+  };
+
   const getUpcomingEvents = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -2508,9 +2529,8 @@ const loadTournamentMatches = async () => {
         if (e.event_status === 'cancelled' || e.event_status === 'completed') return false;
         const start = e.start_date ? new Date(e.start_date) : null;
         if (!start) return false;
-        const end = e.end_date ? new Date(e.end_date) : null;
-        if (end && end < today) return false;
-        return start >= today || (end && end >= today);
+        start.setHours(0, 0, 0, 0);
+        return start > today;
       })
       .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
   };
@@ -2521,10 +2541,16 @@ const loadTournamentMatches = async () => {
     return events
       .filter(e => {
         if (e.event_status === 'completed') return true;
-        const end = e.end_date ? new Date(e.end_date) : null;
-        if (end && end < today) return true;
+        if (e.event_status === 'cancelled') return false;
         const start = e.start_date ? new Date(e.start_date) : null;
-        return start && start < today;
+        if (!start) return false;
+        start.setHours(0, 0, 0, 0);
+        const end = e.end_date ? new Date(e.end_date) : null;
+        if (end) {
+          end.setHours(0, 0, 0, 0);
+          return end < today;
+        }
+        return start < today;
       })
       .sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
   };
@@ -2723,6 +2749,7 @@ const loadTournamentMatches = async () => {
     recordMatchResult,
     declareFinalResults,
     getUpcomingEvents,
+    getOngoingEvents,
     getPastEvents,
     getTournamentById,
     getMatchesByTournament,
