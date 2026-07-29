@@ -25,33 +25,6 @@ import {
   Loader2
 } from 'lucide-react';
 
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Bold.otf') format('opentype');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
-
-if (typeof document !== 'undefined') {
-  const styleId = 'lufga-font-styles';
-  if (!document.getElementById(styleId)) {
-    const styleTag = document.createElement('style');
-    styleTag.id = styleId;
-    styleTag.innerHTML = lufgaFontStyle;
-    document.head.appendChild(styleTag);
-  }
-}
-
 const StatMiniCard = ({ label, value, icon: Icon, color, caption }) => (
   <div className="clay-card" style={{ padding: '16px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
     <div style={{ color: color, background: `${color}15`, padding: '8px', borderRadius: '12px', marginBottom: '4px' }}>
@@ -135,7 +108,7 @@ const ProfilePage = () => {
           </div>
 
           <div style={{ flex: 1, textAlign: isMobile ? 'center' : 'left' }}>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-strong)', margin: 0, fontFamily: "'Lufga', sans-serif" }}>{userName}</h1>
+            <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-strong)', margin: 0 }}>{userName}</h1>
             <div style={{ marginTop: '10px', display: 'flex', gap: '10px', justifyContent: isMobile ? 'center' : 'flex-start', flexWrap: 'wrap' }}>
               <span className="clay-badge clay-badge-navy" style={{ padding: '6px 16px', fontSize: '0.75rem' }}>{empId || 'ABSE1022'}</span>
               <span className="clay-badge clay-badge-green" style={{ padding: '6px 16px', fontSize: '0.75rem' }}>{department}</span>
@@ -167,7 +140,7 @@ const ProfilePage = () => {
       {/* ─── Game Selector ─── */}
       <div className="clay-card" style={{ padding: '24px', borderRadius: '24px' }}>
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>Select Game</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-strong)' }}>Select Game</div>
           <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '4px' }}>Choose Carrom or Chess to view that game's results.</div>
         </div>
         <div style={{ position: 'relative' }}>
@@ -206,7 +179,7 @@ const ProfilePage = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.8, fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               <Star size={18} fill="white" /> Points
             </div>
-            <div style={{ fontSize: '3.5rem', fontWeight: 800, marginTop: '8px', fontFamily: "'Lufga', sans-serif" }}>{stats.points}</div>
+            <div style={{ fontSize: '3.5rem', fontWeight: 800, marginTop: '8px' }}>{stats.points}</div>
           </div>
           <Star size={80} color="rgba(255,255,255,0.06)" style={{ transform: 'rotate(15deg)' }} />
         </div>
@@ -223,7 +196,7 @@ const ProfilePage = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.8, fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             <TrendingUp size={18} /> Winning Streak
           </div>
-          <div style={{ fontSize: '3rem', fontWeight: 800, marginTop: '8px', fontFamily: "'Lufga', sans-serif" }}>{stats.currentWinStreak}</div>
+          <div style={{ fontSize: '3rem', fontWeight: 800, marginTop: '8px' }}>{stats.currentWinStreak}</div>
           <div style={{ fontSize: '0.85rem', opacity: 0.9, marginTop: '4px', fontWeight: 600 }}>Best streak: {stats.bestWinStreak}</div>
           <Trophy size={90} color="rgba(255,255,255,0.06)" style={{ position: 'absolute', right: '-10px', bottom: '-10px', transform: 'rotate(-10deg)' }} />
         </div>
@@ -231,7 +204,7 @@ const ProfilePage = () => {
 
       {/* ─── Current Selection Info ─── */}
       <div className="clay-card" style={{ padding: '24px', borderRadius: '24px', borderLeft: '6px solid var(--accent)' }}>
-        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>Current Selection</div>
+        <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-strong)' }}>Current Selection</div>
         <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent)', marginTop: '6px' }}>{selectedGameRecord?.name || 'Game'}</div>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '12px', lineHeight: 1.6, maxWidth: '700px' }}>
           Points are calculated from saved match results only. Winning team members receive 4 points each, losing team members receive 1 point each, and both teams get 2 points for a draw.
@@ -240,7 +213,7 @@ const ProfilePage = () => {
 
       {/* ─── All Games Summary ─── */}
       <div className="clay-card" style={{ padding: '28px', borderRadius: '32px' }}>
-        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-strong)', marginBottom: '20px', fontFamily: "'Lufga', sans-serif" }}>All Games Summary</h3>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-strong)', marginBottom: '20px' }}>All Games Summary</h3>
         <MobileTable
           columns={[
             { key: 'name', label: 'Game', render: (row) => <strong>{row.game.name}</strong> },
@@ -281,7 +254,7 @@ const ProfilePage = () => {
       {/* ─── My Certificates ─── */}
       <div style={{ marginTop: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '0 8px' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Medal size={24} color="var(--accent)" /> My Certificates
           </h3>
           <span className="clay-badge clay-badge-grey" style={{ padding: '6px 14px' }}>{certLog.length} certificates issued</span>
@@ -309,7 +282,7 @@ const ProfilePage = () => {
                       {certMeta.icon}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>{c.tournaments?.name || 'Tournament Final'}</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-strong)' }}>{c.tournaments?.name || 'Tournament Final'}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '4px', fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {certMeta.label} • {c.tournaments?.game || 'Game'}
                       </div>

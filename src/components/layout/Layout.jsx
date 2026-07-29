@@ -10,42 +10,6 @@ import { useApp } from '../../context/AppContext';
 import bgImageLight from '../../assets/bg_image_light.png';
 import bgImageDark from '../../assets/bg_image_dark.png';
 
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Bold.otf') format('opentype');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
-
-if (typeof document !== 'undefined') {
-  const styleId = 'lufga-font-styles';
-  let styleTag = document.getElementById(styleId);
-  if (!styleTag) {
-    styleTag = document.createElement('style');
-    styleTag.id = styleId;
-    document.head.appendChild(styleTag);
-  }
-  // Always overwrite so all three weights are guaranteed to be registered
-  styleTag.innerHTML = lufgaFontStyle;
-}
-
 const TAB_TITLES = {
   dashboard: 'Dashboard',
   booking: 'Book Slots',
@@ -197,7 +161,6 @@ const Layout = ({ children, user, onLogout }) => {
               margin: 0,
               fontSize: '13px',
               color: 'var(--text)',
-              fontFamily: "'Lufga', sans-serif",
               fontWeight: 400,
             }}
           >
@@ -211,7 +174,6 @@ const Layout = ({ children, user, onLogout }) => {
               justifyContent: 'center',
               gap: '12px',
               fontSize: '12px',
-              fontFamily: "'Lufga', sans-serif",
             }}
           >
             <a

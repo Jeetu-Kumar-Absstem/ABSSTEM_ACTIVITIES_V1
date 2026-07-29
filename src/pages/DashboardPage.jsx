@@ -45,7 +45,7 @@ const QuickActionItem = ({ icon, label, color, onClick }) => (
     }}>
       {icon}
     </div>
-    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text)', textAlign: 'center', fontFamily: "'Lufga', sans-serif" }}>
+    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text)', textAlign: 'center' }}>
       {label}
     </span>
   </button>
@@ -80,41 +80,14 @@ const OverviewCard = ({ icon, label, value, caption, borderColor, iconBg }) => (
         {label}
       </div>
     </div>
-    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", lineHeight: 1 }}>
+    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1 }}>
       {value}
     </div>
-    <div style={{ fontSize: '0.65rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 500 }}>
+    <div style={{ fontSize: '0.65rem', color: 'var(--muted)', fontWeight: 500 }}>
       {caption}
     </div>
   </div>
 );
-
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Bold.otf') format('opentype');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
-
-if (typeof document !== 'undefined') {
-  const styleId = 'lufga-font-styles';
-  if (!document.getElementById(styleId)) {
-    const styleTag = document.createElement('style');
-    styleTag.id = styleId;
-    styleTag.innerHTML = lufgaFontStyle;
-    document.head.appendChild(styleTag);
-  }
-}
 
 // Color palette for leaderboard ranks
 const getRankColor = (rank) => {
@@ -465,13 +438,13 @@ const DashboardPage = () => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               
-              <div style={{ fontSize: '1.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-strong)' }}>
                 Welcome back, <span style={{ color: 'var(--accent)' }}>{getUserDisplayName()}</span>
                 <span style={{ fontSize: '1.4rem' }}>👋</span>
               </div>
               
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Lufga', sans-serif" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', fontSize: '0.85rem', marginTop: '4px' }}>
               {/* <CalendarIcon size="16px" date={currentDate} /> */}
               <span>{formatDate(currentDate)}</span>
             </div>
@@ -490,7 +463,7 @@ const DashboardPage = () => {
                 border: '1px solid var(--border)',
                 background: 'var(--bg-surface)',
                 fontSize: '0.85rem',
-                fontFamily: "'Lufga', sans-serif",
+
                 fontWeight: 600,
                 color: 'var(--text)',
                 boxShadow: 'var(--surface-shadow-soft)',
@@ -566,10 +539,10 @@ const DashboardPage = () => {
             <CalendarIcon size="32px" date={currentDate} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' }}>
               Upcoming Match
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '2px', fontFamily: "'Lufga', sans-serif" }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '2px' }}>
               {upcomingMatches.length > 0 ? currentMatch.title : 'No matches today'}
             </div>
           </div>
@@ -578,7 +551,7 @@ const DashboardPage = () => {
 
         {/* Quick Actions Grid */}
         <section>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)' }}>
             Quick Actions
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
@@ -591,7 +564,7 @@ const DashboardPage = () => {
 
         {/* Overview Section - 2x2 Grid */}
         <section>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px', color: 'var(--text-strong)' }}>
             Overview
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -632,7 +605,7 @@ const DashboardPage = () => {
 
         {/* Today's Bookings Section */}
         <section style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--surface-shadow-soft)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)' }}>
             Today's bookings
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -668,7 +641,7 @@ const DashboardPage = () => {
 
         {/* Leaderboard Section */}
         <section style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: '24px', border: '1px solid var(--border)', boxShadow: 'var(--surface-shadow-soft)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', color: 'var(--text-strong)' }}>
             Leaderboard
           </h3>
           <MobileTable
@@ -709,7 +682,7 @@ const DashboardPage = () => {
   style={{
     fontSize: '2rem',
     color: 'var(--text-strong)',
-    fontFamily: "'Lufga', sans-serif",
+
     fontWeight: 400,
     marginBottom: '2px',
     display: 'flex',
@@ -723,7 +696,7 @@ const DashboardPage = () => {
   <span
     style={{
       color: 'var(--accent)',
-      fontFamily: "'Lufga', sans-serif",
+
       fontWeight: 700,
       display: 'flex',
       alignItems: 'center',
@@ -734,7 +707,7 @@ const DashboardPage = () => {
     <span style={{ fontSize: '1.75rem' }}>👋</span>
   </span>
 </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 400 }}>
               {formatDate(currentDate)} • Week: {weekLabel}
             </div>
           </div>
@@ -823,7 +796,7 @@ const DashboardPage = () => {
                       <div style={{
                         fontSize: '0.5rem',
                         color: 'var(--accent)',
-                        fontFamily: "'Lufga', sans-serif",
+
                         fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: '0.08em',
@@ -838,7 +811,7 @@ const DashboardPage = () => {
                       <div style={{
                         fontSize: '0.5rem',
                         color: 'var(--muted)',
-                        fontFamily: "'Lufga', sans-serif",
+
                         fontWeight: 400,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
@@ -851,7 +824,7 @@ const DashboardPage = () => {
                     {/* Match Title */}
                     <div style={{
                       fontSize: '0.8rem',
-                      fontFamily: "'Lufga', sans-serif",
+
                       fontWeight: 700,
                       color: currentMatch.isUserInMatch || currentMatch.isUserBooking ? 'var(--accent)' : 'var(--text-strong)',
                       marginBottom: '1px',
@@ -869,7 +842,7 @@ const DashboardPage = () => {
                     <div style={{
                       fontSize: '0.6rem',
                       color: 'var(--muted)',
-                      fontFamily: "'Lufga', sans-serif",
+
                       fontWeight: 400,
                       display: 'flex',
                       alignItems: 'center',
@@ -996,7 +969,7 @@ const DashboardPage = () => {
                 color: 'var(--text)',
                 padding: '8px 18px',
                 borderRadius: '999px',
-                fontFamily: "'Lufga', sans-serif",
+
                 fontWeight: 400,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1052,7 +1025,7 @@ const DashboardPage = () => {
                         fontSize: '13px',
                         color: isActive ? 'var(--accent-contrast)' : 'var(--text)',
                         backgroundColor: isActive ? 'var(--accent)' : 'transparent',
-                        fontFamily: "'Lufga', sans-serif",
+
                         fontWeight: isActive ? 700 : 400,
                         transition: 'all 0.15s ease',
                         display: 'flex',
@@ -1115,10 +1088,10 @@ const DashboardPage = () => {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '80% 20%', gap: '14px' }}>
         {/* Today's Bookings - 80% with 5 slots per row */}
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 400 }}>
             Today&apos;s bookings
           </div>
-          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontWeight: 700 }}>
             {selectedGameRecord.name} on {currentDayName}
           </h2>
 
@@ -1156,17 +1129,17 @@ const DashboardPage = () => {
                     <div>
                       <div style={{ 
                         fontSize: '0.7rem',
-                        fontFamily: "'Lufga', sans-serif",
+
                         fontWeight: 700, 
                         color: isFull ? 'var(--danger)' : 'var(--text-strong)',
                       }}>
                         {slot.label}
                       </div>
-                      <div style={{ fontSize: '0.55rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{slot.time}</div>
+                      <div style={{ fontSize: '0.55rem', color: 'var(--muted)', fontWeight: 400 }}>{slot.time}</div>
                     </div>
                     <div style={{ 
                       fontSize: '0.7rem',
-                      fontFamily: "'Lufga', sans-serif",
+
                       fontWeight: 700, 
                       color: isFull ? 'var(--danger)' : hasBooking ? 'var(--accent)' : 'var(--muted)',
                       background: isFull ? 'rgba(198,40,40,0.16)' : hasBooking ? 'var(--accent-soft)' : 'transparent',
@@ -1187,7 +1160,7 @@ const DashboardPage = () => {
                               color: 'white',
                               padding: '2px 6px',
                             borderRadius: '4px',
-                            fontFamily: "'Lufga', sans-serif",
+
                             fontWeight: 400,
                           }}
                         >
@@ -1202,7 +1175,7 @@ const DashboardPage = () => {
                       color: 'var(--muted)', 
                       marginTop: '6px',
                       fontStyle: 'italic',
-                      fontFamily: "'Lufga', sans-serif",
+
                       fontWeight: 400,
                     }}>
                       Empty
@@ -1216,10 +1189,10 @@ const DashboardPage = () => {
 
         {/* Upcoming Events - 20% */}
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 400 }}>
             Upcoming Events
           </div>
-          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+          <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontWeight: 700 }}>
             What's next
           </h2>
 
@@ -1236,13 +1209,13 @@ const DashboardPage = () => {
                     borderLeft: `3px solid var(--accent)`,
                   }}
                 >
-                  <div style={{ fontSize: '0.55rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--accent)', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '0.55rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '2px' }}>
                     {eventDate}
                   </div>
-                  <div style={{ fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 700, color: 'var(--text-strong)' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-strong)' }}>
                     {event.title}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400, marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--muted)', fontWeight: 400, marginTop: '2px' }}>
                     {event.event_type?.charAt(0).toUpperCase() + event.event_type?.slice(1) || 'Event'}
                   </div>
                 </div>
@@ -1263,14 +1236,14 @@ const DashboardPage = () => {
         <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
             <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 400 }}>
                 Leaderboard
               </div>
-              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+              <h2 style={{ margin: '6px 0 0', fontSize: '1.05rem', color: 'var(--text-strong)', fontWeight: 700 }}>
                 Points and Ranking
               </h2>
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-soft)', fontWeight: 400 }}>
               Points: win = 4, draw = 2, loss = 1
             </div>
           </div>
@@ -1382,10 +1355,10 @@ const DashboardPage = () => {
         {/* Quick Actions - 20% (Admin Only) */}
         {isAdmin && isAdmin() ? (
           <section className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 400 }}>
               Quick Actions
             </div>
-            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif", fontWeight: 700 }}>
+            <h2 style={{ margin: '6px 0 14px', fontSize: '1.05rem', color: 'var(--text-strong)', fontWeight: 700 }}>
               Quick Actions
             </h2>
 
@@ -1433,7 +1406,7 @@ const QuickActionButton = ({ icon, label, onClick }) => {
         width: '100%',
         fontSize: '0.7rem',
         color: 'var(--text-strong)',
-        fontFamily: "'Lufga', sans-serif",
+
         fontWeight: 400,
       }}
     >
@@ -1480,7 +1453,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
           color: hovered ? 'var(--text)' : 'var(--muted)',
           textTransform: 'uppercase', 
           letterSpacing: '0.08em',
-          fontFamily: "'Lufga', sans-serif",
+
           fontWeight: 700,
         }}>
           {label}
@@ -1489,7 +1462,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
 
       <div style={{ 
         fontSize: '2.2rem',
-        fontFamily: "'Lufga', sans-serif",
+
         fontWeight: 700, 
         color: hovered ? 'var(--text-strong)' : accent,
         lineHeight: 1,
@@ -1503,7 +1476,7 @@ const MetricCard = ({ label, value, caption, accent }) => {
 
       <div style={{ 
         fontSize: '0.68rem',
-        fontFamily: "'Lufga', sans-serif",
+
         fontWeight: 700,
         color: hovered ? 'var(--text-soft)' : 'var(--text-soft)',
         position: 'relative',
@@ -1518,13 +1491,13 @@ const MetricCard = ({ label, value, caption, accent }) => {
 const thStyle = {
   padding: '8px 10px',
   textAlign: 'left',
-  fontFamily: "'Lufga', sans-serif",
+
   fontWeight: 700,
 };
 
 const tdStyle = {
   padding: '8px 10px',
-  fontFamily: "'Lufga', sans-serif",
+
   fontWeight: 400,
 };
 

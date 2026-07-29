@@ -5,23 +5,6 @@ import { useToast } from '../context/ToastContext';
 import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
 
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
-
 const ADMIN_TABS = [
   { id: 'registration-approval', label: 'Registration Approval' },
 ];
@@ -67,16 +50,6 @@ const AdminPage = () => {
     }
   };
 
-  useEffect(() => {
-    const styleId = 'lufga-font-style';
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = lufgaFontStyle;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
-
   // Table columns
   const columns = [
     {
@@ -109,7 +82,6 @@ const AdminPage = () => {
             color: 'var(--warning)',
             fontWeight: 600,
             fontSize: '0.68rem',
-            fontFamily: "'Lufga', sans-serif",
           }}
         >
           Pending
@@ -132,7 +104,6 @@ const AdminPage = () => {
             cursor: approvingId === row.id ? 'wait' : 'pointer',
             color: '#fff',
             background: approvingId === row.id ? 'var(--muted)' : 'var(--accent)',
-            fontFamily: "'Lufga', sans-serif",
           }}
         >
           {approvingId === row.id ? 'Approving...' : 'Approve'}
@@ -142,7 +113,7 @@ const AdminPage = () => {
   ];
 
   return (
-    <div style={{ display: 'grid', gap: '18px', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+    <div style={{ display: 'grid', gap: '18px', fontWeight: 400 }}>
       <div
         className="clay-card"
         style={{
@@ -152,7 +123,7 @@ const AdminPage = () => {
           color: 'var(--accent-contrast)',
         }}
       >
-        <div style={{ fontSize: '0.78rem', opacity: 0.8, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>Admin</div>
+        <div style={{ fontSize: '0.78rem', opacity: 0.8, fontWeight: 400 }}>Admin</div>
       </div>
 
       <div className="clay-card" style={{ padding: '20px', borderRadius: '28px', background: 'var(--bg-surface-strong)' }}>
@@ -172,7 +143,6 @@ const AdminPage = () => {
                   cursor: 'pointer',
                   color: active ? 'var(--accent-contrast)' : 'var(--accent)',
                   background: active ? 'var(--accent)' : 'var(--accent-soft)',
-                  fontFamily: "'Lufga', sans-serif",
                 }}
               >
                 {tab.label}
@@ -183,7 +153,7 @@ const AdminPage = () => {
 
         {activeTab === 'registration-approval' && (
           <div>
-            <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+            <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: 'var(--text-soft)', fontWeight: 400 }}>
               Pending requests: <strong style={{ fontWeight: 600 }}>{pendingRequests.length}</strong>
             </div>
             <div style={{ overflowX: 'auto' }}>

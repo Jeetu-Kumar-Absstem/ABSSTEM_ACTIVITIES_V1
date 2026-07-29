@@ -14,23 +14,6 @@ import BookSlotModal from '../components/modals/BookSlotModal';
 import useViewport from '../hooks/useViewport';
 import { filterBookingsToWeek, getDayName } from '../utils/helpers';
 
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
-
 const BookingGridPage = () => {
   const {
     bookings,
@@ -49,17 +32,6 @@ const BookingGridPage = () => {
   const [selectedDay, setSelectedDay] = useState(DAYS[0]);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
   const weekBookings = filterBookingsToWeek(bookings, currentDate);
-
-  // Inject Lufga font into document head
-  useEffect(() => {
-    const styleId = 'lufga-font-style';
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = lufgaFontStyle;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
 
   // Refresh bookings when component mounts
   useEffect(() => {
@@ -143,9 +115,9 @@ const BookingGridPage = () => {
   };
 
   return (
-    <div className="booking-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
+    <div className="booking-page" style={{ fontWeight: 400, color: 'var(--text)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent)', fontFamily: "'Lufga', sans-serif" }}>Book Your Slot</h1>
+        <h1 className="booking-page-title" style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--accent)' }}>Book Your Slot</h1>
       </div>
 
       <StatsRow />
@@ -174,7 +146,6 @@ const BookingGridPage = () => {
                 borderSpacing: '0',
                 fontSize: '0.7rem',
                 background: 'var(--bg-surface-strong)',
-                fontFamily: "'Lufga', sans-serif"
               }}>
               <thead>
                 <tr
@@ -182,13 +153,13 @@ const BookingGridPage = () => {
                     background: 'var(--bg-surface)'
                   }}>
                   <th style={{ padding: '14px', textAlign: 'center', fontWeight: 700, color: 'var(--text-strong)', position: 'sticky', left: 0, background: 'var(--accent)', zIndex: 2, minWidth: '120px',
-                        border: '1px solid var(--border)', fontFamily: "'Lufga', sans-serif" }}>Day / Time</th>
+                        border: '1px solid var(--border)' }}>Day / Time</th>
                   {SLOTS.map(s => (
                     <th key={s.id} style={{ padding: '12px', textAlign: 'center', fontWeight: 700, fontSize: '0.6rem', color: 'var(--text)', minWidth: '110px',
                       background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)', fontFamily: "'Lufga', sans-serif" }}>
+                      border: '1px solid var(--border)' }}>
                       {s.label}
-                      <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.82, fontFamily: "'Lufga', sans-serif", fontWeight: 600, color: 'var(--muted)' }}>{s.time}</span>
+                      <span style={{ display: 'block', fontSize: '0.5rem', opacity: 0.82, fontWeight: 600, color: 'var(--muted)' }}>{s.time}</span>
                     </th>
                   ))}
                 </tr>
@@ -210,7 +181,6 @@ const BookingGridPage = () => {
                         background: isToday ? 'var(--bg-surface)' : 'var(--bg-surface-strong)',
                         zIndex: 4,
                         border: '1px solid var(--border)',
-                        fontFamily: "'Lufga', sans-serif",
                         fontWeight: 700
                       }}>
                         {day} {isToday && '📍'}

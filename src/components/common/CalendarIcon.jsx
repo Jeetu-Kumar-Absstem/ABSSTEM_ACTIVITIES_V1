@@ -26,7 +26,6 @@ const CalendarIcon = ({ size = '24px', date = new Date() }) => {
         textAlign: 'center',
         padding: '1px 0',
         lineHeight: 1,
-        fontFamily: "'Lufga', sans-serif",
       }}>
         {month}
       </div>
@@ -39,7 +38,6 @@ const CalendarIcon = ({ size = '24px', date = new Date() }) => {
         fontWeight: 800,
         color: '#1f2937',
         lineHeight: 1,
-        fontFamily: "'Lufga', sans-serif",
       }}>
         {day}
       </div>

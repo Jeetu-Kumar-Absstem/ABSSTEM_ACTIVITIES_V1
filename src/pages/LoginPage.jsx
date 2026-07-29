@@ -6,59 +6,6 @@ import { useToast } from '../context/ToastContext';
 import { validateEmpId, formatEmpId, validatePassword } from '../utils/validators';
 import { Check } from 'lucide-react';
 
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-  *, *::before, *::after {
-    font-family: 'Lufga', sans-serif;
-    font-weight: 400;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Lufga', sans-serif;
-    font-weight: 600;
-  }
-
-  /* Force all inputs/selects inside login to always render in light mode */
-  .login-light-scope {
-    color-scheme: light !important;
-  }
-  .login-light-scope input,
-  .login-light-scope select,
-  .login-light-scope textarea {
-    color-scheme: light !important;
-    background: rgba(240, 243, 250, 0.85) !important;
-    color: #1e1e2f !important;
-    border-color: rgba(200, 210, 230, 0.6) !important;
-  }
-  .login-light-scope input::placeholder {
-    color: #9090aa !important;
-    opacity: 1 !important;
-  }
-`;
-
-// Inject the font + login light-scope styles once
-if (typeof document !== 'undefined') {
-  const styleId = 'login-page-styles';
-  if (!document.getElementById(styleId)) {
-    const styleTag = document.createElement('style');
-    styleTag.id = styleId;
-    styleTag.innerHTML = lufgaFontStyle;
-    document.head.appendChild(styleTag);
-  }
-}
-
 // Eye icons as inline SVG components
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -402,7 +349,6 @@ const LoginPage = ({ onLogin }) => {
     inset: 0,
     zIndex: 9999,
     colorScheme: 'light',
-    fontFamily: "'Lufga', sans-serif",
     fontWeight: 400,
   };
 
@@ -425,7 +371,7 @@ const LoginPage = ({ onLogin }) => {
           {forgotSuccess ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📬</div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 600, color: '#1a3c6e', marginBottom: '8px', fontFamily: "'Lufga', sans-serif" }}>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: 600, color: '#1a3c6e', marginBottom: '8px' }}>
                 Check Your Email
               </h1>
               <p style={{ fontSize: '0.82rem', color: '#555', lineHeight: 1.6, marginBottom: '8px' }}>
@@ -459,7 +405,7 @@ const LoginPage = ({ onLogin }) => {
             <>
               <div style={{ textAlign: 'center', marginBottom: '28px' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🔑</div>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a3c6e', fontFamily: "'Lufga', sans-serif" }}>Forgot Password?</h1>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1a3c6e' }}>Forgot Password?</h1>
                 <p style={{ fontSize: '0.8rem', color: '#8888aa', marginTop: '4px' }}>
                   Enter your Employee ID and we'll send the reset link to your registered email.
                 </p>
@@ -548,7 +494,7 @@ const LoginPage = ({ onLogin }) => {
       <div className="clay" style={cardStyle}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <img src={absstemLogo} alt="Absstem Logo" style={{ height: '64px', marginBottom: '8px', objectFit: 'contain' }} />
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#4d4d4f', fontFamily: "'Lufga', sans-serif" }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#4d4d4f' }}>
             {isRegister ? 'Create Account' : 'Welcome Back'}
           </h1>
           <p style={{ fontSize: '0.8rem', color: '#8888aa', marginTop: '4px' }}>

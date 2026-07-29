@@ -11,23 +11,6 @@ import useViewport from '../hooks/useViewport';
 import usePressState from '../hooks/usePressState';
 import MobileTable from '../components/common/MobileTable';
 
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
-
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
@@ -56,17 +39,6 @@ const LeaderboardPage = () => {
   const [deptFilter, setDeptFilter] = useState('all');
   const [sortBy, setSortBy] = useState('rank'); // rank | points | wins | participations | recent
   const [hoveredMetric, setHoveredMetric] = useState(null);
-
-  // Inject Lufga font into document head
-  useEffect(() => {
-    const styleId = 'lufga-font-style';
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = lufgaFontStyle;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
 
   // Initial load happens in AppProvider; this page just reads `leaderboard` from
   // context. The Refresh button below calls loadLeaderboard() to re-fetch on demand.
@@ -186,7 +158,7 @@ const LeaderboardPage = () => {
   }, [filteredRows, showToast]);
 
   return (
-    <div style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
+    <div style={{ fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
       <EventsTopBar active="leaderboard" />
 
       {/* Header strip */}
@@ -198,21 +170,21 @@ const LeaderboardPage = () => {
         boxShadow: '0 10px 28px rgba(26,60,110,0.22)',
       }}>
         <div>
-          <div style={{ fontSize: '0.72rem', opacity: 0.78, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <div style={{ fontSize: '0.72rem', opacity: 0.78, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 400 }}>
             Activity Leaderboard
           </div>
-          <h1 style={{ margin: '6px 0 4px', fontSize: '1.6rem', lineHeight: 1.05, fontFamily: "'Lufga', sans-serif", fontWeight: 600 }}>
+          <h1 style={{ margin: '6px 0 4px', fontSize: '1.6rem', lineHeight: 1.05, fontWeight: 600 }}>
             🏆 Champions of the Floor
           </h1>
-          <div style={{ fontSize: '0.8rem', opacity: 0.88, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+          <div style={{ fontSize: '0.8rem', opacity: 0.88, fontWeight: 400 }}>
             Points: Win = 5 · Tournament Win = 20 · Runner-up = 15 · 3rd = 10  · Violation = −5 · No-show = −3
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {myRow && (
             <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 14px', fontSize: '0.78rem' }}>
-              <div style={{ opacity: 0.7, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>You</div>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem', fontFamily: "'Lufga', sans-serif" }}>#{myRow.rank} · {myRow.total_points} pts</div>
+              <div style={{ opacity: 0.7, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 400 }}>You</div>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>#{myRow.rank} · {myRow.total_points} pts</div>
             </div>
           )}
           <button onClick={exportCsv} style={styles.outlineBtn}>📤 Export CSV</button>
@@ -297,7 +269,7 @@ const LeaderboardPage = () => {
                 render: (r) => {
                   const rankBadge = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`;
                   return (
-                    <span style={{ fontWeight: 600, color: r.rank <= 3 ? 'var(--accent)' : 'var(--text-soft)', fontFamily: "'Lufga', sans-serif" }}>
+                    <span style={{ fontWeight: 600, color: r.rank <= 3 ? 'var(--accent)' : 'var(--text-soft)' }}>
                       {rankBadge}
                     </span>
                   );
@@ -311,8 +283,8 @@ const LeaderboardPage = () => {
                   const isMe = (r.employee_id || '').toUpperCase() === currentEmpId;
                   return (
                     <>
-                      <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{r.employee_name || r.employee_id}</div>
-                      <div style={{ fontSize: '0.62rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
+                      <div style={{ fontWeight: 600 }}>{r.employee_name || r.employee_id}</div>
+                      <div style={{ fontSize: '0.62rem', color: 'var(--muted)', fontWeight: 400 }}>{r.employee_id}{isMe ? ' · You' : ''}</div>
                     </>
                   );
                 },
@@ -405,18 +377,18 @@ const PodiumCard = ({ row, pos, tall }) => {
         cursor: 'default',
       }}>
       <div style={{ fontSize: tall ? '2rem' : '1.4rem' }}>{style.icon}</div>
-      <div style={{ fontSize: '0.65rem', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+      <div style={{ fontSize: '0.65rem', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontWeight: 400 }}>
         {style.label}
       </div>
-      <div style={{ fontWeight: 600, fontSize: tall ? '1.05rem' : '0.95rem', color: 'var(--text-strong)', marginBottom: 6, fontFamily: "'Lufga', sans-serif" }}>
+      <div style={{ fontWeight: 600, fontSize: tall ? '1.05rem' : '0.95rem', color: 'var(--text-strong)', marginBottom: 6 }}>
         {row.employee_name || row.employee_id}
       </div>
-      <div style={{ fontSize: '0.6rem', color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{row.department || '—'}</div>
-      <div style={{ fontWeight: 600, color: 'var(--accent)', fontSize: tall ? '1.6rem' : '1.3rem', marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>
+      <div style={{ fontSize: '0.6rem', color: 'var(--text-soft)', fontWeight: 400 }}>{row.department || '—'}</div>
+      <div style={{ fontWeight: 600, color: 'var(--accent)', fontSize: tall ? '1.6rem' : '1.3rem', marginTop: 4 }}>
         {row.total_points}
       </div>
-      <div style={{ fontSize: '0.6rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>points</div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4, fontSize: '0.6rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>
+      <div style={{ fontSize: '0.6rem', color: 'var(--muted)', fontWeight: 400 }}>points</div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginTop: 4, fontSize: '0.6rem', fontWeight: 400 }}>
         <span>🥇{row.tournament_wins || 0}</span>
         <span>W{row.match_wins || 0}</span>
         <span>P{row.participations || 0}</span>
@@ -444,26 +416,26 @@ const MetricCard = ({ label, value, sub, accent, hovered, onMouseEnter, onMouseL
       cursor: 'default',
     }}
   >
-    <div style={{ fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{label}</div>
-    <div style={{ fontSize: '1.5rem', fontWeight: 600, color: accent, lineHeight: 1.1, marginTop: 4, fontFamily: "'Lufga', sans-serif" }}>{value}</div>
-    <div style={{ fontSize: '0.6rem', color: 'var(--muted)', marginTop: 4, fontFamily: "'Lufga', sans-serif", fontWeight: 400 }}>{sub}</div>
+    <div style={{ fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 400 }}>{label}</div>
+    <div style={{ fontSize: '1.5rem', fontWeight: 600, color: accent, lineHeight: 1.1, marginTop: 4 }}>{value}</div>
+    <div style={{ fontSize: '0.6rem', color: 'var(--muted)', marginTop: 4, fontWeight: 400 }}>{sub}</div>
   </div>
 );
 
 const styles = {
   card: { background: 'var(--bg-surface-strong)', borderRadius: 16, padding: '1rem', boxShadow: 'var(--surface-shadow-soft)', border: '1px solid var(--border)' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' },
-  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-strong)', fontFamily: "'Lufga', sans-serif" },
-  outlineBtn: { background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
+  cardHeaderTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-strong)' },
+  outlineBtn: { background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 4, padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 400, cursor: 'pointer' },
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.6rem', marginBottom: 14 },
   podium: { display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: '0.8rem', alignItems: 'end', padding: '0.4rem 0 0' },
   filterBar: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' },
-  filterInput: { padding: '0.32rem 0.6rem', border: '1px solid var(--border)', borderRadius: 4, fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)', background: 'var(--bg-surface)', minWidth: 130, flex: 1 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', fontFamily: "'Lufga', sans-serif" },
+  filterInput: { padding: '0.32rem 0.6rem', border: '1px solid var(--border)', borderRadius: 4, fontSize: '0.75rem', fontWeight: 400, color: 'var(--text)', background: 'var(--bg-surface)', minWidth: 130, flex: 1 },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' },
   theadRow: { background: 'var(--accent-soft)' },
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-soft)', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif" },
-  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
-  tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block', fontFamily: "'Lufga', sans-serif" },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-soft)', textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: '0.04em' },
+  td: { padding: '0.5rem 0.6rem', verticalAlign: 'middle', fontWeight: 400 },
+  tinyChip: { padding: '0.12rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, display: 'inline-block' },
 };
 
 export default LeaderboardPage;

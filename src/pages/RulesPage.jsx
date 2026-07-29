@@ -120,7 +120,7 @@ const RulesPage = () => {
 
   if (loading && rules.length === 0) {
     return (
-      <div className="clay-card" style={{ textAlign: 'center', padding: '40px', fontFamily: "'Lufga', sans-serif" }}>
+      <div className="clay-card" style={{ textAlign: 'center', padding: '40px' }}>
         <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⏳</div>
         <div style={{ color: 'var(--muted)', fontWeight: 700 }}>Loading rules...</div>
       </div>
@@ -206,10 +206,10 @@ const RulesPage = () => {
   };
 
   return (
-    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
+    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '16px', fontWeight: 400, color: 'var(--text)' }}>
       <div className="clay-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif", margin: 0, flex: 1, minWidth: 0 }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', margin: 0, flex: 1, minWidth: 0 }}>
             Activity Rules ({rules.length})
           </h2>
           {isAdmin() ? (
@@ -301,10 +301,10 @@ const RulesPage = () => {
       {/* Right sidebar (collapses below rules on mobile) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>📋 Recent Violations</h3>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>📋 Recent Violations</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div className="clay-soft" style={{ padding: '10px 14px', borderRadius: '16px', borderLeft: '3px solid #e53935' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Anil Rawat</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>Anil Rawat</div>
               <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>Using mobile phone during game</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.6rem', color: 'var(--muted)' }}>
                 <span>25 Apr 2026 · Carrom</span>
@@ -320,7 +320,7 @@ const RulesPage = () => {
         </div>
 
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>⚙️ Auto-Ban Settings</h3>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>⚙️ Auto-Ban Settings</h3>
           <div style={{ fontSize: '0.7rem', color: 'var(--text)', marginBottom: '8px' }}>Automatically ban an employee when they accumulate violations:</div>
           <div className="clay-soft" style={{ padding: '8px 12px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
             <span>Ban after <strong>3 violations</strong> (same game)</span>
@@ -364,11 +364,11 @@ const RulesPage = () => {
             maxHeight: '90vh',
             overflowY: 'auto',
             background: 'var(--bg-surface-strong)',
-            fontFamily: "'Lufga', sans-serif",
+
             fontWeight: 400,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
                 {editingRule ? '✏️ Edit Rule' : '📝 Add New Rule'}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
