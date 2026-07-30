@@ -203,6 +203,36 @@ const LoginPage = ({ onLogin }) => {
     try {
       const email = personalEmail.trim().toLowerCase();
 
+      // Check if Employee ID already exists
+      const { data: existingEmp, error: empCheckError } = await supabase
+        .from('employees')
+        .select('employee_code')
+        .eq('employee_code', empId)
+        .maybeSingle();
+
+      if (empCheckError) throw empCheckError;
+
+      if (existingEmp) {
+        showToast('Employee ID already exists. Please login instead.', 'error');
+        setLoading(false);
+        return;
+      }
+
+      // Check if email already exists
+      const { data: existingEmail, error: emailCheckError } = await supabase
+        .from('employees')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (emailCheckError) throw emailCheckError;
+
+      if (existingEmail) {
+        showToast('This email is already registered. Please login instead.', 'error');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -239,11 +269,16 @@ const LoginPage = ({ onLogin }) => {
       setDepartment('');
 
     } catch (error) {
-      if (error.message.includes('User already registered')) {
+      const msg = error.message || '';
+      if (msg.includes('User already registered')) {
         showToast('Employee ID already registered. Please login.', 'warning');
         setIsRegister(false);
+      } else if (msg.includes('Employee ID already exists')) {
+        showToast('Employee ID already exists. Please login instead.', 'error');
+      } else if (msg.includes('Email already registered')) {
+        showToast('This email is already registered. Please login instead.', 'error');
       } else {
-        showToast(error.message || 'Registration failed. Please try again.', 'error');
+        showToast(msg || 'Registration failed. Please try again.', 'error');
       }
     } finally {
       setLoading(false);
@@ -333,7 +368,7 @@ const LoginPage = ({ onLogin }) => {
   const containerStyle = {
     minHeight: '100vh',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: isRegister ? 'flex-start' : 'center',
     justifyContent: 'center',
     // Always light — login page is never affected by dark/light mode
     background: 'linear-gradient(135deg, #eef0f4 0%, #d5dbe8 100%)',
@@ -341,6 +376,7 @@ const LoginPage = ({ onLogin }) => {
     position: 'fixed',
     inset: 0,
     zIndex: 9999,
+    overflowY: 'auto',
     colorScheme: 'light',
     fontFamily: "'Lufga', sans-serif",
     fontWeight: 400,
