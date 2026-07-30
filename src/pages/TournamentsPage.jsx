@@ -403,8 +403,8 @@ const canEditMatch = (m) => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
+        <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
+          <table style={{ ...styles.table, minWidth: 1000 }}>
             <thead>
               <tr style={styles.theadRow}>
                 {['Code','Tournament','Game','Format','Start','End','Participants','Status','Register','Unregister','Action'].map(h => (
@@ -998,8 +998,8 @@ const renderMatch = (m) => {
                 </span>
               )}
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={styles.table}>
+            <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
+              <table style={{ ...styles.table, minWidth: 700 }}>
                 <thead>
                   <tr style={styles.theadRow}>
                     {['Rank', 'Player', 'P', 'W', 'D', 'L', 'Pts', 'Qualify'].map((h) => (
@@ -1066,7 +1066,7 @@ const renderMatch = (m) => {
                 {rrAllDone ? 'Top 5 · QF → SF → Final' : '⏳ Players fill in as league results arrive · QF → SF → Final'}
               </span>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
               <div style={{ ...styles.bracketGrid, gridTemplateColumns: 'repeat(3, 1fr)', minWidth: 720 }}>
                 {koMatchGroups.map(({ key, label, matches: colMatches }) => (
                   <div key={key} style={styles.bracketCol}>
@@ -1175,14 +1175,14 @@ const renderMatch = (m) => {
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
             {/* For RR tournaments, only show the RR fixture grid (KO shown above) */}
             <div style={{
               ...styles.bracketGrid,
-              // RR fixture grid: single full-width column, no horizontal scroll needed.
+              // RR fixture grid: single full-width column, but needs minWidth if using 3-col match grid.
               // KO bracket: one column per round, min 240px each.
               ...(isRoundRobin
-                ? { gridTemplateColumns: '1fr', minWidth: 'unset' }
+                ? { gridTemplateColumns: '1fr', minWidth: 800 }
                 : { minWidth: Math.max(3, roundGroups.length) * 260 }
               ),
             }}>
@@ -1243,8 +1243,8 @@ const renderMatch = (m) => {
               </span>
             )}
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
+          <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
+            <table style={{ ...styles.table, minWidth: 900 }}>
               <thead>
                 <tr style={styles.theadRow}>
                   {['#','Employee','Department','Registered Tournaments','Matches Played','Won','Lost','Status'].map(h => (
@@ -1316,8 +1316,8 @@ const renderMatch = (m) => {
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>Match Records — {activeTournamentRecord.name}</div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
+        <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
+          <table style={{ ...styles.table, minWidth: 1000 }}>
             <thead>
               <tr style={styles.theadRow}>
                 {['Round','Match','Player A','Score A','Score B','Player B','Played','Status','Result','Admin'].map((h, i) => (
@@ -1530,33 +1530,35 @@ const renderMatch = (m) => {
 
           {/* Podium */}
           {resultsForActive.length > 0 && (
-            <div style={styles.podium}>
-              {resultsForActive.filter(r => r.position === 2).map(r => (
-                <div key={r.id} style={styles.podiumSilver}>
-                  <div style={styles.podiumName}>{getEmployeeName(r.employee_id)}</div>
-                  <div style={styles.podiumRank}>2nd Place</div>
-                  <div style={styles.podiumPrize}>{r.prize_description || '—'}</div>
-                </div>
-              ))}
-              {resultsForActive.filter(r => r.position === 1).map(r => (
-                <div key={r.id} style={styles.podiumGold}>
-                  <div style={styles.podiumName}>🏆 {getEmployeeName(r.employee_id)}</div>
-                  <div style={styles.podiumRank}>Champion</div>
-                  <div style={styles.podiumPrize}>{r.prize_description || '—'}</div>
-                </div>
-              ))}
-              {resultsForActive.filter(r => r.position === 3).map(r => (
-                <div key={r.id} style={styles.podiumBronze}>
-                  <div style={styles.podiumName}>{getEmployeeName(r.employee_id)}</div>
-                  <div style={styles.podiumRank}>3rd Place</div>
-                  <div style={styles.podiumPrize}>{r.prize_description || '—'}</div>
-                </div>
-              ))}
+            <div style={{ overflowX: 'auto', width: '100%', display: 'block', marginBottom: '1.2rem' }}>
+              <div style={{ ...styles.podium, minWidth: 600, marginBottom: 0 }}>
+                {resultsForActive.filter(r => r.position === 2).map(r => (
+                  <div key={r.id} style={styles.podiumSilver}>
+                    <div style={styles.podiumName}>{getEmployeeName(r.employee_id)}</div>
+                    <div style={styles.podiumRank}>2nd Place</div>
+                    <div style={styles.podiumPrize}>{r.prize_description || '—'}</div>
+                  </div>
+                ))}
+                {resultsForActive.filter(r => r.position === 1).map(r => (
+                  <div key={r.id} style={styles.podiumGold}>
+                    <div style={styles.podiumName}>🏆 {getEmployeeName(r.employee_id)}</div>
+                    <div style={styles.podiumRank}>Champion</div>
+                    <div style={styles.podiumPrize}>{r.prize_description || '—'}</div>
+                  </div>
+                ))}
+                {resultsForActive.filter(r => r.position === 3).map(r => (
+                  <div key={r.id} style={styles.podiumBronze}>
+                    <div style={styles.podiumName}>{getEmployeeName(r.employee_id)}</div>
+                    <div style={styles.podiumRank}>3rd Place</div>
+                    <div style={styles.podiumPrize}>{r.prize_description || '—'}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
+          <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
+            <table style={{ ...styles.table, minWidth: 900 }}>
               <thead>
                 <tr style={styles.theadRow}>
                   {['Position','Player','Department','Matches','Won','Lost','Points','Prize','Certificate'].map(h => (
@@ -1717,8 +1719,8 @@ const renderMatch = (m) => {
               Every registered participant can download their Certificate of Participation here.
               {' '}Top‑3 finishers can additionally download their Rank certificate from the Final Results table above.
             </p>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={styles.table}>
+            <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
+              <table style={{ ...styles.table, minWidth: 700 }}>
                 <thead>
                   <tr style={styles.theadRow}>
                     {['Employee ID', 'Name', 'Department', 'Certificate'].map(h => (
@@ -2149,6 +2151,13 @@ const renderMatch = (m) => {
 
   return (
     <div className="tournaments-page" style={{  fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
+      <style>{`
+        .tournaments-page .clay-card {
+          min-width: 0 !important;
+          overflow: hidden !important;
+          max-width: 100% !important;
+        }
+      `}</style>
       <EventsTopBar active="tournaments" />
 
       {/* Sub-tab bar */}
