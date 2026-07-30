@@ -64,6 +64,9 @@ export const AppProvider = ({ children }) => {
   const [tournamentMatches, setTournamentMatches] = useState([]);
   const [finalResults, setFinalResults] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [allNotifications, setAllNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gamesLoaded, setGamesLoaded] = useState(false); // track if Supabase games have loaded
@@ -773,6 +776,102 @@ const loadTournamentMatches = async () => {
     }
   };
 
+  const loadNotifications = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      // Fetch notifications joined with logs for the current user
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          *,
+          notification_logs!inner (
+            status,
+            user_id
+          )
+        `)
+        .eq('notification_logs.user_id', user.id)
+        .neq('notification_logs.status', 'deleted')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setNotifications(data || []);
+      setUnreadNotificationsCount((data || []).filter(n => n.notification_logs?.[0]?.status === 'sent').length);
+    } catch (err) {
+      console.error('Error loading notifications:', err);
+    }
+  };
+
+  const loadAllNotifications = async () => {
+    if (!isAdmin()) return;
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAllNotifications(data || []);
+    } catch (err) {
+      console.error('Error loading all notifications:', err);
+    }
+  };
+
+  const deleteNotification = async (notificationId) => {
+    if (!isAdmin()) return { success: false, error: 'Unauthorized' };
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      await loadAllNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('notification_logs')
+        .update({ status: 'opened', updated_at: new Date().toISOString() })
+        .match({ notification_id: notificationId, user_id: user.id });
+
+      if (error) throw error;
+      await loadNotifications();
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const deleteNotificationLog = async (notificationId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('notification_logs')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .match({ notification_id: notificationId, user_id: user.id });
+
+      if (error) throw error;
+      await loadNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting notification log:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   useEffect(() => {
     loadGames();
     loadEmployees();
@@ -789,7 +888,9 @@ const loadTournamentMatches = async () => {
     loadTournamentMatches();
     loadFinalResults();
     loadLeaderboard();
-    
+    loadNotifications();
+    loadAllNotifications();
+
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUser(data.user || null);
     });
@@ -2922,6 +3023,14 @@ const loadTournamentMatches = async () => {
     getEmployeeName,
     getCertificateLog,
     logCertificateIssuance,
+    notifications,
+    allNotifications,
+    unreadNotificationsCount,
+    loadNotifications,
+    loadAllNotifications,
+    markNotificationAsRead,
+    deleteNotificationLog,
+    deleteNotification,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

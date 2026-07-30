@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "388020106363",
+    "project_id": "absstem-activities",
+    "storage_bucket": "absstem-activities.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:388020106363:android:29985faa9c84474e715ede",
+        "android_client_info": {
+          "package_name": "com.absstem.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZQieDYExLicWMHPZ6WkXHEYIYEvlWYPw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

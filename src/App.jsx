@@ -8,6 +8,7 @@ import { ToastProvider } from './context/ToastContext';
 import Toast from './components/common/Toast';
 import { supabase } from './utils/supabase';
 import notificationService from './services/NotificationService';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 // Lazy Loaded Pages
 const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
@@ -44,6 +45,9 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [minLoadingFinished, setMinLoadingFinished] = useState(false);
+
+  // Initialize Push Notifications
+  usePushNotifications(user);
 
   // Initialize Local Notifications only after user logs in
   useEffect(() => {

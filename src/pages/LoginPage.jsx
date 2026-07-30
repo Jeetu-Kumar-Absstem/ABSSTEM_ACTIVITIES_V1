@@ -210,6 +210,21 @@ const LoginPage = ({ onLogin }) => {
     try {
       const email = personalEmail.trim().toLowerCase();
 
+      // Check if Employee ID already exists in employees table
+      const { data: existingEmp, error: empCheckError } = await supabase
+        .from('employees')
+        .select('employee_code')
+        .eq('employee_code', empId)
+        .maybeSingle();
+
+      if (empCheckError) throw empCheckError;
+
+      if (existingEmp) {
+        showToast('Employee ID already exists. Please login instead.', 'error');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,

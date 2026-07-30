@@ -7,6 +7,8 @@ import MobileTable from '../components/common/MobileTable';
 
 const ADMIN_TABS = [
   { id: 'registration-approval', label: 'Registration Approval' },
+  { id: 'push-notifications', label: 'Push Notifications' },
+  { id: 'previous-notifications', label: 'Previous Notifications' },
 ];
 
 const AdminPage = () => {
@@ -15,11 +17,37 @@ const AdminPage = () => {
     tournamentRegistrationRequests,
     approveTournamentRegistration,
     getEmployeeName,
+    setActiveTab: setGlobalActiveTab,
+    allNotifications,
+    loadAllNotifications,
+    deleteNotification,
   } = useApp();
   const { showToast } = useToast();
   const { isMobile } = useViewport();
   const [activeTab, setActiveTab] = useState('registration-approval');
   const [approvingId, setApprovingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  useEffect(() => {
+    if (activeTab === 'previous-notifications') {
+      loadAllNotifications();
+    }
+  }, [activeTab]);
+
+  const handleDeleteNotification = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this notification history? This will remove it for everyone.')) return;
+    setDeletingId(id);
+    try {
+      const res = await deleteNotification(id);
+      if (res.success) {
+        showToast('Notification deleted', 'success');
+      } else {
+        showToast(res.error, 'error');
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const pendingRequests = useMemo(() => {
     return tournamentRegistrationRequests
@@ -164,6 +192,110 @@ const AdminPage = () => {
                 emptyMessage="No registration requests are waiting for approval."
               />
             </div>
+          </div>
+        )}
+
+        {activeTab === 'push-notifications' && (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔔</div>
+            <h3 style={{ marginBottom: '8px', color: 'var(--text-strong)' }}>Push Notifications</h3>
+            <p style={{ color: 'var(--muted)', fontSize: '0.85rem', maxWidth: '400px', margin: '0 auto 24px' }}>
+              Send important updates, tournament alerts, and general announcements directly to employees' devices.
+            </p>
+            <button
+              onClick={() => setGlobalActiveTab('create-notification')}
+              className="clay-button"
+              style={{
+                padding: '12px 24px',
+                borderRadius: '16px',
+                background: 'var(--accent)',
+                color: 'white',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Create New Notification
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'previous-notifications' && (
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {allNotifications.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
+                No notification history found.
+              </div>
+            ) : (
+              allNotifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  className="clay"
+                  style={{
+                    padding: '16px',
+                    borderRadius: '20px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-strong)' }}>{notif.title}</h4>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: '2px' }}>
+                        Sent on: {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteNotification(notif.id)}
+                      disabled={deletingId === notif.id}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: 'none',
+                        color: 'var(--danger)',
+                        padding: '6px 12px',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {deletingId === notif.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                    {notif.body}
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    <span style={{
+                      fontSize: '0.6rem',
+                      background: 'var(--accent-soft)',
+                      color: 'var(--accent-strong)',
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase'
+                    }}>
+                      Target: {notif.target_type}
+                    </span>
+                    {notif.data?.selected_employee_ids?.length > 0 && (
+                      <span style={{
+                        fontSize: '0.6rem',
+                        background: 'var(--bg-surface-strong)',
+                        color: 'var(--text-soft)',
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        fontWeight: 600
+                      }}>
+                        {notif.data.selected_employee_ids.length} Recipients
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

@@ -15,6 +15,8 @@ import SettingsPage from './SettingsPage';
 import EventsCalendarPage from './EventsCalendarPage';
 import TournamentsPage from './TournamentsPage';
 import LeaderboardPage from './LeaderboardPage';
+import NotificationsPage from './NotificationsPage';
+import CreateNotificationPage from './CreateNotificationPage';
 
 const ActivityPlanner = ({ user, onLogout }) => {
   const { activeTab } = useApp();
@@ -34,6 +36,8 @@ const ActivityPlanner = ({ user, onLogout }) => {
       case 'eventsCalendar': return <EventsCalendarPage />;
       case 'tournaments': return <TournamentsPage />;
       case 'leaderboard': return <LeaderboardPage />;
+      case 'notifications': return <NotificationsPage />;
+      case 'create-notification': return <CreateNotificationPage />;
       default: return <DashboardPage />;
     }
   };
