@@ -4,6 +4,11 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Debug: log during build to catch missing env vars early
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('[Supabase] Missing env vars — VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not found at build time.');
+}
+
 const isValidUrl = (url) => {
   if (!url) return false;
   try {
@@ -16,8 +21,47 @@ const isValidUrl = (url) => {
 
 // Create a dummy client that won't crash the app if config is missing
 const createDummyClient = () => {
-  console.warn('Supabase is not configured. Using dummy client.');
+  console.warn('[Supabase] Using dummy client — real Supabase calls will not work.');
   const noop = () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } });
+  const noopChain = () => ({
+    data: null,
+    error: { message: 'Supabase not configured' },
+  });
+
+  // A fully chainable query builder that always resolves to empty/noop
+  const makeChain = () => {
+    const chain = {
+      select: () => makeChain(),
+      eq: () => makeChain(),
+      neq: () => makeChain(),
+      gt: () => makeChain(),
+      lt: () => makeChain(),
+      gte: () => makeChain(),
+      lte: () => makeChain(),
+      like: () => makeChain(),
+      ilike: () => makeChain(),
+      in: () => makeChain(),
+      is: () => makeChain(),
+      not: () => makeChain(),
+      or: () => makeChain(),
+      and: () => makeChain(),
+      filter: () => makeChain(),
+      match: () => makeChain(),
+      order: () => makeChain(),
+      limit: () => makeChain(),
+      range: () => makeChain(),
+      single: noop,
+      maybeSingle: noop,
+      insert: () => makeChain(),
+      update: () => makeChain(),
+      upsert: () => makeChain(),
+      delete: () => makeChain(),
+      then: (cb) => Promise.resolve(cb({ data: [], error: null })),
+      catch: (cb) => Promise.resolve(cb(null)),
+    };
+    return chain;
+  };
+
   return {
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
@@ -29,26 +73,18 @@ const createDummyClient = () => {
       resetPasswordForEmail: noop,
       updateUser: noop,
     },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            single: noop,
-            then: (cb) => cb({ data: [], error: null })
-          }),
-          single: noop,
-          then: (cb) => cb({ data: [], error: null })
-        }),
-        order: () => ({ then: (cb) => cb({ data: [], error: null }) }),
-        then: (cb) => cb({ data: [], error: null })
-      }),
-      insert: () => ({ select: () => ({ single: noop }) }),
-      update: () => ({ eq: () => noop() }),
-      upsert: () => ({ select: () => ({ single: noop }) }),
-      delete: () => ({ eq: () => noop() }),
-    }),
+    from: () => makeChain(),
     rpc: noop,
-    storage: { from: () => ({ upload: noop, getPublicUrl: () => ({ data: { publicUrl: '' } }) }) }
+    storage: {
+      from: () => ({
+        upload: noop,
+        download: noop,
+        remove: noop,
+        list: noop,
+        getPublicUrl: () => ({ data: { publicUrl: '' } }),
+        createSignedUrl: noop,
+      }),
+    },
   };
 };
 

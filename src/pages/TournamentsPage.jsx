@@ -3111,7 +3111,7 @@ const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) =
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
       <div className="clay-card" style={{ ...styles.card }}>
         <div style={styles.cardHeader}>
           <div style={styles.cardHeaderTitle}>⏱ Match Stopwatch & Timer</div>
