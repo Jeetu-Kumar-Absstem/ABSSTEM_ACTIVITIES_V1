@@ -447,6 +447,166 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const syncAutoBan = async (employeeId, employeeName) => {
+    if (!employeeId) return;
+
+    try {
+      // 1. Count current violations
+      const { count, error: countErr } = await supabase
+        .from('violations')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (countErr) throw countErr;
+
+      // 2. Check for existing active auto-ban
+      // We look for an active ban on "All Games" with the specific "Automatic ban" reason prefix
+      const { data: existingBans, error: banErr } = await supabase
+        .from('bans')
+        .select('id, active, until_date')
+        .eq('employee_id', employeeId)
+        .eq('game', 'All Games')
+        .eq('active', true)
+        .ilike('reason', 'Automatic ban%');
+
+      if (banErr) throw banErr;
+
+      const activeAutoBan = existingBans?.find(b => new Date(b.until_date) > new Date());
+
+      if (count >= 3 && !activeAutoBan) {
+        // Threshold reached and no active auto-ban: Create one
+        const threeMonthsLater = new Date();
+        threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+
+        await addBan({
+          employee: employeeName || employeeId,
+          employee_id: employeeId,
+          game: 'All Games',
+          from_date: new Date().toISOString().split('T')[0],
+          until_date: threeMonthsLater.toISOString().split('T')[0],
+          reason: `Automatic ban after reaching ${count} violations.`,
+        });
+      } else if (count < 3 && activeAutoBan) {
+        // Threshold no longer met but active auto-ban exists: Lift it
+        await liftBan(activeAutoBan.id);
+      }
+    } catch (err) {
+      console.error('[AppContext] syncAutoBan error:', err);
+    }
+  };
+
+  const addViolation = async (violationData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can report violations!' };
+    }
+
+    console.log('[AppContext] addViolation started:', violationData);
+    try {
+      console.log('[AppContext] Inserting into violations table...');
+      const { data, error } = await supabase
+        .from('violations')
+        .insert([{
+          employee: violationData.employee,
+          employee_id: violationData.employee_id,
+          game: violationData.game || 'General',
+          rule: violationData.rule || 'N/A',
+          reason: violationData.reason || 'No reason provided',
+          violation_date: new Date().toISOString(),
+          created_by: currentUser?.user_metadata?.name || 'Admin',
+          status: 'open'
+        }])
+        .select();
+
+      if (error) {
+        console.error('[AppContext] Supabase violation insert error:', error);
+        return { success: false, error: `Database error: ${error.message}. Please ensure the "violations" table exists and you have permissions.` };
+      }
+
+      await syncAutoBan(violationData.employee_id, violationData.employee);
+      await loadViolations();
+      return { success: true, data: data[0] };
+    } catch (err) {
+      console.error('[AppContext] Uncaught error in addViolation:', err);
+      return { success: false, error: `System error: ${err.message}` };
+    }
+  };
+
+  const updateViolation = async (violationId, violationData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can update violations!' };
+    }
+
+    try {
+      // Get old data to handle employee changes
+      const { data: oldViolation } = await supabase
+        .from('violations')
+        .select('employee_id, employee')
+        .eq('id', violationId)
+        .single();
+
+      const { error } = await supabase
+        .from('violations')
+        .update({
+          employee: violationData.employee,
+          employee_id: violationData.employee_id,
+          game: violationData.game,
+          rule: violationData.rule,
+          reason: violationData.reason,
+          status: violationData.status || 'open',
+          updated_at: new Date().toISOString()
+        })
+        .match({ id: violationId });
+
+      if (error) throw error;
+
+      // Sync for new employee
+      await syncAutoBan(violationData.employee_id, violationData.employee);
+
+      // If employee changed, sync for old employee too
+      if (oldViolation && oldViolation.employee_id !== violationData.employee_id) {
+        await syncAutoBan(oldViolation.employee_id, oldViolation.employee);
+      }
+
+      await loadViolations();
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating violation:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteViolation = async (violationId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can delete violations!' };
+    }
+
+    try {
+      // Get employee info before deleting
+      const { data: violation } = await supabase
+        .from('violations')
+        .select('employee_id, employee')
+        .eq('id', violationId)
+        .single();
+
+      const { error } = await supabase
+        .from('violations')
+        .delete()
+        .match({ id: violationId });
+
+      if (error) throw error;
+
+      if (violation) {
+        await syncAutoBan(violation.employee_id, violation.employee);
+      }
+
+      await loadViolations();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting violation:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   // ── Events / Tournaments / Leaderboard loaders ──────────────────────────
   const loadEvents = async () => {
     try {
@@ -2674,6 +2834,9 @@ const loadTournamentMatches = async () => {
     setRules,
     violations,
     setViolations,
+    addViolation,
+    updateViolation,
+    deleteViolation,
     loading,
     currentDate,
     setCurrentDate,

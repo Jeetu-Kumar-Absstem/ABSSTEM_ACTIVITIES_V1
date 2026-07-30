@@ -4,7 +4,7 @@ create table if not exists public.violations (
   employee_id text,
   game text not null default 'General',
   rule text,
-  reason text not null,
+  reason text not null default 'No reason provided',
   status text not null default 'open',
   created_by text,
   created_at timestamptz not null default now(),
@@ -15,7 +15,19 @@ alter table if exists public.violations
   add column if not exists employee_id text;
 
 alter table if exists public.violations
+  add column if not exists rule text;
+
+alter table if exists public.violations
+  add column if not exists reason text default 'No reason provided';
+
+alter table if exists public.violations
   add column if not exists created_by text;
+
+alter table if exists public.violations
+  add column if not exists status text default 'open';
+
+alter table if exists public.violations
+  add column if not exists violation_date timestamptz default now();
 
 alter table if exists public.violations
   add column if not exists updated_at timestamptz not null default now();
