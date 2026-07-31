@@ -5,7 +5,7 @@ import { Trash2, Bell, MessageSquare, ArrowLeft, Check, CheckSquare, Square, X }
 import { format } from 'date-fns';
 
 const NotificationsPage = () => {
-  const { notifications, loadNotifications, markNotificationAsRead, deleteNotificationLog, deleteMultipleNotificationLogs, setActiveTab } = useApp();
+  const { notifications, loadNotifications, markNotificationAsRead, deleteNotificationLog, deleteMultipleNotificationLogs, setActiveTab, themeTokens } = useApp();
   const { showToast } = useToast();
   const [selectedNotif, setSelectedNotif] = useState(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -295,10 +295,10 @@ const NotificationsPage = () => {
                 style={{
                   padding: '20px',
                   borderRadius: '28px',
-                  background: isSelected ? 'var(--accent-soft)' : 'white',
+                  background: isSelected ? 'var(--accent-soft)' : 'var(--bg-surface)',
                   border: '1px solid',
-                  borderColor: isSelected ? 'var(--accent)' : 'rgba(0,0,0,0.06)',
-                  boxShadow: '0 8px 20px -4px rgba(0,0,0,0.05)',
+                  borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                  boxShadow: themeTokens.isDark ? 'none' : '0 8px 20px -4px rgba(0,0,0,0.05)',
                   position: 'relative',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   cursor: 'pointer',
@@ -315,13 +315,13 @@ const NotificationsPage = () => {
                       width: '48px',
                       height: '48px',
                       borderRadius: '16px',
-                      background: isUnread ? 'var(--accent-soft)' : '#f8fafc',
+                      background: isUnread ? 'var(--accent-soft)' : 'var(--bg-surface-strong)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: isUnread ? 'var(--accent-strong)' : '#64748b',
+                      color: isUnread ? 'var(--accent-strong)' : 'var(--text-soft)',
                       flexShrink: 0,
-                      border: '1px solid rgba(0,0,0,0.02)'
+                      border: '1px solid var(--border)'
                     }}>
                       <MessageSquare size={24} />
                     </div>
@@ -333,7 +333,7 @@ const NotificationsPage = () => {
                         margin: 0,
                         fontSize: '1.05rem',
                         fontWeight: 700,
-                        color: isUnread || isSelected ? 'var(--accent-strong)' : '#1e293b',
+                        color: isUnread || isSelected ? 'var(--accent-strong)' : 'var(--text-strong)',
                         display: '-webkit-box',
                         WebkitLineClamp: 1,
                         WebkitBoxOrient: 'vertical',
@@ -342,14 +342,14 @@ const NotificationsPage = () => {
                       }}>
                         {notif.title}
                       </h3>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', flexShrink: 0, fontWeight: 500, marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted)', flexShrink: 0, fontWeight: 500, marginTop: '2px' }}>
                         {format(new Date(notif.created_at), 'MMM d')}
                       </span>
                     </div>
                     <p style={{
                       margin: '4px 0 0',
                       fontSize: '0.85rem',
-                      color: '#64748b',
+                      color: 'var(--text-soft)',
                       display: '-webkit-box',
                       WebkitLineClamp: 1,
                       WebkitBoxOrient: 'vertical',
@@ -391,7 +391,7 @@ const NotificationsPage = () => {
                       height: '8px',
                       background: 'var(--accent)',
                       borderRadius: '50%',
-                      boxShadow: '0 0 0 2px white'
+                      boxShadow: `0 0 0 2px ${themeTokens.isDark ? 'var(--bg-surface)' : 'white'}`
                     }} />
                   )}
                 </div>
