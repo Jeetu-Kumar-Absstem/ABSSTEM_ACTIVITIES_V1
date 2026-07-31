@@ -899,8 +899,14 @@ const loadTournamentMatches = async () => {
       setCurrentUser(session?.user || null);
     });
 
+    const refreshOnPush = () => {
+      loadNotifications();
+    };
+    window.addEventListener('notification-received', refreshOnPush);
+
     return () => {
       authListener?.subscription?.unsubscribe?.();
+      window.removeEventListener('notification-received', refreshOnPush);
     };
   }, []);
 

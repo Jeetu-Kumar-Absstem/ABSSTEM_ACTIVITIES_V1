@@ -20,6 +20,19 @@ export const usePushNotifications = (user) => {
       }
 
       await PushNotifications.register();
+
+      // Create a channel for Android (required for high-priority/heads-up notifications)
+      if (Capacitor.getPlatform() === 'android') {
+        PushNotifications.createChannel({
+          id: 'absstem-notifs',
+          name: 'Absstem Notifications',
+          description: 'General notifications for ABSSTEM Activities',
+          importance: 5, // High importance (heads-up)
+          visibility: 1,
+          sound: 'default',
+          vibration: true
+        });
+      }
     };
 
     // Listeners
@@ -51,7 +64,11 @@ export const usePushNotifications = (user) => {
 
       await PushNotifications.addListener('pushNotificationReceived', (notification) => {
         console.log('Push received: ', notification);
-        // You could trigger a local toast here if you want
+        // Refresh notifications list in AppContext if available
+        // Note: You might need to export loadNotifications and call it here
+        // or use a custom event.
+        const event = new CustomEvent('notification-received');
+        window.dispatchEvent(event);
       });
 
       await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {

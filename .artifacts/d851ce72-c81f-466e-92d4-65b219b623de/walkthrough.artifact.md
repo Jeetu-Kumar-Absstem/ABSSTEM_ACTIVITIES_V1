@@ -35,7 +35,12 @@ Admin can now view and manage past notifications.
 - Added **Previous Notifications** tab in the Admin page.
 - Lists all sent notifications with timestamp, target type, and recipient count.
 - **Delete Functionality**: Admins can remove notifications from the system (deletes from everyone's history).
-- Improved Edge Function logic ensures notifications appear in a user's personal history even if their device token isn't registered yet.
+- **System-Level Logging**: Edge Function now uses the `service_role` key to bypass RLS when creating logs. This ensures every targeted user sees the notification in their history, regardless of who sent it or whether they have a device token registered.
+
+### 7. Reliable Delivery Tracking
+Fixed an issue where notification logs were being blocked by RLS.
+- The Edge Function now uses an Admin Client to insert logs for all recipients.
+- Even if a user hasn't registered a device yet, a log entry is created so the notification appears in their personal history when they next log in.
 
 ## Manual Steps Required (CRITICAL)
 

@@ -33,3 +33,6 @@
     - [x] Add "Previous Notifications" tab to `AdminPage.jsx`
     - [x] Add delete functionality to "Previous Notifications" tab
     - [x] Update Edge Function to create logs for all targeted users (for history)
+- [x] **Phase 8: Critical Fixes**
+    - [x] Fix `notification_logs` insertion by using `service_role` in Edge Function (Bypass RLS)
+    - [x] Ensure history logs are created for 'all' employees regardless of token status

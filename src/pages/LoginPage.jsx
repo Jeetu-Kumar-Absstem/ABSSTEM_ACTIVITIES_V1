@@ -225,6 +225,21 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
 
+      // Check if email already exists
+      const { data: existingEmail, error: emailCheckError } = await supabase
+        .from('employees')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (emailCheckError) throw emailCheckError;
+
+      if (existingEmail) {
+        showToast('This email is already registered. Please login instead.', 'error');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -261,11 +276,16 @@ const LoginPage = ({ onLogin }) => {
       setDepartment('');
 
     } catch (error) {
-      if (error.message.includes('User already registered')) {
+      const msg = error.message || '';
+      if (msg.includes('User already registered')) {
         showToast('Employee ID already registered. Please login.', 'warning');
         setIsRegister(false);
+      } else if (msg.includes('Employee ID already exists')) {
+        showToast('Employee ID already exists. Please login instead.', 'error');
+      } else if (msg.includes('Email already registered')) {
+        showToast('This email is already registered. Please login instead.', 'error');
       } else {
-        showToast(error.message || 'Registration failed. Please try again.', 'error');
+        showToast(msg || 'Registration failed. Please try again.', 'error');
       }
     } finally {
       setLoading(false);
@@ -355,7 +375,7 @@ const LoginPage = ({ onLogin }) => {
   const containerStyle = {
     minHeight: '100vh',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: isRegister ? 'flex-start' : 'center',
     justifyContent: 'center',
     // Always light — login page is never affected by dark/light mode
     background: 'linear-gradient(135deg, #eef0f4 0%, #d5dbe8 100%)',
@@ -363,6 +383,8 @@ const LoginPage = ({ onLogin }) => {
     position: 'fixed',
     inset: 0,
     zIndex: 9999,
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
     colorScheme: 'light',
     fontWeight: 400,
   };
