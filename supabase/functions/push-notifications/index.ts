@@ -133,7 +133,6 @@ serve(async (req) => {
                 data: { notification_id: notification.id, ...extraData },
                 android: {
                   notification: {
-                    click_action: 'TOP_STORY_ACTIVITY',
                     color: '#3d5afe',
                     channel_id: 'absstem-notifs' // Use the high-priority channel
                   }

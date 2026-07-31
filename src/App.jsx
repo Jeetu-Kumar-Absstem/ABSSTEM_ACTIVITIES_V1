@@ -42,26 +42,20 @@ const PageLoader = () => (
   </div>
 );
 
+// Global listener registered outside the component to catch intents as early as possible.
+if (Capacitor.getPlatform() !== 'web') {
+  PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+    console.log('App (Global): Push action performed: ', notification);
+    localStorage.setItem('pending_notif_redirect', 'true');
+    // Dispatch event for foreground clicks
+    window.dispatchEvent(new CustomEvent('notification-clicked'));
+  });
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [minLoadingFinished, setMinLoadingFinished] = useState(false);
-
-  // Early listener to catch notification clicks before auth/context is ready
-  useEffect(() => {
-    if (Capacitor.getPlatform() === 'web') return;
-
-    const actionListener = PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('App: Push action performed: ', notification);
-      localStorage.setItem('pending_notif_redirect', 'true');
-      // Dispatch event for foreground clicks
-      window.dispatchEvent(new CustomEvent('notification-clicked'));
-    });
-
-    return () => {
-      actionListener.then(l => l.remove());
-    };
-  }, []);
 
   // Initialize Local Notifications only after user logs in
   useEffect(() => {
