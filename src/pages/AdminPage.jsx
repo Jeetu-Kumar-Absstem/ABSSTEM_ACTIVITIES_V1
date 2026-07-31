@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
+import { Trash2, MessageSquare, ArrowLeft, CheckSquare, Square, X, Bell } from 'lucide-react';
+import { format } from 'date-fns';
 
 const ADMIN_TABS = [
   { id: 'registration-approval', label: 'Registration Approval' },
@@ -21,32 +23,101 @@ const AdminPage = () => {
     allNotifications,
     loadAllNotifications,
     deleteNotification,
+    deleteMultipleNotifications,
   } = useApp();
   const { showToast } = useToast();
   const { isMobile } = useViewport();
   const [activeTab, setActiveTab] = useState('registration-approval');
   const [approvingId, setApprovingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [selectedNotif, setSelectedNotif] = useState(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   useEffect(() => {
     if (activeTab === 'previous-notifications') {
       loadAllNotifications();
+    } else {
+      exitSelectionMode();
+      setSelectedNotif(null);
     }
   }, [activeTab]);
 
   const handleDeleteNotification = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this notification history? This will remove it for everyone.')) return;
+    if (!window.confirm('Delete this notification history? It will remove it for all employees.')) return;
     setDeletingId(id);
     try {
       const res = await deleteNotification(id);
       if (res.success) {
         showToast('Notification deleted', 'success');
+        if (selectedNotif?.id === id) setSelectedNotif(null);
       } else {
         showToast(res.error, 'error');
       }
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected history records? This cannot be undone.`)) return;
+    try {
+      const res = await deleteMultipleNotifications(selectedIds);
+      if (res.success) {
+        showToast(`${selectedIds.length} records deleted`, 'success');
+        exitSelectionMode();
+      } else {
+        showToast(res.error, 'error');
+      }
+    } catch (err) {
+      showToast('Failed to delete records', 'error');
+    }
+  };
+
+  // Selection Logic
+  const toggleSelection = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleLongPress = (notif) => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      setSelectedIds([notif.id]);
+    }
+  };
+
+  const handleSelectNotif = (notif) => {
+    if (selectionMode) {
+      toggleSelection(notif.id);
+      return;
+    }
+    setSelectedNotif(notif);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === allNotifications.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(allNotifications.map(n => n.id));
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds([]);
+  };
+
+  // Long press timer logic
+  const [timer, setTimer] = useState(null);
+  const startTimer = (notif) => {
+    const t = setTimeout(() => handleLongPress(notif), 600);
+    setTimer(t);
+  };
+  const stopTimer = () => {
+    if (timer) clearTimeout(timer);
   };
 
   const pendingRequests = useMemo(() => {
@@ -222,79 +293,166 @@ const AdminPage = () => {
 
         {activeTab === 'previous-notifications' && (
           <div style={{ display: 'grid', gap: '12px' }}>
-            {allNotifications.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
-                No notification history found.
+            {/* Tab Header when in history */}
+            {selectionMode ? (
+              <div className="clay-card" style={{ padding: '16px 20px', borderRadius: '20px', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button onClick={exitSelectionMode} style={{ background: 'transparent', border: 'none', color: 'var(--text-soft)', cursor: 'pointer' }}><X size={20} /></button>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{selectedIds.length} Selected</span>
+                </div>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button onClick={handleSelectAll} style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer' }}><CheckSquare size={20} /></button>
+                  <button onClick={handleDeleteSelected} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={20} /></button>
+                </div>
               </div>
-            ) : (
-              allNotifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  className="clay"
-                  style={{
-                    padding: '16px',
-                    borderRadius: '20px',
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                  }}
+            ) : selectedNotif ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <button
+                  onClick={() => setSelectedNotif(null)}
+                  style={{ padding: '8px', borderRadius: '10px', background: 'var(--bg-surface)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-strong)' }}>{notif.title}</h4>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: '2px' }}>
-                        Sent on: {new Date(notif.created_at).toLocaleString()}
-                      </div>
+                  <ArrowLeft size={18} />
+                </button>
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>History Detail</span>
+              </div>
+            ) : null}
+
+            {selectedNotif ? (
+              /* Detail View for History */
+              <div className="clay" style={{ padding: '24px', borderRadius: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-strong)' }}>{selectedNotif.title}</h3>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '4px' }}>
+                      Sent on: {format(new Date(selectedNotif.created_at), 'PPPP, h:mm a')}
                     </div>
-                    <button
-                      onClick={() => handleDeleteNotification(notif.id)}
-                      disabled={deletingId === notif.id}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: 'none',
-                        color: 'var(--danger)',
-                        padding: '6px 12px',
-                        borderRadius: '12px',
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {deletingId === notif.id ? 'Deleting...' : 'Delete'}
-                    </button>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-soft)', lineHeight: 1.4 }}>
-                    {notif.body}
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                    <span style={{
-                      fontSize: '0.6rem',
-                      background: 'var(--accent-soft)',
-                      color: 'var(--accent-strong)',
-                      padding: '2px 8px',
-                      borderRadius: '999px',
-                      fontWeight: 600,
-                      textTransform: 'uppercase'
-                    }}>
-                      Target: {notif.target_type}
-                    </span>
-                    {notif.data?.selected_employee_ids?.length > 0 && (
-                      <span style={{
-                        fontSize: '0.6rem',
-                        background: 'var(--bg-surface-strong)',
-                        color: 'var(--text-soft)',
-                        padding: '2px 8px',
-                        borderRadius: '999px',
-                        fontWeight: 600
-                      }}>
-                        {notif.data.selected_employee_ids.length} Recipients
-                      </span>
-                    )}
+                  <div style={{ padding: '8px', borderRadius: '10px', background: 'var(--accent-soft)', color: 'var(--accent-strong)' }}>
+                    <MessageSquare size={20} />
                   </div>
                 </div>
-              ))
+
+                <div style={{
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: 'var(--bg-surface-strong)',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5,
+                  color: 'var(--text)',
+                  whiteSpace: 'pre-wrap',
+                  marginBottom: '20px'
+                }}>
+                  {selectedNotif.body}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }}>
+                  <span style={{ fontSize: '0.65rem', background: 'var(--accent-soft)', color: 'var(--accent-strong)', padding: '4px 10px', borderRadius: '999px', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Type: {selectedNotif.target_type}
+                  </span>
+                  {selectedNotif.data?.selected_employee_ids?.length > 0 && (
+                    <span style={{ fontSize: '0.65rem', background: 'var(--bg-surface-strong)', color: 'var(--text-soft)', padding: '4px 10px', borderRadius: '999px', fontWeight: 700 }}>
+                      {selectedNotif.data.selected_employee_ids.length} Recipients
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                  <button
+                    onClick={() => handleDeleteNotification(selectedNotif.id)}
+                    style={{ padding: '10px 20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}
+                  >
+                    <Trash2 size={16} /> Permanently Delete History
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* List View for History */
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {allNotifications.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
+                    No notification history found.
+                  </div>
+                ) : (
+                  allNotifications.map((notif) => {
+                    const isSelected = selectedIds.includes(notif.id);
+                    return (
+                      <div
+                        key={notif.id}
+                        className="clay"
+                        onMouseDown={() => startTimer(notif)}
+                        onMouseUp={stopTimer}
+                        onMouseLeave={stopTimer}
+                        onTouchStart={() => startTimer(notif)}
+                        onTouchEnd={stopTimer}
+                        onClick={() => handleSelectNotif(notif)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: '20px',
+                          background: isSelected ? 'var(--accent-soft)' : 'var(--bg-surface)',
+                          border: '1px solid',
+                          borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          position: 'relative'
+                        }}
+                      >
+                        {selectionMode ? (
+                          <div style={{ color: isSelected ? 'var(--accent)' : 'var(--muted)', flexShrink: 0 }}>
+                            {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                          </div>
+                        ) : (
+                          <div style={{ padding: '8px', borderRadius: '10px', background: 'var(--bg-surface-strong)', color: 'var(--text-soft)', flexShrink: 0 }}>
+                            <MessageSquare size={18} />
+                          </div>
+                        )}
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <h4 style={{
+                              margin: 0,
+                              fontSize: '0.9rem',
+                              fontWeight: 700,
+                              color: isSelected ? 'var(--accent-strong)' : 'var(--text-strong)',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}>
+                              {notif.title}
+                            </h4>
+                            <span style={{ fontSize: '0.6rem', color: 'var(--muted)', flexShrink: 0 }}>
+                              {format(new Date(notif.created_at), 'MMM d')}
+                            </span>
+                          </div>
+                          <p style={{
+                            margin: '2px 0 0',
+                            fontSize: '0.75rem',
+                            color: 'var(--text-soft)',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}>
+                            {notif.body}
+                          </p>
+                        </div>
+
+                        {!selectionMode && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteNotification(notif.id); }}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--danger)', opacity: 0.4, padding: '4px', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             )}
           </div>
         )}

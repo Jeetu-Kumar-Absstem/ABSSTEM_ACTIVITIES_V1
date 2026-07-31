@@ -10,6 +10,7 @@ const CreateNotificationPage = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+  const [showAllList, setShowAllList] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     body: '',
@@ -20,9 +21,6 @@ const CreateNotificationPage = () => {
   const TARGET_TYPES = [
     { id: 'all', label: 'All Employees', icon: <Users size={18} /> },
     { id: 'selected_employees', label: 'Select Employees', icon: <UserPlus size={18} /> },
-    { id: 'admins', label: 'Admins Only', icon: <Shield size={18} /> },
-    { id: 'company', label: 'By Company', icon: <Building size={18} /> },
-    { id: 'tournament', label: 'Tournament Participants', icon: <Trophy size={18} /> },
   ];
 
   const filteredEmployees = useMemo(() => {
@@ -125,6 +123,107 @@ const CreateNotificationPage = () => {
               ))}
             </div>
           </div>
+
+          {/* All Employees List Toggle */}
+          {formData.target_type === 'all' && (
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <button
+                type="button"
+                onClick={() => setShowAllList(!showAllList)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--accent)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {showAllList ? <X size={14} /> : <Eye size={14} />}
+                {showAllList ? 'Hide Recipient List' : `View Recipients (${employees.length})`}
+              </button>
+            </div>
+          )}
+
+          {/* All Employees Preview List */}
+          {formData.target_type === 'all' && showAllList && (
+            <div className="clay" style={{ padding: '20px', borderRadius: '20px', background: 'var(--bg-surface)' }}>
+              <div style={{ position: 'relative', marginBottom: '12px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Filter list..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 10px 10px 36px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-surface-strong)',
+                    fontSize: '0.8rem',
+                    color: 'var(--text)'
+                  }}
+                />
+              </div>
+              <div style={{
+                maxHeight: '200px',
+                overflowY: 'auto',
+                display: 'grid',
+                gap: '8px',
+                paddingRight: '4px'
+              }}>
+                {filteredEmployees.map(emp => (
+                  <div
+                    key={emp.employee_code}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px 12px',
+                      borderRadius: '14px',
+                      background: 'var(--bg-surface-strong)',
+                      border: '1px solid transparent'
+                    }}
+                  >
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      background: 'var(--accent-soft)',
+                      color: 'var(--accent-strong)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      fontWeight: 700
+                    }}>
+                      {emp.name?.charAt(0)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-strong)' }}>
+                        {emp.name}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>
+                        {emp.employee_code} • {emp.department}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {filteredEmployees.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '10px', fontSize: '0.75rem', color: 'var(--muted)' }}>
+                    No results found
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Employee Selection List */}
           {formData.target_type === 'selected_employees' && (
@@ -257,7 +356,7 @@ const CreateNotificationPage = () => {
               placeholder="Enter the notification message here..."
               value={formData.body}
               onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-              maxLength={200}
+              maxLength={500}
               rows={4}
               style={{
                 width: '100%',
@@ -271,7 +370,7 @@ const CreateNotificationPage = () => {
               }}
             />
             <div style={{ textAlign: 'right', fontSize: '0.65rem', color: 'var(--muted)', marginTop: '4px' }}>
-              {formData.body.length}/200
+              {formData.body.length}/500
             </div>
           </div>
 

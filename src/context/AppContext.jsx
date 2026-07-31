@@ -836,6 +836,23 @@ const loadTournamentMatches = async () => {
     }
   };
 
+  const deleteMultipleNotifications = async (notificationIds) => {
+    if (!isAdmin() || !notificationIds.length) return { success: false, error: 'Unauthorized or empty list' };
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (error) throw error;
+      await loadAllNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting multiple notifications:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   const markNotificationAsRead = async (notificationId) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -872,6 +889,26 @@ const loadTournamentMatches = async () => {
     }
   };
 
+  const deleteMultipleNotificationLogs = async (notificationIds) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !notificationIds.length) return;
+
+    try {
+      const { error } = await supabase
+        .from('notification_logs')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .in('notification_id', notificationIds)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      await loadNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting multiple notification logs:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   useEffect(() => {
     loadGames();
     loadEmployees();
@@ -902,11 +939,38 @@ const loadTournamentMatches = async () => {
     const refreshOnPush = () => {
       loadNotifications();
     };
+
+    const handleNotificationClick = () => {
+      console.log('AppContext: Notification click detected, redirecting...');
+      setActiveTab('notifications');
+      loadNotifications();
+    };
+
+    // Handle cold start redirection with persistence
+    const checkRedirect = () => {
+      const isPending = localStorage.getItem('pending_notif_redirect') === 'true';
+      if (isPending) {
+        console.log('AppContext: Redirecting to notifications due to pending flag');
+        setActiveTab('notifications');
+        loadNotifications();
+        localStorage.removeItem('pending_notif_redirect');
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately and at various stages of app initialization
+    checkRedirect();
+    const timers = [100, 500, 1000, 2000, 3000].map(ms => setTimeout(checkRedirect, ms));
+
     window.addEventListener('notification-received', refreshOnPush);
+    window.addEventListener('notification-clicked', handleNotificationClick);
 
     return () => {
       authListener?.subscription?.unsubscribe?.();
+      timers.forEach(clearTimeout);
       window.removeEventListener('notification-received', refreshOnPush);
+      window.removeEventListener('notification-clicked', handleNotificationClick);
     };
   }, []);
 
@@ -3036,7 +3100,9 @@ const loadTournamentMatches = async () => {
     loadAllNotifications,
     markNotificationAsRead,
     deleteNotificationLog,
+    deleteMultipleNotificationLogs,
     deleteNotification,
+    deleteMultipleNotifications,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

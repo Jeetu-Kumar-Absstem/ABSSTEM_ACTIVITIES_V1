@@ -37,7 +37,9 @@ export const usePushNotifications = (user) => {
 
     // Listeners
     const addListeners = async () => {
-      await PushNotifications.addListener('registration', async (token) => {
+      const handlers = [];
+
+      handlers.push(await PushNotifications.addListener('registration', async (token) => {
         console.log('Push registration success, token: ' + token.value);
 
         // Save token to Supabase
@@ -56,33 +58,28 @@ export const usePushNotifications = (user) => {
         } catch (err) {
           console.error('Failed to register token with backend:', err);
         }
-      });
+      }));
 
-      await PushNotifications.addListener('registrationError', (err) => {
+      handlers.push(await PushNotifications.addListener('registrationError', (err) => {
         console.error('Registration error: ', err.error);
-      });
+      }));
 
-      await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      handlers.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
         console.log('Push received: ', notification);
-        // Refresh notifications list in AppContext if available
-        // Note: You might need to export loadNotifications and call it here
-        // or use a custom event.
         const event = new CustomEvent('notification-received');
         window.dispatchEvent(event);
-      });
+      }));
 
-      await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-        console.log('Push action performed: ', notification);
-        // Handle deep linking here if needed
-        // For example: window.location.hash = '#/notifications';
-      });
+      return handlers;
     };
 
     registerPush();
-    addListeners();
+    const listeners = addListeners();
 
     return () => {
-      PushNotifications.removeAllListeners();
+      listeners.then(l => {
+        l.forEach(handler => handler.remove());
+      });
     };
   }, [user]);
 };

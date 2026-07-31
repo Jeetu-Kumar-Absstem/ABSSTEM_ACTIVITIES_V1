@@ -8,7 +8,8 @@ import { ToastProvider } from './context/ToastContext';
 import Toast from './components/common/Toast';
 import { supabase } from './utils/supabase';
 import notificationService from './services/NotificationService';
-import { usePushNotifications } from './hooks/usePushNotifications';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 // Lazy Loaded Pages
 const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
@@ -46,8 +47,21 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [minLoadingFinished, setMinLoadingFinished] = useState(false);
 
-  // Initialize Push Notifications
-  usePushNotifications(user);
+  // Early listener to catch notification clicks before auth/context is ready
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'web') return;
+
+    const actionListener = PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+      console.log('App: Push action performed: ', notification);
+      localStorage.setItem('pending_notif_redirect', 'true');
+      // Dispatch event for foreground clicks
+      window.dispatchEvent(new CustomEvent('notification-clicked'));
+    });
+
+    return () => {
+      actionListener.then(l => l.remove());
+    };
+  }, []);
 
   // Initialize Local Notifications only after user logs in
   useEffect(() => {

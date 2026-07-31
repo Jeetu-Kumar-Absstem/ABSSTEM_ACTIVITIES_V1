@@ -17,9 +17,13 @@ import TournamentsPage from './TournamentsPage';
 import LeaderboardPage from './LeaderboardPage';
 import NotificationsPage from './NotificationsPage';
 import CreateNotificationPage from './CreateNotificationPage';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const ActivityPlanner = ({ user, onLogout }) => {
   const { activeTab } = useApp();
+
+  // Initialize Push Notifications
+  usePushNotifications(user);
 
   const renderTab = () => {
     switch(activeTab) {

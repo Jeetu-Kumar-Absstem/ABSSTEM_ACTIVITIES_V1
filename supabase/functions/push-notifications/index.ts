@@ -121,12 +121,15 @@ serve(async (req) => {
       const fcmUrl = `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`
 
       if (tokens && tokens.length > 0) {
+        // Truncate body for system tray to avoid cluttering mobile drawer
+        const truncatedBody = msgBody.length > 80 ? msgBody.substring(0, 77) + "..." : msgBody;
+
         await Promise.all(tokens.map(async (t) => {
           try {
             const fcmPayload = {
               message: {
                 token: t.token,
-                notification: { title, body: msgBody },
+                notification: { title, body: truncatedBody },
                 data: { notification_id: notification.id, ...extraData },
                 android: {
                   notification: {
