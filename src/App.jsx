@@ -1,6 +1,6 @@
 // src/App.jsx
 
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import absstemLogo from './assets/absstem_game_light_logo.png';
 import { AppProvider } from './context/AppContext';
@@ -10,6 +10,12 @@ import { supabase } from './utils/supabase';
 import notificationService from './services/NotificationService';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+
+const isPrivacyPolicyRoute =
+  typeof window !== 'undefined' &&
+  (window.location.pathname === '/privacy-policy' ||
+    window.location.hash === '#/privacy-policy');
 
 // Lazy Loaded Pages
 const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
@@ -129,6 +135,10 @@ function App() {
   const handleLogin = (userData) => setUser(userData);
   const handleLogout = () => setUser(null);
 
+  if (isPrivacyPolicyRoute) {
+    return <PrivacyPolicy />;
+  }
+
   // Initial authentication loading
   if (loading || !minLoadingFinished) {
     return <PageLoader />;
@@ -140,6 +150,12 @@ function App() {
         <ToastProvider>
           <Suspense fallback={<PageLoader />}>
             <Routes>
+              {/* Public Policy Page */}
+              <Route
+                path="/privacy-policy"
+                element={<PrivacyPolicy />}
+              />
+
               {/* Password Reset */}
               <Route
                 path="/reset-password"
