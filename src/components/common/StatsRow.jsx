@@ -75,6 +75,7 @@ const StatCard = ({ stat }) => {
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
         fontWeight: 700,
+        fontFamily: "'Lufga', sans-serif",
       }}>{stat.label}</div>
       <div style={{
         fontSize: '1.3rem',

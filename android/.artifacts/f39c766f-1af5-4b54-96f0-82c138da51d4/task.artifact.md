@@ -1,0 +1,3 @@
+- [x] Update `responsive.css` with new drawer styles
+- [x] Update `MobileDrawer.jsx` with new layout and dynamic calendar icon
+- [x] Verify the changes in mobile view

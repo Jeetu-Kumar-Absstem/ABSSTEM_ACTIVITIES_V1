@@ -1,5 +1,5 @@
 // src/context/ToastContext.jsx
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useRef } from 'react';
 
 const ToastContext = createContext();
 
@@ -7,12 +7,12 @@ export const useToast = () => useContext(ToastContext);
 
 export const ToastProvider = ({ children }) => {
   const [toast, setToast] = useState({ message: '', type: 'success', visible: false });
-  let timeoutId = null;
+  const timeoutRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
-    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setToast({ message, type, visible: true });
-    timeoutId = setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+    timeoutRef.current = setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
   return (

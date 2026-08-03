@@ -1,0 +1,38 @@
+# Tasks - Push Notification System Implementation
+
+- [x] **Phase 1: Database Setup**
+    - [x] Create `device_tokens` table with RLS
+    - [x] Create `notifications` table with RLS
+    - [x] Create `notification_logs` table with RLS
+    - [x] Add `app_is_admin()` helper if not already robust
+- [x] **Phase 2: Backend (Supabase Edge Functions)**
+    - [x] Initialize `push-notifications` function
+    - [x] Implement FCM HTTP v1 integration
+    - [x] Implement `/register` endpoint
+    - [x] Implement `/send` endpoint with target filtering
+- [/] **Phase 3: Frontend Integration**
+    - [x] Create `usePushNotifications` hook
+    - [x] Update `AppContext.jsx` with notification state
+    - [x] Update `ActivityPlanner.jsx` with new tabs
+    - [x] Implement `NotificationsPage.jsx`
+    - [x] Implement `CreateNotificationPage.jsx`
+    - [x] Update `ProfileIcon.jsx` with dropdown link
+    - [x] Update `AdminPage.jsx` with "Push Notifications" tab
+- [/] **Phase 4: Android Configuration**
+    - [ ] Add `@capacitor/push-notifications` plugin
+    - [x] Configure `AndroidManifest.xml`
+    - [x] Add Firebase SDK to `build.gradle` (Note: build.gradle already has the plugin apply)
+    - [x] Create `colors.xml`
+- [x] **Phase 6: Targeted Notifications Enhancement**
+    - [x] Create `employees_user_id_migration.sql` for mapping employees to users
+    - [x] Update `CreateNotificationPage.jsx` with employee multi-select UI
+    - [x] Update `push-notifications` Edge Function to handle `selected_employees` targeting
+- [x] **Phase 7: Notification Management (Admin)**
+    - [x] Add `allNotifications` state to `AppContext.jsx`
+    - [x] Implement `loadAllNotifications` and `deleteNotification` in `AppContext.jsx`
+    - [x] Add "Previous Notifications" tab to `AdminPage.jsx`
+    - [x] Add delete functionality to "Previous Notifications" tab
+    - [x] Update Edge Function to create logs for all targeted users (for history)
+- [x] **Phase 8: Critical Fixes**
+    - [x] Fix `notification_logs` insertion by using `service_role` in Edge Function (Bypass RLS)
+    - [x] Ensure history logs are created for 'all' employees regardless of token status

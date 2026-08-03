@@ -10,23 +10,7 @@ import EventsTopBar from '../components/events/EventsTopBar';
 import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
 import BottomSheet from '../components/common/BottomSheet';
-
-const lufgaFontStyle = `
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-Regular.otf') format('opentype');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Lufga';
-    src: url('/fonts/Lufga-SemiBold.otf') format('opentype');
-    font-weight: 600;
-    font-style: normal;
-    font-display: swap;
-  }
-`;
+import CalendarIcon from '../components/common/CalendarIcon';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -83,6 +67,7 @@ const EventsCalendarPage = () => {
   const {
     events,
     getUpcomingEvents,
+    getOngoingEvents,
     getPastEvents,
     addEvent,
     deleteEvent,
@@ -112,21 +97,11 @@ const EventsCalendarPage = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
-  // Inject Lufga font into document head
-  useEffect(() => {
-    const styleId = 'lufga-font-style';
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = lufgaFontStyle;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
-
   // Initial load happens in AppProvider; this page just reads `events` from
   // context. After addEvent/deleteEvent, AppContext already refreshes the list.
 
   const upcomingEvents = useMemo(() => getUpcomingEvents(), [getUpcomingEvents, events]);
+  const ongoingEvents = useMemo(() => getOngoingEvents(), [getOngoingEvents, events]);
   const pastEvents = useMemo(() => getPastEvents(), [getPastEvents, events]);
 
   const eventsByDate = useMemo(() => {
@@ -143,6 +118,7 @@ const EventsCalendarPage = () => {
   // Stats for the top row
   const totalEvents = events.length;
   const upcomingCount = upcomingEvents.length;
+  const ongoingCount = ongoingEvents.length;
   const pastCount = pastEvents.length;
   const tournamentCount = events.filter(e => e.event_type === 'tournament').length;
   const outstationCount = events.filter(e => e.event_type === 'outstation').length;
@@ -252,13 +228,14 @@ const EventsCalendarPage = () => {
   };
 
   return (
-    <div className="events-calendar-page" style={{ fontFamily: "'Lufga', sans-serif", fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
+    <div className="events-calendar-page" style={{ fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
       <EventsTopBar active="eventsCalendar" />
 
       {/* Stats row */}
-      <div className="events-stats-grid" style={styles.statsRow}>
+      <div className="events-stats-grid" style={{ ...styles.statsRow, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(140px, 1fr))' }}>
         {[
           { label: 'Total Events',  val: totalEvents,      color: 'var(--accent)', sub: 'This year' },
+          { label: 'Ongoing',       val: ongoingCount,    color: 'var(--warning)', sub: 'Active now' },
           { label: 'Upcoming',      val: upcomingCount,   color: '#f9a825', sub: 'Future' },
           { label: 'Completed',     val: pastCount,       color: '#00897b', sub: 'This year' },
           { label: 'Tournaments',   val: tournamentCount, color: '#6a1b9a', sub: 'All time' },
@@ -368,10 +345,78 @@ const EventsCalendarPage = () => {
           </div>
         </div>
 
-        {/* Sidebar: Upcoming + Past */}
-        <div>
+        {/* Sidebar: Ongoing + Upcoming */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {ongoingEvents.length > 0 && (
+            <div style={styles.sideCard}>
+              <div style={{ ...styles.sideHeader, background: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CalendarIcon size="20px" /> Ongoing Events
+              </div>
+              {ongoingEvents.map((ev) => {
+                const status = STATUS_BADGE[ev.event_status] || STATUS_BADGE.ongoing;
+                const type = EVENT_TYPE_STYLE[ev.event_type] || EVENT_TYPE_STYLE.company;
+                const isPending = eventToDelete?.id === ev.id;
+                return (
+                  <div
+                    key={ev.id}
+                    style={{
+                      ...styles.sideItem,
+                      background: isPending ? 'rgba(229,57,53,0.08)' : 'transparent',
+                      borderLeft: isPending ? '3px solid var(--danger)' : '3px solid transparent',
+                    }}
+                    onClick={() => {
+                      if (isPending) setEventToDelete(null);
+                      else setSelectedEvent(ev);
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.4rem' }}>
+                      <div style={styles.sideItemTitle}>{ev.title}</div>
+                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                        <span style={{ ...type, ...styles.miniChip }}>{ev.event_type}</span>
+                        {isAdmin() && (
+                          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                            {isPending ? (
+                              <>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                                  style={styles.miniBtn}
+                                >Cancel</button>
+                                <button
+                                  onClick={(e) => requestDeleteFromCard(e, ev)}
+                                  style={{ ...styles.miniBtn, background: 'var(--danger)', color: '#fff', borderColor: 'var(--danger)' }}
+                                >Confirm</button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={(e) => requestDeleteFromCard(e, ev)}
+                                title="Delete this event"
+                                style={styles.miniDeleteBtn}
+                              >🗑</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={styles.sideItemMeta}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CalendarIcon size="12px" date={ev.start_date} /> {formatDateRange(ev)}
+                      </span>
+                      {formatTimeRange(ev) && <span>⏰ {formatTimeRange(ev)}</span>}
+                    </div>
+                    <div style={styles.sideItemMeta}>
+                      <span style={{ ...status, ...styles.statusChip }}>{status.label}</span>
+                      {ev.venue && <span>📍 {ev.venue}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div style={styles.sideCard}>
-            <div style={styles.sideHeader}>📅 Upcoming Events</div>
+            <div style={{ ...styles.sideHeader, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarIcon size="20px" /> Upcoming Events
+            </div>
             {upcomingEvents.length === 0 ? (
               <div style={styles.sideEmpty}>No upcoming events scheduled.</div>
             ) : (
@@ -400,28 +445,34 @@ const EventsCalendarPage = () => {
                       <div style={styles.sideItemTitle}>{ev.title}</div>
                       <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
                         <span style={{ ...type, ...styles.miniChip }}>{ev.event_type}</span>
-                        {isAdmin() && (
-                          <button
-                            onClick={(e) => requestDeleteFromCard(e, ev)}
-                            title={isPending ? 'Click again to confirm delete' : 'Delete this event'}
-                            style={{
-                              background: isPending ? 'var(--danger)' : 'transparent',
-                              color: isPending ? 'var(--text-strong)' : 'var(--danger)',
-                              border: `1px solid ${isPending ? 'var(--danger)' : 'rgba(229,57,53,0.24)'}`,
-                              borderRadius: 4,
-                              padding: '0.1rem 0.35rem',
-                              fontSize: '0.66rem',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontFamily: 'inherit',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >{isPending ? '✓ Confirm' : '🗑'}</button>
-                        )}
+                {isAdmin() && (
+                  <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', flexShrink: 0 }}>
+                    {isPending ? (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                          style={styles.miniBtn}
+                        >Cancel</button>
+                        <button
+                          onClick={(e) => requestDeleteFromCard(e, ev)}
+                          style={{ ...styles.miniBtn, background: 'var(--danger)', color: '#fff', borderColor: 'var(--danger)' }}
+                        >Confirm</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={(e) => requestDeleteFromCard(e, ev)}
+                        title="Delete this event"
+                        style={styles.miniDeleteBtn}
+                      >🗑</button>
+                    )}
+                  </div>
+                )}
                       </div>
                     </div>
                     <div style={styles.sideItemMeta}>
-                      <span>📅 {formatDateRange(ev)}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CalendarIcon size="12px" date={ev.start_date} /> {formatDateRange(ev)}
+                      </span>
                       {formatTimeRange(ev) && <span>⏰ {formatTimeRange(ev)}</span>}
                     </div>
                     <div style={styles.sideItemMeta}>
@@ -451,7 +502,7 @@ const EventsCalendarPage = () => {
                 hideOnCard: true,
                 render: (ev) => (
                   <>
-                    <div style={{ fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>{ev.title}</div>
+                    <div style={{ fontWeight: 600 }}>{ev.title}</div>
                     {ev.organizer && <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>by {ev.organizer}</div>}
                   </>
                 ),
@@ -474,14 +525,120 @@ const EventsCalendarPage = () => {
                   return <span style={{ ...status, ...styles.tableChip }}>{status.label}</span>;
                 },
               },
+              ...(isAdmin() ? [{
+                key: 'actions',
+                label: 'Action',
+                align: 'center',
+                hideOnCard: true,
+                render: (ev) => {
+                  const isPending = eventToDelete?.id === ev.id;
+                  return (
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                      {isPending ? (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                            style={{
+                              background: 'var(--bg-muted)',
+                              color: 'var(--text)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 4,
+                              padding: '4px 8px',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >Cancel</button>
+                          <button
+                            onClick={(e) => requestDeleteFromCard(e, ev)}
+                            style={{
+                              background: 'var(--danger)',
+                              color: '#fff',
+                              border: '1px solid var(--danger)',
+                              borderRadius: 4,
+                              padding: '4px 8px',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >Confirm</button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={(e) => requestDeleteFromCard(e, ev)}
+                          style={{
+                            background: 'transparent',
+                            color: 'var(--danger)',
+                            border: '1px solid rgba(229,57,53,0.3)',
+                            borderRadius: 4,
+                            padding: '4px 8px',
+                            fontSize: '0.7rem',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >🗑 Delete</button>
+                      )}
+                    </div>
+                  );
+                }
+              }] : [])
             ]}
             rows={pastEvents}
             rowKey={(ev) => ev.id}
+            onRowClick={(ev) => setSelectedEvent(ev)}
             emptyMessage="No past events recorded yet."
             cardTitle={(ev) => ev.title}
             cardSubtitle={(ev) => (
               <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
                 📅 {formatDateRange(ev)} {ev.organizer ? `· by ${ev.organizer}` : ''}
+              </div>
+            )}
+            cardActions={(ev) => isAdmin() && (
+              <div style={{ textAlign: 'right', marginTop: '8px' }}>
+                {eventToDelete?.id === ev.id ? (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEventToDelete(null); }}
+                      style={{
+                        background: 'var(--bg-muted)',
+                        color: 'var(--text)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 4,
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={(e) => requestDeleteFromCard(e, ev)}
+                      style={{
+                        background: 'var(--danger)',
+                        color: '#fff',
+                        border: '1px solid var(--danger)',
+                        borderRadius: 4,
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >Confirm Delete</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => requestDeleteFromCard(e, ev)}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      border: '1px solid rgba(229,57,53,0.3)',
+                      borderRadius: 4,
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >🗑 Delete Event</button>
+                )}
               </div>
             )}
           />
@@ -569,7 +726,7 @@ const EventsCalendarPage = () => {
 
         if (isMobile) {
           return (
-            <BottomSheet open onClose={() => setShowAddModal(false)} title="Add New Event" icon="📅">
+            <BottomSheet open onClose={() => setShowAddModal(false)} title="Add New Event" icon={<CalendarIcon size="24px" />}>
               {formBody}
             </BottomSheet>
           );
@@ -580,7 +737,7 @@ const EventsCalendarPage = () => {
                style={styles.modalBackdrop}>
             <div style={styles.modalCard}>
               <div style={styles.modalHeader}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>Add New Event</h3>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Add New Event</h3>
                 <button onClick={() => setShowAddModal(false)} style={styles.modalClose}>✕</button>
               </div>
               {formBody}
@@ -624,7 +781,7 @@ const EventsCalendarPage = () => {
               open
               onClose={() => setSelectedEvent(null)}
               title={selectedEvent.title}
-              icon="📅"
+              icon={<CalendarIcon size="24px" date={selectedEvent.start_date} />}
             >
               {detailsBody}
             </BottomSheet>
@@ -636,7 +793,7 @@ const EventsCalendarPage = () => {
                style={styles.modalBackdrop}>
             <div style={{ ...styles.modalCard, maxWidth: 520 }}>
               <div style={styles.modalHeader}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" }}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
                   {EVENT_TYPE_STYLE[selectedEvent.event_type] && (
                     <span style={{
                       ...EVENT_TYPE_STYLE[selectedEvent.event_type],
@@ -666,8 +823,8 @@ const EventsCalendarPage = () => {
 
 const DetailRow = ({ label, value }) => (
   <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '0.6rem', padding: '0.3rem 0', borderBottom: '1px solid var(--border)' }}>
-    <div style={{ color: 'var(--muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 600 }}>{label}</div>
-    <div style={{ color: 'var(--text)', fontFamily: "'Lufga', sans-serif", fontWeight: 500 }}>{value}</div>
+    <div style={{ color: 'var(--muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>{label}</div>
+    <div style={{ color: 'var(--text)', fontWeight: 500 }}>{value}</div>
   </div>
 );
 
@@ -682,9 +839,9 @@ const styles = {
     borderRadius: 16,
     padding: '0.7rem 0.9rem',
   },
-  statLabel: { fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 600 },
-  statVal:   { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1, fontFamily: "'Lufga', sans-serif" },
-  statSub:   { fontSize: '0.6rem', color: 'var(--muted)', marginTop: '0.18rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
+  statLabel: { fontSize: '0.6rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem', fontWeight: 600 },
+  statVal:   { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1 },
+  statSub:   { fontSize: '0.6rem', color: 'var(--muted)', marginTop: '0.18rem', fontWeight: 500 },
 
   gridLayout: { display: 'grid', gridTemplateColumns: '1fr 320px', gap: '0.8rem' },
 
@@ -703,7 +860,7 @@ const styles = {
     borderBottom: '1px solid var(--border)',
     flexWrap: 'wrap',
   },
-  calendarTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-strong)', minWidth: 150, textAlign: 'center', fontFamily: "'Lufga', sans-serif" },
+  calendarTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-strong)', minWidth: 150, textAlign: 'center' },
   navBtn: {
     background: 'var(--bg-muted)',
     border: '1px solid var(--border)',
@@ -714,15 +871,15 @@ const styles = {
   },
   outlineBtn: {
     background: 'var(--bg-muted)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4,
-    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 400, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
+    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 400, cursor: 'pointer',
   },
   navyBtn: {
     background: 'var(--accent)', color: 'var(--accent-contrast)', border: 'none', borderRadius: 4,
-    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
+    padding: '0.22rem 0.7rem', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
   },
   dangerBtn: {
     background: 'var(--danger)', color: 'var(--accent-contrast)', border: 'none', borderRadius: 4,
-    padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Lufga', sans-serif",
+    padding: '0.32rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
   },
 
   weekHeader: {
@@ -731,7 +888,7 @@ const styles = {
   },
   weekHeaderCell: {
     textAlign: 'center', fontSize: '0.62rem', fontWeight: 700, color: 'var(--muted)',
-    padding: '0.4rem 0', textTransform: 'uppercase', fontFamily: "'Lufga', sans-serif",
+    padding: '0.4rem 0', textTransform: 'uppercase',
   },
   calendarGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' },
   calendarCell: {
@@ -743,15 +900,15 @@ const styles = {
   todayBadge: {
     width: 22, height: 22, background: 'var(--accent)', color: 'var(--accent-contrast)',
     borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '0.7rem', fontWeight: 600, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif",
+    fontSize: '0.7rem', fontWeight: 600, marginBottom: '0.2rem',
   },
-  cellDay: { fontSize: '0.72rem', fontWeight: 700, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
+  cellDay: { fontSize: '0.72rem', fontWeight: 700, marginBottom: '0.2rem' },
   eventChip: {
     fontSize: '0.6rem', padding: '0.08rem 0.3rem', borderRadius: 3,
     marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden',
-    textOverflow: 'ellipsis', cursor: 'pointer', fontWeight: 400, fontFamily: "'Lufga', sans-serif",
+    textOverflow: 'ellipsis', cursor: 'pointer', fontWeight: 400,
   },
-  moreChip: { fontSize: '0.58rem', color: 'var(--muted)', padding: '0.05rem 0.25rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
+  moreChip: { fontSize: '0.58rem', color: 'var(--muted)', padding: '0.05rem 0.25rem', fontWeight: 500 },
 
   legend: { display: 'flex', gap: '1rem', padding: '0.6rem 0.2rem', flexWrap: 'wrap' },
   legendItem: { display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.66rem', color: 'var(--text-soft)' },
@@ -763,18 +920,26 @@ const styles = {
   },
   sideHeader: {
     background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.5rem 0.85rem',
-    fontSize: '0.78rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif",
+    fontSize: '0.78rem', fontWeight: 600,
   },
-  sideEmpty: { padding: '0.8rem', fontSize: '0.75rem', color: 'var(--muted)', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
-  sideItem: { borderBottom: '1px solid var(--border)', padding: '0.7rem 0.85rem', cursor: 'pointer', transition: 'background 0.15s', fontFamily: "'Lufga', sans-serif" },
-  sideItemTitle: { fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.2rem', fontFamily: "'Lufga', sans-serif" },
-  sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: 'var(--text-soft)', marginTop: '0.2rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500 },
-  miniChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 400, textTransform: 'capitalize', fontFamily: "'Lufga', sans-serif" },
-  statusChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 600, fontFamily: "'Lufga', sans-serif" },
-  tableChip: { padding: '0.1rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, textTransform: 'capitalize', fontFamily: "'Lufga', sans-serif" },
+  sideEmpty: { padding: '0.8rem', fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 500 },
+  sideItem: { borderBottom: '1px solid var(--border)', padding: '0.7rem 0.85rem', cursor: 'pointer', transition: 'background 0.15s' },
+  sideItemTitle: { fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.2rem' },
+  sideItemMeta: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.66rem', color: 'var(--text-soft)', marginTop: '0.2rem', fontWeight: 500 },
+  miniChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 400, textTransform: 'capitalize' },
+  miniBtn: {
+    background: 'var(--bg-muted)', color: 'var(--text)', border: '1px solid var(--border)',
+    borderRadius: 4, padding: '0.1rem 0.4rem', fontSize: '0.66rem', cursor: 'pointer', fontWeight: 600,
+  },
+  miniDeleteBtn: {
+    background: 'transparent', color: 'var(--danger)', border: '1px solid rgba(229,57,53,0.24)',
+    borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.66rem', cursor: 'pointer', fontWeight: 600,
+  },
+  statusChip: { padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.6rem', fontWeight: 600 },
+  tableChip: { padding: '0.1rem 0.5rem', borderRadius: 4, fontSize: '0.66rem', fontWeight: 400, textTransform: 'capitalize' },
 
-  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.65rem', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: "'Lufga', sans-serif", fontWeight: 700 },
-  td: { padding: '0.5rem 0.6rem', verticalAlign: 'top', fontFamily: "'Lufga', sans-serif", fontWeight: 400 },
+  th: { padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.65rem', color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 },
+  td: { padding: '0.5rem 0.6rem', verticalAlign: 'top', fontWeight: 400 },
 
   modalBackdrop: {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300,
@@ -787,21 +952,19 @@ const styles = {
   modalHeader: {
     background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.7rem 1rem',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0',
-    fontFamily: "'Lufga', sans-serif",
   },
-  modalClose: { background: 'none', border: 'none', color: 'var(--accent-contrast)', fontSize: '1rem', cursor: 'pointer', fontFamily: "'Lufga', sans-serif" },
+  modalClose: { background: 'none', border: 'none', color: 'var(--accent-contrast)', fontSize: '1rem', cursor: 'pointer' },
   modalFooter: {
     padding: '0.7rem 1rem', borderTop: '1px solid var(--border)', display: 'flex',
     justifyContent: 'flex-end', gap: '0.4rem', background: 'var(--bg-muted)', borderRadius: '0 0 8px 8px',
-    fontFamily: "'Lufga', sans-serif",
   },
 
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  formLabel: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-soft)', fontFamily: "'Lufga', sans-serif" },
+  formLabel: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-soft)' },
   formInput: {
     padding: '0.32rem 0.55rem', border: '1px solid var(--border)', borderRadius: 4,
-    fontSize: '0.75rem', fontFamily: "'Lufga', sans-serif", fontWeight: 500, color: 'var(--text)', width: '100%',
+    fontSize: '0.75rem', fontWeight: 500, color: 'var(--text)', width: '100%',
   },
 };
 

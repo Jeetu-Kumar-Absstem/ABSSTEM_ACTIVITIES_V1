@@ -9,12 +9,14 @@ import BottomSheet from '../components/common/BottomSheet';
 
 
 const RulesPage = () => {
-  const { rules, isAdmin, addRule, updateRule, deleteRule, loadRules } = useApp();
+  const { rules, violations, employees, isAdmin, addRule, updateRule, deleteRule, loadRules, addViolation, updateViolation, deleteViolation, loadViolations } = useApp();
   const { showToast } = useToast();
   const { isMobile } = useViewport();
   const [filter, setFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
+  const [showViolationModal, setShowViolationModal] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
+  const [editingViolation, setEditingViolation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     rule_description: '',
@@ -23,10 +25,18 @@ const RulesPage = () => {
     game: 'General'
   });
 
+  const [violationData, setViolationData] = useState({
+    employee: '',
+    employee_id: '',
+    game: 'General',
+    rule: '',
+    reason: ''
+  });
+
   useEffect(() => {
     const fetchRules = async () => {
       setLoading(true);
-      await loadRules();
+      await Promise.all([loadRules(), loadViolations()]);
       setLoading(false);
     };
     fetchRules();
@@ -118,9 +128,98 @@ const RulesPage = () => {
     setLoading(false);
   };
 
+  const handleReportViolation = async (e) => {
+    e.preventDefault();
+    console.log('[RulesPage] handleReportViolation clicked', violationData);
+
+    if (!isAdmin()) {
+      console.warn('[RulesPage] User is not admin');
+      showToast('Only admins can report violations!', 'error');
+      alert('Error: Only admins can report violations!');
+      return;
+    }
+
+    if (!violationData.employee_id) {
+      console.warn('[RulesPage] No employee selected');
+      showToast('Please select an employee!', 'warning');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log('[RulesPage] Calling reporting function...');
+      const result = editingViolation
+        ? await updateViolation(editingViolation.id, violationData)
+        : await addViolation(violationData);
+
+      console.log('[RulesPage] result:', result);
+
+      if (result.success) {
+        showToast(editingViolation ? 'Violation updated successfully!' : 'Violation reported successfully!', 'success');
+        setShowViolationModal(false);
+        setEditingViolation(null);
+        setViolationData({
+          employee: '',
+          employee_id: '',
+          game: 'General',
+          rule: '',
+          reason: ''
+        });
+        console.log('[RulesPage] Refreshing violations...');
+        await loadViolations();
+      } else {
+        console.error('[RulesPage] addViolation failed:', result.error);
+        showToast(result.error, 'error');
+        alert('Report Failed: ' + result.error);
+      }
+    } catch (err) {
+      console.error('[RulesPage] Error in handleReportViolation:', err);
+      showToast(`Unexpected error: ${err.message}`, 'error');
+      alert('System Error: ' + err.message);
+    } finally {
+      setLoading(false);
+      console.log('[RulesPage] handleReportViolation finished');
+    }
+  };
+
+  const handleEditViolation = (violation) => {
+    if (!isAdmin()) {
+      showToast('Only admins can edit violations!', 'error');
+      return;
+    }
+    setEditingViolation(violation);
+    setViolationData({
+      employee: violation.employee,
+      employee_id: violation.employee_id,
+      game: violation.game || 'General',
+      rule: violation.rule || '',
+      reason: violation.reason || ''
+    });
+    setShowViolationModal(true);
+  };
+
+  const handleDeleteViolation = async (violationId) => {
+    if (!isAdmin()) {
+      showToast('Only admins can delete violations!', 'error');
+      return;
+    }
+    if (!window.confirm('Are you sure you want to delete this violation record?')) return;
+
+    setLoading(true);
+    const result = await deleteViolation(violationId);
+    if (result.success) {
+      showToast('Violation deleted successfully!', 'success');
+      await loadViolations();
+    } else {
+      showToast(result.error, 'error');
+      alert('Delete Failed: ' + result.error);
+    }
+    setLoading(false);
+  };
+
   if (loading && rules.length === 0) {
     return (
-      <div className="clay-card" style={{ textAlign: 'center', padding: '40px', fontFamily: "'Lufga', sans-serif" }}>
+      <div className="clay-card" style={{ textAlign: 'center', padding: '40px' }}>
         <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⏳</div>
         <div style={{ color: 'var(--muted)', fontWeight: 700 }}>Loading rules...</div>
       </div>
@@ -198,6 +297,91 @@ const RulesPage = () => {
     </form>
   );
 
+  const violationFormBody = (
+    <form onSubmit={handleReportViolation}>
+      <div style={{ marginBottom: '12px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+          Employee <span style={{ color: 'var(--danger)' }}>*</span>
+        </label>
+        <select
+          className="clay-select"
+          value={violationData.employee_id}
+          onChange={(e) => {
+            const emp = employees.find(emp => emp.employee_code === e.target.value);
+            setViolationData({ ...violationData, employee_id: e.target.value, employee: emp?.name || '' });
+          }}
+          required
+        >
+          <option value="">-- Select Employee --</option>
+          {employees.map(emp => (
+            <option key={emp.id} value={emp.employee_code}>{emp.name} ({emp.employee_code})</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+            Game
+          </label>
+          <select
+            className="clay-select"
+            value={violationData.game}
+            onChange={(e) => setViolationData({ ...violationData, game: e.target.value })}
+          >
+            <option value="General">General (All)</option>
+            {GAMES.map(g => (
+              <option key={g.id} value={g.name}>{g.icon} {g.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+            Related Rule
+          </label>
+          <select
+            className="clay-select"
+            value={violationData.rule}
+            onChange={(e) => setViolationData({ ...violationData, rule: e.target.value })}
+          >
+            <option value="">-- Select Rule (Optional) --</option>
+            {rules.map(r => (
+              <option key={r.id} value={r.rule_description.substring(0, 50) + '...'}>
+                {r.rule_description.substring(0, 50)}...
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '4px' }}>
+          Violation Reason
+        </label>
+        <textarea
+          className="clay-input"
+          value={violationData.reason}
+          onChange={(e) => setViolationData({ ...violationData, reason: e.target.value })}
+          placeholder="Describe the violation (optional)..."
+          rows="3"
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+        <button type="button" className="clay-btn" onClick={() => {
+          setShowViolationModal(false);
+          setEditingViolation(null);
+        }}>
+          Cancel
+        </button>
+        <button type="submit" className="clay-btn clay-btn-red" disabled={loading}>
+          {loading ? '⏳ Processing...' : editingViolation ? '💾 Update Violation' : '🚩 Report Violation'}
+        </button>
+      </div>
+    </form>
+  );
+
   const ruleActionButtonStyle = {
     padding: '4px 10px',
     fontSize: '0.65rem',
@@ -206,10 +390,10 @@ const RulesPage = () => {
   };
 
   return (
-    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '16px', fontFamily: "'Lufga', sans-serif", fontWeight: 400, color: 'var(--text)' }}>
+    <div className="rules-page" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '16px', fontWeight: 400, color: 'var(--text)' }}>
       <div className="clay-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif", margin: 0, flex: 1, minWidth: 0 }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', margin: 0, flex: 1, minWidth: 0 }}>
             Activity Rules ({rules.length})
           </h2>
           {isAdmin() ? (
@@ -234,18 +418,27 @@ const RulesPage = () => {
               ))}
             </select>
           </label>
-          <button
-            className="clay-btn"
-            style={{ fontSize: '0.7rem' }}
-            onClick={async () => {
-              setLoading(true);
-              await loadRules();
-              setLoading(false);
-              showToast('Rules refreshed!', 'success');
-            }}
-          >
-            🔄 Refresh
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className="clay-btn"
+              style={{ fontSize: '0.7rem' }}
+              onClick={async () => {
+                setLoading(true);
+                await loadRules();
+                setLoading(false);
+                showToast('Rules refreshed!', 'success');
+              }}
+            >
+              🔄 Refresh
+            </button>
+            <button
+              className="clay-btn"
+              style={{ fontSize: '0.7rem', opacity: 0.6 }}
+              onClick={() => showToast('🔔 Notification system test successful!', 'info')}
+            >
+              🧪 Test Toast
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto' }}>
@@ -301,26 +494,96 @@ const RulesPage = () => {
       {/* Right sidebar (collapses below rules on mobile) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>📋 Recent Violations</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div className="clay-soft" style={{ padding: '10px 14px', borderRadius: '16px', borderLeft: '3px solid #e53935' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Lufga', sans-serif" }}>Anil Rawat</div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>Using mobile phone during game</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.6rem', color: 'var(--muted)' }}>
-                <span>25 Apr 2026 · Carrom</span>
-                <span className="clay-badge clay-badge-red">Violation #2</span>
-              </div>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', margin: 0 }}>📋 Recent Violations</h3>
+            <button
+              className="clay-btn"
+              style={{ padding: '2px 8px', fontSize: '0.6rem' }}
+              onClick={async () => {
+                setLoading(true);
+                await loadViolations();
+                setLoading(false);
+                showToast('Violations refreshed!', 'success');
+              }}
+            >
+              🔄
+            </button>
           </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+            {violations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '10px', color: 'var(--muted)', fontSize: '0.7rem' }}>
+                No violations reported yet.
+              </div>
+            ) : (
+              violations.map((v, idx) => {
+                const empViolations = violations.filter(vi => vi.employee_id === v.employee_id);
+                const violationIndex = empViolations.length - empViolations.findIndex(vi => vi.id === v.id);
+
+                return (
+                  <div key={v.id || idx} className="clay-soft" style={{ padding: '10px 14px', borderRadius: '16px', borderLeft: '3px solid #e53935' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.75rem' }}>{v.employee}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: '2px' }}>{v.reason}</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        <span className={`clay-badge ${violationIndex >= 3 ? 'clay-badge-red' : 'clay-badge-orange'}`} style={{ fontSize: '0.55rem' }}>
+                          Violation #{violationIndex}
+                        </span>
+                        {isAdmin() && (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              className="clay-btn"
+                              style={{ ...ruleActionButtonStyle, padding: '2px 6px', minWidth: '24px', minHeight: '24px' }}
+                              onClick={() => handleEditViolation(v)}
+                              title="Edit"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className="clay-btn"
+                              style={{ ...ruleActionButtonStyle, padding: '2px 6px', minWidth: '24px', minHeight: '24px', color: 'var(--danger)' }}
+                              onClick={() => handleDeleteViolation(v.id)}
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.6rem', color: 'var(--muted)' }}>
+                      <span>{v.created_at ? new Date(v.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'} · {v.game}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
           {isAdmin() && (
-            <button className="clay-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+            <button
+              className="clay-btn clay-btn-red"
+              style={{ width: '100%', justifyContent: 'center', marginTop: '12px', fontSize: '0.75rem' }}
+              onClick={() => {
+                setViolationData({
+                  employee: '',
+                  employee_id: '',
+                  game: 'General',
+                  rule: '',
+                  reason: ''
+                });
+                setShowViolationModal(true);
+              }}
+            >
               + Report New Violation
             </button>
           )}
         </div>
 
         <div className="clay-card">
-          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px', fontFamily: "'Lufga', sans-serif" }}>⚙️ Auto-Ban Settings</h3>
+          <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>⚙️ Auto-Ban Settings</h3>
           <div style={{ fontSize: '0.7rem', color: 'var(--text)', marginBottom: '8px' }}>Automatically ban an employee when they accumulate violations:</div>
           <div className="clay-soft" style={{ padding: '8px 12px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
             <span>Ban after <strong>3 violations</strong> (same game)</span>
@@ -364,16 +627,67 @@ const RulesPage = () => {
             maxHeight: '90vh',
             overflowY: 'auto',
             background: 'var(--bg-surface-strong)',
-            fontFamily: "'Lufga', sans-serif",
+
             fontWeight: 400,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', fontFamily: "'Lufga', sans-serif" }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
                 {editingRule ? '✏️ Edit Rule' : '📝 Add New Rule'}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
             </div>
             {formBody}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showViolationModal && isMobile && (
+        <BottomSheet
+          open
+          onClose={() => {
+            setShowViolationModal(false);
+            setEditingViolation(null);
+          }}
+          title={editingViolation ? '✏️ Edit Violation' : '🚩 Report Violation'}
+          icon="📋"
+        >
+          {violationFormBody}
+        </BottomSheet>
+      )}
+
+      {showViolationModal && !isMobile && createPortal(
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="clay" style={{
+            width: '100%',
+            maxWidth: 520,
+            padding: '24px',
+            borderRadius: '32px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            background: 'var(--bg-surface-strong)',
+            fontWeight: 400,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
+                {editingViolation ? '✏️ Edit Violation' : '🚩 Report New Violation'}
+              </h3>
+              <button onClick={() => {
+                setShowViolationModal(false);
+                setEditingViolation(null);
+              }} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
+            </div>
+            {violationFormBody}
           </div>
         </div>,
         document.body

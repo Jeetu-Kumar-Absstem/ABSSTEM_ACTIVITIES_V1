@@ -64,6 +64,9 @@ export const AppProvider = ({ children }) => {
   const [tournamentMatches, setTournamentMatches] = useState([]);
   const [finalResults, setFinalResults] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [allNotifications, setAllNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gamesLoaded, setGamesLoaded] = useState(false); // track if Supabase games have loaded
@@ -447,6 +450,166 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const syncAutoBan = async (employeeId, employeeName) => {
+    if (!employeeId) return;
+
+    try {
+      // 1. Count current violations
+      const { count, error: countErr } = await supabase
+        .from('violations')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId);
+
+      if (countErr) throw countErr;
+
+      // 2. Check for existing active auto-ban
+      // We look for an active ban on "All Games" with the specific "Automatic ban" reason prefix
+      const { data: existingBans, error: banErr } = await supabase
+        .from('bans')
+        .select('id, active, until_date')
+        .eq('employee_id', employeeId)
+        .eq('game', 'All Games')
+        .eq('active', true)
+        .ilike('reason', 'Automatic ban%');
+
+      if (banErr) throw banErr;
+
+      const activeAutoBan = existingBans?.find(b => new Date(b.until_date) > new Date());
+
+      if (count >= 3 && !activeAutoBan) {
+        // Threshold reached and no active auto-ban: Create one
+        const threeMonthsLater = new Date();
+        threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+
+        await addBan({
+          employee: employeeName || employeeId,
+          employee_id: employeeId,
+          game: 'All Games',
+          from_date: new Date().toISOString().split('T')[0],
+          until_date: threeMonthsLater.toISOString().split('T')[0],
+          reason: `Automatic ban after reaching ${count} violations.`,
+        });
+      } else if (count < 3 && activeAutoBan) {
+        // Threshold no longer met but active auto-ban exists: Lift it
+        await liftBan(activeAutoBan.id);
+      }
+    } catch (err) {
+      console.error('[AppContext] syncAutoBan error:', err);
+    }
+  };
+
+  const addViolation = async (violationData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can report violations!' };
+    }
+
+    console.log('[AppContext] addViolation started:', violationData);
+    try {
+      console.log('[AppContext] Inserting into violations table...');
+      const { data, error } = await supabase
+        .from('violations')
+        .insert([{
+          employee: violationData.employee,
+          employee_id: violationData.employee_id,
+          game: violationData.game || 'General',
+          rule: violationData.rule || 'N/A',
+          reason: violationData.reason || 'No reason provided',
+          violation_date: new Date().toISOString(),
+          created_by: currentUser?.user_metadata?.name || 'Admin',
+          status: 'open'
+        }])
+        .select();
+
+      if (error) {
+        console.error('[AppContext] Supabase violation insert error:', error);
+        return { success: false, error: `Database error: ${error.message}. Please ensure the "violations" table exists and you have permissions.` };
+      }
+
+      await syncAutoBan(violationData.employee_id, violationData.employee);
+      await loadViolations();
+      return { success: true, data: data[0] };
+    } catch (err) {
+      console.error('[AppContext] Uncaught error in addViolation:', err);
+      return { success: false, error: `System error: ${err.message}` };
+    }
+  };
+
+  const updateViolation = async (violationId, violationData) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can update violations!' };
+    }
+
+    try {
+      // Get old data to handle employee changes
+      const { data: oldViolation } = await supabase
+        .from('violations')
+        .select('employee_id, employee')
+        .eq('id', violationId)
+        .single();
+
+      const { error } = await supabase
+        .from('violations')
+        .update({
+          employee: violationData.employee,
+          employee_id: violationData.employee_id,
+          game: violationData.game,
+          rule: violationData.rule,
+          reason: violationData.reason,
+          status: violationData.status || 'open',
+          updated_at: new Date().toISOString()
+        })
+        .match({ id: violationId });
+
+      if (error) throw error;
+
+      // Sync for new employee
+      await syncAutoBan(violationData.employee_id, violationData.employee);
+
+      // If employee changed, sync for old employee too
+      if (oldViolation && oldViolation.employee_id !== violationData.employee_id) {
+        await syncAutoBan(oldViolation.employee_id, oldViolation.employee);
+      }
+
+      await loadViolations();
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating violation:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteViolation = async (violationId) => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Only admins can delete violations!' };
+    }
+
+    try {
+      // Get employee info before deleting
+      const { data: violation } = await supabase
+        .from('violations')
+        .select('employee_id, employee')
+        .eq('id', violationId)
+        .single();
+
+      const { error } = await supabase
+        .from('violations')
+        .delete()
+        .match({ id: violationId });
+
+      if (error) throw error;
+
+      if (violation) {
+        await syncAutoBan(violation.employee_id, violation.employee);
+      }
+
+      await loadViolations();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting violation:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   // ── Events / Tournaments / Leaderboard loaders ──────────────────────────
   const loadEvents = async () => {
     try {
@@ -613,6 +776,139 @@ const loadTournamentMatches = async () => {
     }
   };
 
+  const loadNotifications = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      // Fetch notifications joined with logs for the current user
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          *,
+          notification_logs!inner (
+            status,
+            user_id
+          )
+        `)
+        .eq('notification_logs.user_id', user.id)
+        .neq('notification_logs.status', 'deleted')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setNotifications(data || []);
+      setUnreadNotificationsCount((data || []).filter(n => n.notification_logs?.[0]?.status === 'sent').length);
+    } catch (err) {
+      console.error('Error loading notifications:', err);
+    }
+  };
+
+  const loadAllNotifications = async () => {
+    if (!isAdmin()) return;
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAllNotifications(data || []);
+    } catch (err) {
+      console.error('Error loading all notifications:', err);
+    }
+  };
+
+  const deleteNotification = async (notificationId) => {
+    if (!isAdmin()) return { success: false, error: 'Unauthorized' };
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      await loadAllNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteMultipleNotifications = async (notificationIds) => {
+    if (!isAdmin() || !notificationIds.length) return { success: false, error: 'Unauthorized or empty list' };
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (error) throw error;
+      await loadAllNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting multiple notifications:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('notification_logs')
+        .update({ status: 'opened', updated_at: new Date().toISOString() })
+        .match({ notification_id: notificationId, user_id: user.id });
+
+      if (error) throw error;
+      await loadNotifications();
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const deleteNotificationLog = async (notificationId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('notification_logs')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .match({ notification_id: notificationId, user_id: user.id });
+
+      if (error) throw error;
+      await loadNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting notification log:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteMultipleNotificationLogs = async (notificationIds) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !notificationIds.length) return;
+
+    try {
+      const { error } = await supabase
+        .from('notification_logs')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .in('notification_id', notificationIds)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      await loadNotifications();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting multiple notification logs:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   useEffect(() => {
     loadGames();
     loadEmployees();
@@ -629,7 +925,9 @@ const loadTournamentMatches = async () => {
     loadTournamentMatches();
     loadFinalResults();
     loadLeaderboard();
-    
+    loadNotifications();
+    loadAllNotifications();
+
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUser(data.user || null);
     });
@@ -638,8 +936,41 @@ const loadTournamentMatches = async () => {
       setCurrentUser(session?.user || null);
     });
 
+    const refreshOnPush = () => {
+      loadNotifications();
+    };
+
+    const handleNotificationClick = () => {
+      console.log('AppContext: Notification click detected, redirecting...');
+      setActiveTab('notifications');
+      loadNotifications();
+    };
+
+    // Handle cold start redirection with persistence
+    const checkRedirect = () => {
+      const isPending = localStorage.getItem('pending_notif_redirect') === 'true';
+      if (isPending) {
+        console.log('AppContext: Redirecting to notifications due to pending flag');
+        setActiveTab('notifications');
+        loadNotifications();
+        localStorage.removeItem('pending_notif_redirect');
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately and at various stages of app initialization
+    checkRedirect();
+    const timers = [100, 500, 1000, 2000, 3000].map(ms => setTimeout(checkRedirect, ms));
+
+    window.addEventListener('notification-received', refreshOnPush);
+    window.addEventListener('notification-clicked', handleNotificationClick);
+
     return () => {
       authListener?.subscription?.unsubscribe?.();
+      timers.forEach(clearTimeout);
+      window.removeEventListener('notification-received', refreshOnPush);
+      window.removeEventListener('notification-clicked', handleNotificationClick);
     };
   }, []);
 
@@ -2499,6 +2830,27 @@ const loadTournamentMatches = async () => {
   };
 
   // ── Derived helpers for Events / Tournaments / Leaderboard ──────────────
+  const getOngoingEvents = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return events
+      .filter(e => {
+        if (!e.is_published) return false;
+        if (e.event_status === 'cancelled' || e.event_status === 'completed') return false;
+        const start = e.start_date ? new Date(e.start_date) : null;
+        if (!start) return false;
+        start.setHours(0, 0, 0, 0);
+        const end = e.end_date ? new Date(e.end_date) : null;
+        if (end) end.setHours(0, 0, 0, 0);
+
+        if (end) {
+          return start <= today && end >= today;
+        }
+        return start.getTime() === today.getTime();
+      })
+      .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
+  };
+
   const getUpcomingEvents = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -2508,9 +2860,8 @@ const loadTournamentMatches = async () => {
         if (e.event_status === 'cancelled' || e.event_status === 'completed') return false;
         const start = e.start_date ? new Date(e.start_date) : null;
         if (!start) return false;
-        const end = e.end_date ? new Date(e.end_date) : null;
-        if (end && end < today) return false;
-        return start >= today || (end && end >= today);
+        start.setHours(0, 0, 0, 0);
+        return start > today;
       })
       .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
   };
@@ -2521,10 +2872,16 @@ const loadTournamentMatches = async () => {
     return events
       .filter(e => {
         if (e.event_status === 'completed') return true;
-        const end = e.end_date ? new Date(e.end_date) : null;
-        if (end && end < today) return true;
+        if (e.event_status === 'cancelled') return false;
         const start = e.start_date ? new Date(e.start_date) : null;
-        return start && start < today;
+        if (!start) return false;
+        start.setHours(0, 0, 0, 0);
+        const end = e.end_date ? new Date(e.end_date) : null;
+        if (end) {
+          end.setHours(0, 0, 0, 0);
+          return end < today;
+        }
+        return start < today;
       })
       .sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
   };
@@ -2648,6 +3005,9 @@ const loadTournamentMatches = async () => {
     setRules,
     violations,
     setViolations,
+    addViolation,
+    updateViolation,
+    deleteViolation,
     loading,
     currentDate,
     setCurrentDate,
@@ -2723,6 +3083,7 @@ const loadTournamentMatches = async () => {
     recordMatchResult,
     declareFinalResults,
     getUpcomingEvents,
+    getOngoingEvents,
     getPastEvents,
     getTournamentById,
     getMatchesByTournament,
@@ -2732,6 +3093,16 @@ const loadTournamentMatches = async () => {
     getEmployeeName,
     getCertificateLog,
     logCertificateIssuance,
+    notifications,
+    allNotifications,
+    unreadNotificationsCount,
+    loadNotifications,
+    loadAllNotifications,
+    markNotificationAsRead,
+    deleteNotificationLog,
+    deleteMultipleNotificationLogs,
+    deleteNotification,
+    deleteMultipleNotifications,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

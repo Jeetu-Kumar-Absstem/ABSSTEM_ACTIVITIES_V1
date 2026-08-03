@@ -1,0 +1,3 @@
+- [ ] Copy `absstem_game_light_logo.png` to Android resources
+- [ ] Update `AndroidManifest.xml` to use the new logo
+- [ ] Verify changes

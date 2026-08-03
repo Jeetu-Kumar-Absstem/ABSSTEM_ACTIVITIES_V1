@@ -15,7 +15,7 @@ const ProfileIcon = ({ user, onLogout }) => {
   const [userName, setUserName] = useState('');
   const dropdownRef = useRef(null);
   const { showToast } = useToast();
-  const { setActiveTab, isAdmin } = useApp();
+  const { setActiveTab, isAdmin, unreadNotificationsCount } = useApp();
   const { isMobile } = useViewport();
 
   useEffect(() => {
@@ -53,6 +53,10 @@ const ProfileIcon = ({ user, onLogout }) => {
   const handleMyProfile = () => {
     setShowDropdown(false);
     setActiveTab('profile');
+  };
+  const handleNotifications = () => {
+    setShowDropdown(false);
+    setActiveTab('notifications');
   };
   const handleAdmin = () => {
     setShowDropdown(false);
@@ -102,12 +106,51 @@ const ProfileIcon = ({ user, onLogout }) => {
         </button>
         <button
           type="button"
+          onClick={handleNotifications}
+          className="drawer-item"
+          style={{ width: '100%', textAlign: 'left', position: 'relative' }}
+        >
+          <span className="drawer-item-icon" aria-hidden>🔔</span>
+          <span className="drawer-item-label">Notifications</span>
+          {unreadNotificationsCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'var(--danger)',
+              color: 'white',
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              padding: '2px 6px',
+              borderRadius: '10px',
+              minWidth: '18px',
+              textAlign: 'center'
+            }}>
+              {unreadNotificationsCount}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
           onClick={handleSettings}
           className="drawer-item"
           style={{ width: '100%', textAlign: 'left' }}
         >
           <span className="drawer-item-icon" aria-hidden>⚙️</span>
           <span className="drawer-item-label">Settings</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setShowDropdown(false);
+            setActiveTab('reports');
+          }}
+          className="drawer-item"
+          style={{ width: '100%', textAlign: 'left' }}
+        >
+          <span className="drawer-item-icon" aria-hidden>📊</span>
+          <span className="drawer-item-label">Reports</span>
         </button>
       </div>
 
