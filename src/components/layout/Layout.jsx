@@ -160,7 +160,7 @@ const Layout = ({ children, user, onLogout }) => {
             style={{
               margin: 0,
               fontSize: '13px',
-              color: 'var(--text)',
+              color: 'rgba(255,255,255,0.7)',
               fontWeight: 400,
             }}
           >
@@ -180,29 +180,35 @@ const Layout = ({ children, user, onLogout }) => {
               href="https://absstem.com/privacy-policy"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'var(--text-soft)', textDecoration: 'none', fontWeight: 600 }}
+              style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none', fontWeight: 600 }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#4da6ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
             >
               Privacy Policy
             </a>
-            <span className="app-footer-sep" style={{ color: 'var(--muted)', fontWeight: 400 }}>
+            <span className="app-footer-sep" style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
               |
             </span>
             <a
               href="https://absstem.com/terms-condition"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'var(--text-soft)', textDecoration: 'none', fontWeight: 600 }}
+              style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none', fontWeight: 600 }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#4da6ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
             >
               Terms &amp; Conditions
             </a>
-            <span className="app-footer-sep" style={{ color: 'var(--muted)', fontWeight: 400 }}>
+            <span className="app-footer-sep" style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
               |
             </span>
             <a
               href="https://absstem.com"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'var(--text-soft)', textDecoration: 'none', fontWeight: 600 }}
+              style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none', fontWeight: 600 }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#4da6ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
             >
               absstem.com
             </a>
