@@ -240,36 +240,6 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
 
-      // Check if Employee ID already exists
-      const { data: existingEmp, error: empCheckError } = await supabase
-        .from('employees')
-        .select('employee_code')
-        .eq('employee_code', empId)
-        .maybeSingle();
-
-      if (empCheckError) throw empCheckError;
-
-      if (existingEmp) {
-        showToast('Employee ID already exists. Please login instead.', 'error');
-        setLoading(false);
-        return;
-      }
-
-      // Check if email already exists
-      const { data: existingEmail, error: emailCheckError } = await supabase
-        .from('employees')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (emailCheckError) throw emailCheckError;
-
-      if (existingEmail) {
-        showToast('This email is already registered. Please login instead.', 'error');
-        setLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
