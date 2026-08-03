@@ -159,6 +159,10 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
     setShowDropdown(false);
     setActiveTab('admin');
   };
+  const handleNotifications = () => {
+    setShowDropdown(false);
+    setActiveTab('notifications');
+  };
   const handleSettings = () => {
     setShowDropdown(false);
     setActiveTab('settings');
@@ -442,6 +446,14 @@ const Sidebar = ({ defaultCollapsed = false, user: propUser, onLogout, onToggle 
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     👤 My Profile
+                  </div>
+                  <div
+                    onClick={handleNotifications}
+                    style={menuItemStyle}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--drawer-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    🔔 Notifications
                   </div>
                   <div
                     onClick={handleSettings}
