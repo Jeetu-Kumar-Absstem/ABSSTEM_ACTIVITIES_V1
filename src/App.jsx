@@ -11,11 +11,16 @@ import notificationService from './services/NotificationService';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import AccountDeletionPage from './pages/AccountDeletionPage';
 
 const isPrivacyPolicyRoute =
   typeof window !== 'undefined' &&
   (window.location.pathname === '/privacy-policy' ||
     window.location.hash === '#/privacy-policy');
+const isAccountDeletionRoute =
+  typeof window !== 'undefined' &&
+  (window.location.pathname === '/account-deletion' ||
+    window.location.hash === '#/account-deletion');
 
 // Lazy Loaded Pages
 const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
@@ -139,6 +144,10 @@ function App() {
     return <PrivacyPolicy />;
   }
 
+  if (isAccountDeletionRoute) {
+    return <AccountDeletionPage />;
+  }
+
   // Initial authentication loading
   if (loading || !minLoadingFinished) {
     return <PageLoader />;
@@ -154,6 +163,11 @@ function App() {
               <Route
                 path="/privacy-policy"
                 element={<PrivacyPolicy />}
+              />
+
+              <Route
+                path="/account-deletion"
+                element={<AccountDeletionPage />}
               />
 
               {/* Password Reset */}
