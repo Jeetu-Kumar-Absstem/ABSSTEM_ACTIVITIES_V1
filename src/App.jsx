@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import absstemLogo from './assets/absstem_game_light_logo.png';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
@@ -15,17 +15,16 @@ import AccountDeletionPage from './pages/AccountDeletionPage';
 
 const isPrivacyPolicyRoute =
   typeof window !== 'undefined' &&
-  (window.location.pathname === '/privacy-policy' ||
-    window.location.hash === '#/privacy-policy');
+  window.location.pathname === '/privacy-policy';
 const isAccountDeletionRoute =
   typeof window !== 'undefined' &&
-  (window.location.pathname === '/account-deletion' ||
-    window.location.hash === '#/account-deletion');
+  window.location.pathname === '/account-deletion';
 
 // Lazy Loaded Pages
 const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const VerifyEmailOtp = lazy(() => import('./pages/VerifyEmailOtp'));
 
 // Loading Component
 const PageLoader = () => (
@@ -67,6 +66,43 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [minLoadingFinished, setMinLoadingFinished] = useState(false);
+  const isOtpRegistrationFlow = () =>
+    sessionStorage.getItem('pending_otp_registration') === 'true' ||
+    !!sessionStorage.getItem('pending_otp_context');
+
+  const verifyActiveEmployeeAccount = async (authUser) => {
+    if (!authUser?.email) return false;
+
+    const email = authUser.email.trim().toLowerCase();
+    const empId = String(
+      authUser?.user_metadata?.emp_id ||
+      authUser?.user_metadata?.employee_code ||
+      authUser?.user_metadata?.empId ||
+      ''
+    ).trim().toUpperCase();
+
+    const query = empId
+      ? supabase
+          .from('employees')
+          .select('employee_code, is_active, email')
+          .or(`email.eq.${email},employee_code.eq.${empId}`)
+      : supabase
+          .from('employees')
+          .select('employee_code, is_active, email')
+          .eq('email', email);
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error || !data || data.is_active === false) {
+      return false;
+    }
+
+    if (empId && String(data.employee_code || '').toUpperCase() !== empId) {
+      return false;
+    }
+
+    return true;
+  };
 
   // Initialize Local Notifications only after user logs in
   useEffect(() => {
@@ -90,13 +126,31 @@ function App() {
           return;
         }
 
+        if (session?.user && isOtpRegistrationFlow()) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         if (session?.user && !session.user.email_confirmed_at) {
           await supabase.auth.signOut();
           setUser(null);
-        } else {
-          setUser(session?.user || null);
+          setLoading(false);
+          return;
         }
 
+        if (session?.user) {
+          const isEmployeeActive = await verifyActiveEmployeeAccount(session.user);
+          if (!isEmployeeActive) {
+            await supabase.auth.signOut();
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+        }
+
+        setUser(session?.user || null);
         setLoading(false);
       })
       .catch((error) => {
@@ -118,6 +172,12 @@ function App() {
         return;
       }
 
+      if (event === 'SIGNED_IN' && isOtpRegistrationFlow()) {
+        supabase.auth.signOut();
+        setUser(null);
+        return;
+      }
+
       if (
         event === 'SIGNED_IN' &&
         session?.user &&
@@ -125,6 +185,20 @@ function App() {
       ) {
         supabase.auth.signOut();
         setUser(null);
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        void (async () => {
+          const isEmployeeActive = await verifyActiveEmployeeAccount(session.user);
+          if (!isEmployeeActive) {
+            await supabase.auth.signOut();
+            setUser(null);
+            return;
+          }
+
+          setUser(session.user);
+        })();
         return;
       }
 
@@ -154,7 +228,7 @@ function App() {
   }
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <AppProvider key={user?.id || 'guest'}>
         <ToastProvider>
           <Suspense fallback={<PageLoader />}>
@@ -174,6 +248,25 @@ function App() {
               <Route
                 path="/reset-password"
                 element={<ResetPasswordPage />}
+              />
+
+              <Route
+                path="/verify-email-otp"
+                element={<VerifyEmailOtp />}
+              />
+
+              <Route
+                path="/login"
+                element={
+                  user ? (
+                    <ActivityPlanner
+                      user={user}
+                      onLogout={handleLogout}
+                    />
+                  ) : (
+                    <LoginPage onLogin={handleLogin} />
+                  )
+                }
               />
 
               {/* Main App */}
@@ -202,7 +295,7 @@ function App() {
           <Toast />
         </ToastProvider>
       </AppProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 

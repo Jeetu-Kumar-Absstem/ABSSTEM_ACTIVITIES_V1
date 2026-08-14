@@ -1,8 +1,10 @@
 // src/pages/LoginPage.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import absstemLogo from '../assets/absstem_game_light_logo.png';
 import { supabase } from '../utils/supabase';
 import { useToast } from '../context/ToastContext';
+import { otpService } from '../services/otp/otpService';
 import { validateEmpId, formatEmpId, validatePassword } from '../utils/validators';
 import { Check } from 'lucide-react';
 
@@ -25,6 +27,7 @@ const EyeOffIcon = () => (
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
 
 const LoginPage = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [empId, setEmpId] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -150,6 +153,18 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
 
+      const { data: activeEmp, error: activeEmpError } = await supabase
+        .from('employees')
+        .select('employee_code, is_active')
+        .eq('employee_code', empId)
+        .maybeSingle();
+
+      if (activeEmpError || !activeEmp || activeEmp.is_active === false) {
+        await supabase.auth.signOut();
+        setLoginError('This account is no longer active. Please contact support.');
+        return;
+      }
+
       // Save or remove from multi-account store
       if (rememberMe) {
         const accounts = getSavedAccounts();
@@ -209,6 +224,7 @@ const LoginPage = ({ onLogin }) => {
     setLoading(true);
     try {
       const email = personalEmail.trim().toLowerCase();
+      sessionStorage.setItem('pending_otp_registration', 'true');
 
       // Check if Employee ID already exists in employees table
       const { data: existingEmp, error: empCheckError } = await supabase
@@ -237,6 +253,7 @@ const LoginPage = ({ onLogin }) => {
       if (existingEmail) {
         showToast('This email is already registered. Please login instead.', 'error');
         setLoading(false);
+        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
@@ -244,7 +261,6 @@ const LoginPage = ({ onLogin }) => {
         email,
         password,
         options: {
-          emailRedirectTo: `${APP_URL}/`,
           data: {
             name: name.trim(),
             emp_id: empId,
@@ -260,20 +276,38 @@ const LoginPage = ({ onLogin }) => {
         showToast('This email is already registered. Please login instead.', 'error');
         setIsRegister(false);
         setLoading(false);
+        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
-      // Sign out immediately — prevent auto-login before email is confirmed
-      await supabase.auth.signOut();
-      showToast('We sent a confirmation email. Please confirm it before logging in.', 'success');
+      if (!data.user?.id) {
+        throw new Error('Account creation failed. Please try again.');
+      }
 
-      setIsRegister(false);
-      setName('');
-      setEmpId('');
-      setPassword('');
-      setConfirmPassword('');
-      setPersonalEmail('');
-      setDepartment('');
+      const otpResult = await otpService.sendOtp(data.user.id, email);
+      if (!otpResult.success) {
+        throw new Error(otpResult.error || 'Unable to send verification code.');
+      }
+
+      sessionStorage.setItem(
+        'pending_otp_context',
+        JSON.stringify({
+          userId: data.user.id,
+          email,
+        })
+      );
+
+      await supabase.auth.signOut();
+
+      navigate('/verify-email-otp', {
+        replace: true,
+        state: {
+          userId: data.user.id,
+          email,
+          autoSend: false,
+        },
+      });
+      showToast('Account created. We are sending your verification code.', 'success');
 
     } catch (error) {
       const msg = error.message || '';
@@ -287,6 +321,7 @@ const LoginPage = ({ onLogin }) => {
       } else {
         showToast(msg || 'Registration failed. Please try again.', 'error');
       }
+      sessionStorage.removeItem('pending_otp_registration');
     } finally {
       setLoading(false);
     }
