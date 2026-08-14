@@ -66,9 +66,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [minLoadingFinished, setMinLoadingFinished] = useState(false);
-  const isOtpRegistrationFlow = () =>
-    sessionStorage.getItem('pending_otp_registration') === 'true' ||
-    !!sessionStorage.getItem('pending_otp_context');
 
   const verifyActiveEmployeeAccount = async (authUser) => {
     if (!authUser?.email) return false;
@@ -126,13 +123,6 @@ function App() {
           return;
         }
 
-        if (session?.user && isOtpRegistrationFlow()) {
-          await supabase.auth.signOut();
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-
         if (session?.user && !session.user.email_confirmed_at) {
           await supabase.auth.signOut();
           setUser(null);
@@ -169,12 +159,6 @@ function App() {
         event === 'SIGNED_IN' &&
         window.location.pathname === '/reset-password'
       ) {
-        return;
-      }
-
-      if (event === 'SIGNED_IN' && isOtpRegistrationFlow()) {
-        supabase.auth.signOut();
-        setUser(null);
         return;
       }
 

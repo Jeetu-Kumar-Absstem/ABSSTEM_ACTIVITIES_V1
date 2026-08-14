@@ -56,6 +56,29 @@ const LoginPage = ({ onLogin }) => {
 
   const { showToast } = useToast();
 
+  useEffect(() => {
+    const storedContext = sessionStorage.getItem('pending_otp_context');
+    if (!storedContext || isForgotPassword) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(storedContext);
+      if (parsed?.userId && parsed?.email) {
+        navigate('/verify-email-otp', {
+          replace: true,
+          state: {
+            userId: parsed.userId,
+            email: parsed.email,
+            autoSend: false,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Failed to restore pending OTP context:', error);
+    }
+  }, [isForgotPassword, navigate]);
+
   const getSavedAccounts = () => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -224,7 +247,6 @@ const LoginPage = ({ onLogin }) => {
     setLoading(true);
     try {
       const email = personalEmail.trim().toLowerCase();
-      sessionStorage.setItem('pending_otp_registration', 'true');
 
       // Check if Employee ID already exists in employees table
       const { data: existingEmp, error: empCheckError } = await supabase
@@ -253,7 +275,6 @@ const LoginPage = ({ onLogin }) => {
       if (existingEmail) {
         showToast('This email is already registered. Please login instead.', 'error');
         setLoading(false);
-        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
@@ -276,7 +297,6 @@ const LoginPage = ({ onLogin }) => {
         showToast('This email is already registered. Please login instead.', 'error');
         setIsRegister(false);
         setLoading(false);
-        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
@@ -321,7 +341,6 @@ const LoginPage = ({ onLogin }) => {
       } else {
         showToast(msg || 'Registration failed. Please try again.', 'error');
       }
-      sessionStorage.removeItem('pending_otp_registration');
     } finally {
       setLoading(false);
     }
