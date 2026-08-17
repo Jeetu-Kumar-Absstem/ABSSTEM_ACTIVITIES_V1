@@ -247,6 +247,7 @@ const LoginPage = ({ onLogin }) => {
     setLoading(true);
     try {
       const email = personalEmail.trim().toLowerCase();
+      sessionStorage.setItem('pending_otp_registration', 'true');
 
       // Check if Employee ID already exists in employees table
       const { data: existingEmp, error: empCheckError } = await supabase
@@ -260,6 +261,7 @@ const LoginPage = ({ onLogin }) => {
       if (existingEmp) {
         showToast('Employee ID already exists. Please login instead.', 'error');
         setLoading(false);
+        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
@@ -275,6 +277,7 @@ const LoginPage = ({ onLogin }) => {
       if (existingEmail) {
         showToast('This email is already registered. Please login instead.', 'error');
         setLoading(false);
+        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
@@ -297,6 +300,7 @@ const LoginPage = ({ onLogin }) => {
         showToast('This email is already registered. Please login instead.', 'error');
         setIsRegister(false);
         setLoading(false);
+        sessionStorage.removeItem('pending_otp_registration');
         return;
       }
 
@@ -341,6 +345,7 @@ const LoginPage = ({ onLogin }) => {
       } else {
         showToast(msg || 'Registration failed. Please try again.', 'error');
       }
+      sessionStorage.removeItem('pending_otp_registration');
     } finally {
       setLoading(false);
     }

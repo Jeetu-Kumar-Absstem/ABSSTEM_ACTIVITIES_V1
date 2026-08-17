@@ -49,6 +49,7 @@ export const VerifyEmailOtp: React.FC = () => {
 
   const handleVerified = () => {
     sessionStorage.removeItem('pending_otp_context');
+    sessionStorage.removeItem('pending_otp_registration');
     showToast('Your account has been verified! Please login with your credentials.', 'success');
     void supabase.auth.signOut().finally(() => {
       navigate('/', { replace: true, state: { verifiedEmail: email } });
@@ -57,6 +58,7 @@ export const VerifyEmailOtp: React.FC = () => {
 
   const handleBack = () => {
     sessionStorage.removeItem('pending_otp_context');
+    sessionStorage.removeItem('pending_otp_registration');
     void supabase.auth.signOut();
     navigate('/login', { replace: true });
   };

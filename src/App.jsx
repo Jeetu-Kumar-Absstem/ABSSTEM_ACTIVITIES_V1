@@ -67,6 +67,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [minLoadingFinished, setMinLoadingFinished] = useState(false);
 
+  const isPendingOtpRegistration = () =>
+    sessionStorage.getItem('pending_otp_registration') === 'true';
+
   const verifyActiveEmployeeAccount = async (authUser) => {
     if (!authUser?.email) return false;
 
@@ -123,6 +126,13 @@ function App() {
           return;
         }
 
+        if (session?.user && isPendingOtpRegistration()) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         if (session?.user && !session.user.email_confirmed_at) {
           await supabase.auth.signOut();
           setUser(null);
@@ -159,6 +169,12 @@ function App() {
         event === 'SIGNED_IN' &&
         window.location.pathname === '/reset-password'
       ) {
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && isPendingOtpRegistration()) {
+        supabase.auth.signOut();
+        setUser(null);
         return;
       }
 
