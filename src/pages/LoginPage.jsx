@@ -43,6 +43,7 @@ const LoginPage = ({ onLogin }) => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [pendingVerificationAccount, setPendingVerificationAccount] = useState(null);
 
   // Show/hide password toggles
   const [showPassword, setShowPassword] = useState(false);
@@ -119,6 +120,7 @@ const LoginPage = ({ onLogin }) => {
     const formatted = formatEmpId(rawValue);
     setEmpId(formatted);
     setLoginError('');
+    setPendingVerificationAccount(null);
   };
 
   const handleLogin = async (e) => {
@@ -136,6 +138,7 @@ const LoginPage = ({ onLogin }) => {
     }
 
     setLoading(true);
+    setPendingVerificationAccount(null);
     try {
       // Look up real email by employee_code
       const { data: empData, error: empError } = await supabase
@@ -170,10 +173,29 @@ const LoginPage = ({ onLogin }) => {
         return;
       }
 
-      if (!data?.user?.email_confirmed_at) {
-        await supabase.auth.signOut();
-        setLoginError('Please confirm your email address before logging in.');
-        return;
+      if (data?.user?.user_metadata?.otp_verified !== true) {
+        const otpStatus = await otpService.checkOtpStatus(data.user.id);
+
+        if (!otpStatus.success) {
+          await supabase.auth.signOut();
+          setLoginError('Please verify your account.');
+          return;
+        }
+
+        if (otpStatus.pending) {
+          await supabase.auth.signOut();
+          setPendingVerificationAccount({
+            userId: data.user.id,
+            email: empData.email,
+          });
+          setLoginError('First verify your account.');
+          return;
+        }
+
+        // OTP record is gone, so the account is verified even if auth metadata is stale.
+        await supabase.auth.updateUser({
+          data: { otp_verified: true },
+        });
       }
 
       const { data: activeEmp, error: activeEmpError } = await supabase
@@ -210,6 +232,65 @@ const LoginPage = ({ onLogin }) => {
 
     } catch (error) {
       setLoginError(error.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resumePendingVerification = async (userId, email) => {
+    if (!userId || !email) {
+      return false;
+    }
+
+    const otpStatus = await otpService.checkOtpStatus(userId);
+    if (!otpStatus.success || !otpStatus.pending) {
+      return false;
+    }
+
+    const otpResult = await otpService.sendOtp(userId, email);
+    if (!otpResult.success) {
+      throw new Error(otpResult.error || 'Unable to send verification code.');
+    }
+
+    sessionStorage.setItem(
+      'pending_otp_context',
+      JSON.stringify({
+        userId,
+        email,
+      })
+    );
+    sessionStorage.setItem('pending_otp_registration', 'true');
+
+    navigate('/verify-email-otp', {
+      replace: true,
+      state: {
+        userId,
+        email,
+        autoSend: false,
+      },
+    });
+
+    showToast('This account is not verified yet. We sent a new verification code.', 'warning');
+    return true;
+  };
+
+  const handleVerifyPendingAccount = async () => {
+    if (!pendingVerificationAccount?.userId || !pendingVerificationAccount?.email) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const resumed = await resumePendingVerification(
+        pendingVerificationAccount.userId,
+        pendingVerificationAccount.email
+      );
+
+      if (!resumed) {
+        setLoginError('Unable to send verification code. Please try again.');
+      }
+    } catch (error) {
+      setLoginError(error.message || 'Unable to send verification code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -252,14 +333,22 @@ const LoginPage = ({ onLogin }) => {
       // Check if Employee ID already exists in employees table
       const { data: existingEmp, error: empCheckError } = await supabase
         .from('employees')
-        .select('employee_code')
+        .select('employee_code, email, user_id')
         .eq('employee_code', empId)
         .maybeSingle();
 
       if (empCheckError) throw empCheckError;
 
       if (existingEmp) {
-        showToast('Employee ID already exists. Please login instead.', 'error');
+        const resumed = await resumePendingVerification(
+          existingEmp.user_id,
+          existingEmp.email || email
+        );
+        if (resumed) {
+          return;
+        }
+
+        showToast('This Employee ID is already registered and verified. Please login instead.', 'error');
         setLoading(false);
         sessionStorage.removeItem('pending_otp_registration');
         return;
@@ -268,14 +357,22 @@ const LoginPage = ({ onLogin }) => {
       // Check if email already exists
       const { data: existingEmail, error: emailCheckError } = await supabase
         .from('employees')
-        .select('email')
+        .select('email, employee_code, user_id')
         .eq('email', email)
         .maybeSingle();
 
       if (emailCheckError) throw emailCheckError;
 
       if (existingEmail) {
-        showToast('This email is already registered. Please login instead.', 'error');
+        const resumed = await resumePendingVerification(
+          existingEmail.user_id,
+          existingEmail.email || email
+        );
+        if (resumed) {
+          return;
+        }
+
+        showToast('This email is already registered and verified. Please login instead.', 'error');
         setLoading(false);
         sessionStorage.removeItem('pending_otp_registration');
         return;
@@ -289,6 +386,7 @@ const LoginPage = ({ onLogin }) => {
             name: name.trim(),
             emp_id: empId,
             department: department || 'General',
+            otp_verified: false,
           },
         },
       });
@@ -331,7 +429,7 @@ const LoginPage = ({ onLogin }) => {
           autoSend: false,
         },
       });
-      showToast('Account created. We are sending your verification code.', 'success');
+      showToast('Verification code sent. Please verify your OTP to continue.', 'success');
 
     } catch (error) {
       const msg = error.message || '';
@@ -925,6 +1023,26 @@ const LoginPage = ({ onLogin }) => {
                 {loginError}
               </span>
             </div>
+          )}
+          {!isRegister && pendingVerificationAccount && (
+            <button
+              type="button"
+              onClick={handleVerifyPendingAccount}
+              disabled={loading}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#1a3c6e',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                padding: 0,
+                marginBottom: '12px',
+                textDecoration: 'underline',
+              }}
+            >
+              First verify your account
+            </button>
           )}
 
           <button

@@ -24,6 +24,13 @@ export interface VerifyOtpResponse {
   remainingAttempts?: number;
 }
 
+export interface OtpStatusResponse {
+  success: boolean;
+  pending?: boolean;
+  expiresAt?: string | null;
+  error?: string;
+}
+
 export interface OtpServiceConfig {
   supabaseUrl?: string;
   supabaseAnonKey?: string;

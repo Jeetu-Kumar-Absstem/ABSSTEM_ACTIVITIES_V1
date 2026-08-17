@@ -112,6 +112,9 @@ Deno.serve(async (req) => {
     // Hash MATCHES! Server-side verify account in Supabase Auth
     const { error: updateAuthError } = await supabase.auth.admin.updateUserById(user_id, {
       email_confirm: true,
+      user_metadata: {
+        otp_verified: true,
+      },
     });
 
     if (updateAuthError) {

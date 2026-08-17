@@ -1,5 +1,5 @@
 import { supabase, supabaseUrl, supabaseAnonKey } from '../../utils/supabase';
-import { SendOtpPayload, SendOtpResponse, VerifyOtpPayload, VerifyOtpResponse } from './types';
+import { OtpStatusResponse, SendOtpPayload, SendOtpResponse, VerifyOtpPayload, VerifyOtpResponse } from './types';
 
 class OtpService {
   private async invokeEdgeFunction<T>(functionName: string, body: unknown): Promise<{ ok: boolean; status: number; data: T | null; error: string | null }> {
@@ -120,6 +120,33 @@ class OtpService {
       return {
         success: false,
         error: 'We couldn\'t verify your code. Please check your connection and try again.',
+      };
+    }
+  }
+
+  async checkOtpStatus(userId: string): Promise<OtpStatusResponse> {
+    try {
+      const result = await this.invokeEdgeFunction<OtpStatusResponse>('check-otp-status', {
+        user_id: userId,
+      });
+
+      if (!result.ok) {
+        return {
+          success: false,
+          error: result.error || 'Failed to check verification status.',
+        };
+      }
+
+      return {
+        success: true,
+        pending: Boolean(result.data?.pending),
+        expiresAt: result.data?.expiresAt || null,
+      };
+    } catch (err: any) {
+      console.error('otpService.checkOtpStatus error:', err);
+      return {
+        success: false,
+        error: 'We could not verify your account status. Please try again.',
       };
     }
   }

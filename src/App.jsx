@@ -7,6 +7,7 @@ import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
 import Toast from './components/common/Toast';
 import { supabase } from './utils/supabase';
+import { otpService } from './services/otp/otpService';
 import notificationService from './services/NotificationService';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -133,6 +134,16 @@ function App() {
           return;
         }
 
+        if (session?.user) {
+          const otpStatus = await otpService.checkOtpStatus(session.user.id);
+          if (!otpStatus.success || otpStatus.pending) {
+            await supabase.auth.signOut();
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+        }
+
         if (session?.user && !session.user.email_confirmed_at) {
           await supabase.auth.signOut();
           setUser(null);
@@ -178,18 +189,15 @@ function App() {
         return;
       }
 
-      if (
-        event === 'SIGNED_IN' &&
-        session?.user &&
-        !session.user.email_confirmed_at
-      ) {
-        supabase.auth.signOut();
-        setUser(null);
-        return;
-      }
-
       if (event === 'SIGNED_IN' && session?.user) {
         void (async () => {
+          const otpStatus = await otpService.checkOtpStatus(session.user.id);
+          if (!otpStatus.success || otpStatus.pending) {
+            await supabase.auth.signOut();
+            setUser(null);
+            return;
+          }
+
           const isEmployeeActive = await verifyActiveEmployeeAccount(session.user);
           if (!isEmployeeActive) {
             await supabase.auth.signOut();
@@ -199,6 +207,17 @@ function App() {
 
           setUser(session.user);
         })();
+        return;
+      }
+
+      if (
+        event === 'SIGNED_IN' &&
+        session?.user &&
+        !session.user.email_confirmed_at &&
+        session.user.user_metadata?.otp_verified !== true
+      ) {
+        supabase.auth.signOut();
+        setUser(null);
         return;
       }
 
