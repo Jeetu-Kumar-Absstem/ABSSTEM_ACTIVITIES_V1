@@ -188,7 +188,7 @@ const LoginPage = ({ onLogin }) => {
             userId: data.user.id,
             email: empData.email,
           });
-          setLoginError('First verify your account.');
+          setLoginError('Your account is not verified ');
           return;
         }
 
