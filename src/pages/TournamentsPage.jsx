@@ -239,12 +239,12 @@ const TournamentsPage = () => {
 
   const [sub, setSub] = useState('active');
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
-  const [tForm, setTForm] = useState({
-    name: '', game: 'Carrom', format: 'knockout',
-    players_per_team: 1,
-    start_date: '', end_date: '', max_participants: 8,
-    prize_pool: '', description: '',
-  });
+    const [tForm, setTForm] = useState({
+      name: '', game: 'Carrom', customGame: '', format: 'knockout',
+      players_per_team: 1,
+      start_date: '', end_date: '', max_participants: 8,
+      prize_pool: '', description: '',
+    });
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
   const [mForm, setMForm] = useState({
     match_code: '', round: 'QF', match_number: 1,
@@ -1899,15 +1899,21 @@ const renderMatch = (m) => {
       showToast('Name and start date are required', 'error');
       return;
     }
+    const finalGame = tForm.game === 'Other' ? tForm.customGame : tForm.game;
+    if (tForm.game === 'Other' && !finalGame?.trim()) {
+      showToast('Please enter the game name', 'error');
+      return;
+    }
     const result = await addTournament({
       ...tForm,
+      game: finalGame,
       max_participants: parseInt(tForm.max_participants, 10) || 8,
       players_per_team: parseInt(tForm.players_per_team, 10) || 1,
     });
     if (result.success) {
       showToast(`Tournament "${tForm.name}" created!`);
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '' });
+      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '' });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -2292,13 +2298,19 @@ const renderMatch = (m) => {
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Game</label>
-                  <select style={styles.formInput} value={tForm.game}
-                          onChange={(e) => setTForm(f => ({ ...f, game: e.target.value }))}>
-                    <option>Carrom</option>
-                    <option>Chess</option>
-                    <option>Table Tennis</option>
-                    <option>Other</option>
-                  </select>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <select style={styles.formInput} value={tForm.game}
+                            onChange={(e) => setTForm(f => ({ ...f, game: e.target.value }))}>
+                      <option>Carrom</option>
+                      <option>Chess</option>
+                      <option>Table Tennis</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {tForm.game === 'Other' && (
+                      <input style={styles.formInput} placeholder="Enter game name" value={tForm.customGame}
+                             onChange={(e) => setTForm(f => ({ ...f, customGame: e.target.value }))} />
+                    )}
+                  </div>
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Format</label>
@@ -2327,12 +2339,8 @@ const renderMatch = (m) => {
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Players Per Team</label>
-                  <select style={styles.formInput} value={tForm.players_per_team}
-                          onChange={(e) => setTForm(f => ({ ...f, players_per_team: parseInt(e.target.value, 10) }))}>
-                    <option value={1}>1 — Singles (1v1)</option>
-                    <option value={2}>2 — Doubles (2v2)</option>
-                    <option value={3}>3 — Triples (3v3)</option>
-                  </select>
+                  <input style={styles.formInput} type="number" min="1" value={tForm.players_per_team}
+                         onChange={(e) => setTForm(f => ({ ...f, players_per_team: parseInt(e.target.value, 10) || 1 }))} />
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Prize Pool</label>
