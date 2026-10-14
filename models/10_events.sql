@@ -53,6 +53,12 @@ alter table if exists public.events
   add column if not exists location text;
 
 alter table if exists public.events
+  add column if not exists schedules jsonb not null default '[]'::jsonb;
+
+alter table if exists public.events
+  add check (jsonb_typeof(schedules) = 'array');
+
+alter table if exists public.events
   add column if not exists organizer text;
 
 alter table if exists public.events

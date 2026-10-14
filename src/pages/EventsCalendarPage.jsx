@@ -2,7 +2,7 @@
 // Activity Planner ▸ Events ▸ Events Calendar
 // Renders a top tab bar (Events Calendar / Tournaments / Leaderboard) plus
 // a full month calendar, an Upcoming Events list and a Past Events table.
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
@@ -63,6 +63,94 @@ const formatTimeRange = (event) => {
   return t(event.start_time);
 };
 
+const ScheduleManager = ({ schedules, onSchedulesChange, isAdmin, showToast }) => {
+  const [newEntry, setNewEntry] = useState({ title: '', date: '', time: '' });
+
+  const addEntry = () => {
+    if (!newEntry.date || !newEntry.time) {
+      showToast('Date and time are compulsory', 'error');
+      return;
+    }
+    onSchedulesChange([...schedules, newEntry]);
+    setNewEntry({ title: '', date: '', time: '' });
+  };
+
+  const updateEntry = (index, field, value) => {
+    const updated = [...schedules];
+    updated[index] = { ...updated[index], [field]: value };
+    onSchedulesChange(updated);
+  };
+
+  const removeEntry = (index) => {
+    onSchedulesChange(schedules.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+        <label style={{ ...styles.formLabel, fontSize: '0.8rem' }}>Event Schedule</label>
+        {isAdmin && (
+          <button onClick={addEntry} style={styles.miniBtn}>+ Add Slot</button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {schedules.map((entry, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 30px', gap: '0.4rem', alignItems: 'center' }}>
+            <input
+              style={{ ...styles.formInput, padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+              value={entry.title || ''}
+              onChange={(e) => updateEntry(i, 'title', e.target.value)}
+              placeholder="Activity"
+            />
+            <input
+              style={{ ...styles.formInput, padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+              type="date"
+              value={entry.date || ''}
+              onChange={(e) => updateEntry(i, 'date', e.target.value)}
+            />
+            <input
+              style={{ ...styles.formInput, padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+              type="time"
+              value={entry.time || ''}
+              onChange={(e) => updateEntry(i, 'time', e.target.value)}
+            />
+            <button
+              onClick={() => removeEntry(i)}
+              style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}
+            >✕</button>
+          </div>
+        ))}
+        {schedules.length === 0 && <div style={{ fontSize: '0.7rem', color: 'var(--muted)', textAlign: 'center', padding: '0.5rem' }}>No schedule added.</div>}
+      </div>
+
+      {isAdmin && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 40px', gap: '0.4rem', marginTop: '0.6rem', alignItems: 'center' }}>
+          <input
+            style={{ ...styles.formInput, padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+            value={newEntry.title}
+            onChange={(e) => setNewEntry(f => ({ ...f, title: e.target.value }))}
+            placeholder="New Activity..."
+          />
+          <input
+            style={{ ...styles.formInput, padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+            type="date"
+            value={newEntry.date}
+            onChange={(e) => setNewEntry(f => ({ ...f, date: e.target.value }))}
+          />
+          <input
+            style={{ ...styles.formInput, padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+            type="time"
+            value={newEntry.time}
+            onChange={(e) => setNewEntry(f => ({ ...f, time: e.target.value }))}
+          />
+          <button onClick={addEntry} style={{ ...styles.miniBtn, padding: '0.2rem', fontSize: '0.6rem' }}>Add</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const EventsCalendarPage = () => {
   const {
     events,
@@ -70,6 +158,7 @@ const EventsCalendarPage = () => {
     getOngoingEvents,
     getPastEvents,
     addEvent,
+    updateEvent,
     deleteEvent,
     isAdmin,
     currentUser,
@@ -81,6 +170,7 @@ const EventsCalendarPage = () => {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [form, setForm] = useState({
     title: '',
     event_type: 'company',
@@ -93,6 +183,7 @@ const EventsCalendarPage = () => {
     organizer: '',
     description: '',
     max_participants: '',
+    schedules: [],
   });
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -164,37 +255,65 @@ const EventsCalendarPage = () => {
   const openAddModal = (presetDate = null) => {
     setForm(f => ({
       ...f,
+      title: '',
+      event_type: 'company',
       start_date: presetDate || fmtDate(year, month, today.getDate()),
+      end_date: '',
+      start_time: '',
+      end_time: '',
+      venue: '',
+      location: '',
+      organizer: '',
+      description: '',
+      max_participants: '',
+      schedules: [],
     }));
     setShowAddModal(true);
   };
 
+  const openEditModal = (event) => {
+    setForm({
+      ...event,
+      max_participants: event.max_participants || '',
+      schedules: event.schedules || [],
+    });
+    setShowEditModal(true);
+  };
+
   const saveEvent = async () => {
-    if (!form.title.trim() || !form.start_date) {
-      showToast('Title and start date are required', 'error');
+    if (!form.title.trim() || !form.start_date || !form.end_date) {
+      showToast('Title, start date and end date are required', 'error');
       return;
     }
     const submitter =
       currentUser?.user_metadata?.name ||
       currentUser?.email?.split('@')[0] ||
       'Admin';
-    const result = await addEvent({
+
+    const eventData = {
       ...form,
       max_participants: form.max_participants ? parseInt(form.max_participants, 10) : null,
       organizer: form.organizer || submitter,
-    });
+    };
+
+    const result = showEditModal
+      ? await updateEvent(form.id, eventData)
+      : await addEvent(eventData);
+
     if (result.success) {
-      showToast(`Event added: ${form.title}`);
+      showToast(showEditModal ? `Event updated: ${form.title}` : `Event added: ${form.title}`);
       setShowAddModal(false);
+      setShowEditModal(false);
       setForm({
         title: '', event_type: 'company',
         start_date: fmtDate(year, month, today.getDate()),
         end_date: '', start_time: '', end_time: '',
         venue: '', location: '', organizer: '',
         description: '', max_participants: '',
+        schedules: [],
       });
     } else {
-      showToast(result.error || 'Failed to add event', 'error');
+      showToast(result.error || 'Failed to save event', 'error');
     }
   };
 
@@ -646,7 +765,7 @@ const EventsCalendarPage = () => {
       </div>
 
       {/* Add Event Modal */}
-      {showAddModal && (() => {
+      { (showAddModal || showEditModal) && (() => {
         const formBody = (
           <>
             <div style={{ padding: '1rem' }}>
@@ -663,7 +782,7 @@ const EventsCalendarPage = () => {
                          onChange={(e) => setForm(f => ({ ...f, start_date: e.target.value }))} />
                 </div>
                 <div style={styles.formRow}>
-                  <label style={styles.formLabel}>End Date</label>
+                  <label style={styles.formLabel}>End Date <span style={{ color: '#e53935' }}>*</span></label>
                   <input style={styles.formInput} type="date" value={form.end_date}
                          onChange={(e) => setForm(f => ({ ...f, end_date: e.target.value }))} />
                 </div>
@@ -716,9 +835,15 @@ const EventsCalendarPage = () => {
                             onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
                 </div>
               </div>
+              <ScheduleManager
+                schedules={form.schedules || []}
+                onSchedulesChange={(s) => setForm(f => ({ ...f, schedules: s }))}
+                isAdmin={isAdmin()}
+                showToast={showToast}
+              />
             </div>
             <div style={styles.modalFooter}>
-              <button onClick={() => setShowAddModal(false)} style={styles.outlineBtn}>Cancel</button>
+              <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} style={styles.outlineBtn}>Cancel</button>
               <button onClick={saveEvent} style={styles.navyBtn}>Save Event</button>
             </div>
           </>
@@ -733,12 +858,17 @@ const EventsCalendarPage = () => {
         }
 
         return createPortal(
-          <div onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
+          <div onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false);
+              setShowEditModal(false);
+            }
+          }}
                style={styles.modalBackdrop}>
             <div style={styles.modalCard}>
               <div style={styles.modalHeader}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>Add New Event</h3>
-                <button onClick={() => setShowAddModal(false)} style={styles.modalClose}>✕</button>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>{showEditModal ? 'Edit Event' : 'Add New Event'}</h3>
+                <button onClick={() => { setShowAddModal(false); setShowEditModal(false); }} style={styles.modalClose}>✕</button>
               </div>
               {formBody}
             </div>
@@ -759,13 +889,32 @@ const EventsCalendarPage = () => {
               {selectedEvent.organizer && <DetailRow label="Organizer" value={selectedEvent.organizer} />}
               {selectedEvent.max_participants && <DetailRow label="Max Participants" value={String(selectedEvent.max_participants)} />}
               {selectedEvent.description && <DetailRow label="Description" value={selectedEvent.description} />}
+
+              {selectedEvent.schedules && selectedEvent.schedules.length > 0 && (
+                <div style={{ marginTop: '1rem', paddingBottom: '0.5rem' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Event Schedule</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {selectedEvent.schedules.map((entry, i) => (
+                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0.5rem', padding: '0.3rem 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 500 }}>{entry.title || 'Activity'}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>📅 {entry.date}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>⏰ {entry.time}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <DetailRow label="Status" value={
                 <span style={{ ...(STATUS_BADGE[selectedEvent.event_status] || STATUS_BADGE.scheduled), ...styles.tableChip }}>
                   {(STATUS_BADGE[selectedEvent.event_status] || STATUS_BADGE.scheduled).label}
                 </span>
               } />
               {isAdmin() && (
-                <div style={{ marginTop: 12, textAlign: 'right' }}>
+                <div style={{ marginTop: 12, display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button onClick={() => openEditModal(selectedEvent)} style={{ ...styles.navyBtn, padding: '0.32rem 0.85rem', fontSize: '0.72rem' }}>
+                    ✏️ Edit Event
+                  </button>
                   <button onClick={() => handleDeleteEvent(selectedEvent.id)} style={styles.dangerBtn}>
                     🗑 Delete Event
                   </button>
