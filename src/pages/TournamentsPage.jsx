@@ -360,28 +360,24 @@ const TournamentsPage = () => {
 // the match (player_a or player_b) AND both slots are filled (not TBD).
 const canEditMatch = (m) => {
   if (!m) return false;
-  
-  // CRITICAL FIX: If either side is TBD (waiting for a winner), 
-  // ONLY admin can enter a result (and only to fill in the TBD slot)
-  const hasTBD = !m.player_a_employee_id || !m.player_b_employee_id;
-  
+
+  const teamAExists = m.player_a_employee_id || (m.team_a_players && m.team_a_players.length > 0);
+  const teamBExists = m.player_b_employee_id || (m.team_b_players && m.team_b_players.length > 0);
+  const hasTBD = !teamAExists || !teamBExists;
+
   if (hasTBD) {
-    // Only admin can edit matches with TBD (to fill in the winner)
     return isAdmin();
   }
-  
-  // Both players are known - check permissions
+
   if (isAdmin()) return true;
   if (!currentEmpId) return false;
-  
+
   const me = currentEmpId.toUpperCase();
   const a = (m.player_a_employee_id || '').toUpperCase();
   const b = (m.player_b_employee_id || '').toUpperCase();
-  
-  // Check captain columns first
+
   if (me === a || me === b) return true;
-  
-  // Then check all team members from junction table
+
   const allPlayers = [
     ...(m.team_a_players || []),
     ...(m.team_b_players || []),
@@ -659,13 +655,16 @@ const canEditMatch = (m) => {
 
     // Build a display label for a team: "Captain" for 1v1, "P1 & P2 & P3" for multi
     const teamLabel = (captainId, teamPlayers) => {
-      if (!captainId) return 'TBD';
-      if (!teamPlayers || teamPlayers.length === 0) return getEmployeeName(captainId);
-      // teamPlayers from junction table includes captain too; deduplicate by position order
-      const ids = teamPlayers.map(p => p.employee_id);
-      // Ensure captain is first
-      const ordered = [captainId, ...ids.filter(id => id !== captainId)];
-      return ordered.map(id => getEmployeeName(id)).join(' & ');
+      const players = (teamPlayers || []).map(p => p.employee_id).filter(Boolean);
+      const allIds = [captainId, ...players].filter(Boolean);
+      if (allIds.length === 0) return 'TBD';
+      const uniqueIds = [...new Set(allIds)];
+      const names = uniqueIds.map(id => getEmployeeName(id));
+
+      // If it's a team match (more than 1 player), prefix with "Team"
+      return uniqueIds.length > 1
+        ? `Team - ${names.join(', ')}`
+        : names[0];
     };
 
     const latestRound = roundGroups[roundGroups.length - 1];
@@ -1335,12 +1334,12 @@ const renderMatch = (m) => {
                   <td style={styles.td}>{m.round} · M{m.match_number}</td>
                   <td style={styles.td}><strong>{m.match_code || `M${m.match_number}`}</strong></td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_a_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_a_employee_id ? 700 : 500 }}>
-                    {m.player_a_employee_id ? [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
+                    {m.player_a_employee_id || (m.team_a_players && m.team_a_players.length > 0) ? [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(Boolean)].filter((v, i, a) => a.indexOf(v) === i).map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
                   <td style={{ ...styles.td, fontWeight: 700, color: 'var(--accent)'  }}>{m.score_a ?? '—'}</td>
                   <td style={{ ...styles.td, fontWeight: 700, color: 'var(--accent)'  }}>{m.score_b ?? '—'}</td>
                   <td style={{ ...styles.td, color: m.winner_employee_id === m.player_b_employee_id ? '#1b5e20' : '#212121', fontWeight: m.winner_employee_id === m.player_b_employee_id ? 700 : 500 }}>
-                    {m.player_b_employee_id ? [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)].map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
+                    {m.player_b_employee_id || (m.team_b_players && m.team_b_players.length > 0) ? [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(Boolean)].filter((v, i, a) => a.indexOf(v) === i).map(id => getEmployeeName(id)).join(' & ') : 'TBD'}
                   </td>
                   <td style={styles.td}>{m.played_at ? formatDate(m.played_at) : '—'}</td>
                   <td style={styles.td}>

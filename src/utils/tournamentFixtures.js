@@ -102,18 +102,6 @@ export const getMatchTeams = (match) => {
   };
 };
 
-// ─── 2v2 Team helpers ────────────────────────────────────────────────────────
-
-/**
- * Split a flat participant list into teams of `playersPerTeam`.
- * Returns an array of team objects: { captain, members[] }
- * where members includes all players (captain + partners).
- *
- * Example for 2v2 with [A, B, C, D, E, F]:
- *   → [ {captain:A, members:[A,B]}, {captain:C, members:[C,D]}, {captain:E, members:[E,F]} ]
- *
- * Odd leftover players at the end are discarded (they can't form a full team).
- */
 export const groupIntoTeams = (participants = [], playersPerTeam = 1) => {
   const ppt = Math.max(1, Number(playersPerTeam) || 1);
   if (ppt === 1) return participants.map((p) => ({ captain: p, members: [p] }));
@@ -126,20 +114,6 @@ export const groupIntoTeams = (participants = [], playersPerTeam = 1) => {
   return teams;
 };
 
-/**
- * Promote a match plan produced by any of the build*FixturePlan functions
- * to carry proper 2v2 data.
- *
- * For each match that has `player_a_employee_id` set, looks up the team
- * in `teamMap` (keyed by captain employee_id) and injects:
- *   • player_a_employee_id  — captain A (unchanged)
- *   • player_b_employee_id  — captain B (unchanged)
- *   • team_a_players        — [{employee_id}, …] for ALL team-A members
- *   • team_b_players        — [{employee_id}, …] for ALL team-B members
- *
- * Bye matches are handled: the single captain's team is expanded on the
- * appropriate side; the other side stays null/[].
- */
 export const injectTeamPlayers = (rounds = [], teamMap = {}) => {
   const expand = (captainId) => {
     if (!captainId) return [];
@@ -158,19 +132,6 @@ export const injectTeamPlayers = (rounds = [], teamMap = {}) => {
   }));
 };
 
-// ─── Scheduled-time helpers ───────────────────────────────────────────────────
-
-/**
- * Build an ISO timestamp (UTC) for a match slot.
- *
- * @param {string|Date} baseDate  — tournament start date ("YYYY-MM-DD" or Date)
- * @param {number}      slotIndex — 0-based slot index (each slot = intervalMinutes apart)
- * @param {number}      startHour — local hour to begin scheduling (default 10 = 10:00 AM)
- * @param {number}      intervalMinutes — gap between matches in minutes (default 30)
- * @param {string}      timezone  — IANA timezone (default "Asia/Kolkata")
- *
- * Returns an ISO-8601 UTC string suitable for storing in a `timestamptz` column.
- */
 export const buildMatchTimestamp = (
   baseDate,
   slotIndex = 0,
@@ -180,18 +141,14 @@ export const buildMatchTimestamp = (
 ) => {
   if (!baseDate) return null;
 
-  // Parse the date part in the target timezone so we don't shift days
   const dateStr = baseDate instanceof Date
-    ? baseDate.toLocaleDateString('en-CA', { timeZone: timezone }) // "YYYY-MM-DD"
+    ? baseDate.toLocaleDateString('en-CA', { timeZone: timezone })
     : String(baseDate).slice(0, 10);
 
   const [year, month, day] = dateStr.split('-').map(Number);
 
-  // Build a Date representing `startHour:00` local time in `timezone`
-  // Strategy: use Intl to find the UTC offset for that local time
-  const localBase = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)); // noon UTC as anchor
+  const localBase = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
-  // Convert noon-UTC to the target timezone to find offset
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -202,29 +159,13 @@ export const buildMatchTimestamp = (
   const get = (type) => Number(parts.find((p) => p.type === type)?.value ?? 0);
   const localHour = get('hour');
 
-  // Offset in ms between UTC noon and local noon
   const utcOffsetMs = (12 - localHour) * 60 * 60 * 1000;
-  // Moment when local clock reads startHour:00:00 on dateStr
   const startMs = Date.UTC(year, month - 1, day, startHour, 0, 0) + utcOffsetMs;
 
   const slotMs = startMs + slotIndex * intervalMinutes * 60 * 1000;
   return new Date(slotMs).toISOString();
 };
 
-/**
- * Stamp every match in `rounds` with a `scheduled_at` value.
- *
- * Matches are numbered globally across all rounds in order, starting at
- * slotIndex 0.  Each subsequent match is spaced `intervalMinutes` apart.
- *
- * @param {Round[]} rounds           — output of any build*FixturePlan
- * @param {string}  tournamentStartDate — "YYYY-MM-DD"
- * @param {object}  opts
- *   @param {number} opts.startHour       — local hour (default 10)
- *   @param {number} opts.intervalMinutes — minutes between matches (default 30)
- *   @param {string} opts.timezone        — IANA tz (default "Asia/Kolkata")
- * @returns {Round[]} — deep copy with scheduled_at set on each match
- */
 export const stampScheduledTimes = (rounds = [], tournamentStartDate = null, opts = {}) => {
   if (!tournamentStartDate) return rounds;
 
@@ -238,8 +179,6 @@ export const stampScheduledTimes = (rounds = [], tournamentStartDate = null, opt
   return rounds.map((round) => ({
     ...round,
     matches: round.matches.map((m) => {
-      // Bye matches are auto-completed; no real play time needed, but we
-      // still assign a slot so times are contiguous and editable later.
       const scheduled_at = buildMatchTimestamp(
         tournamentStartDate,
         slotIndex,
@@ -253,15 +192,6 @@ export const stampScheduledTimes = (rounds = [], tournamentStartDate = null, opt
   }));
 };
 
-
-
-/**
- * Classic bracket seeding permutation for a bracket of `n` slots (power of 2).
- * Returns 1-based seed numbers in bracket order so that seed 1 and seed 2
- * can only meet in the final.
- *   n=4  → [1, 4, 3, 2]
- *   n=8  → [1, 8, 5, 4, 3, 6, 7, 2]
- */
 const _seedOrder = (n) => {
   if (n === 1) return [1];
   const half = n / 2;
@@ -272,73 +202,29 @@ const _seedOrder = (n) => {
   return result;
 };
 
-/**
- * Build the seeded slot array: length = bracketSize, each entry is a
- * participant object or null (bye slot).
- */
 const _buildSeededSlots = (players) => {
   const size = nextPowerOfTwo(players.length || 2);
-  const order = _seedOrder(size); // 1-based seed positions
+  const order = _seedOrder(size);
   return order.map((seed) => (seed <= players.length ? players[seed - 1] : null));
 };
 
-// ─── Main builder ─────────────────────────────────────────────────────────
-
-/**
- * @param {object[]} participants     — array of participant objects (each has employee_id)
- * @param {object}   opts
- *   @param {number}  opts.playersPerTeam   — 1 (singles), 2 (doubles), 3 (triples). Default 1.
- *   @param {string}  opts.tournamentStartDate — "YYYY-MM-DD" for auto-scheduling
- *   @param {number}  opts.startHour           — local hour for first match (default 10)
- *   @param {number}  opts.intervalMinutes      — minutes between matches (default 30)
- *   @param {string}  opts.timezone             — IANA tz (default "Asia/Kolkata")
- */
-// In tournamentFixtures.js, replace the buildKnockoutFixturePlan function
-// with this corrected version:
-
-// In tournamentFixtures.js, replace the buildKnockoutFixturePlan function
-// with this corrected version:
-
-// In tournamentFixtures.js, replace the entire buildKnockoutFixturePlan function
-// with this corrected version:
-
-// In tournamentFixtures.js, replace the buildKnockoutFixturePlan function
-// with this corrected version:
-
-export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
-  if (!participants || participants.length < 2) return { rounds: [], bracketSize: 2 };
+export const buildKnockoutFixturePlan = (teams = [], opts = {}) => {
+  if (!teams || teams.length < 2) return { rounds: [], bracketSize: 2 };
 
   const {
-    playersPerTeam      = 1,
     tournamentStartDate = null,
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
   } = opts;
 
-  const ppt = Math.max(1, Number(playersPerTeam) || 1);
-
-  // For team play: group participants into teams
-  let teamMap = {};
-  let bracketParticipants = participants;
-
-  if (ppt > 1) {
-    const shuffledAll = shuffleArray(participants);
-    const teams = groupIntoTeams(shuffledAll, ppt);
-    teamMap = Object.fromEntries(
-      teams.map((t) => [t.captain.employee_id, t])
-    );
-    bracketParticipants = teams.map((t) => t.captain);
-  }
-
-  const shuffled = ppt > 1 ? bracketParticipants : shuffleArray(participants);
+  const shuffled = shuffleArray(teams);
   const size = nextPowerOfTwo(shuffled.length);
   const slots = _buildSeededSlots(shuffled);
 
-  const rounds = [];
+  let rounds = [];
   const matchByCode = new Map();
-  
-  // ── Round 0 (first round played) ────────────────────────────────────────
+
   const round0RoundSize = size;
   const round0Code = (() => {
     if (round0RoundSize === 2) return 'F';
@@ -351,17 +237,16 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
   const r0EffectiveSlots = [];
 
   for (let i = 0; i < size; i += 2) {
-    const playerA = slots[i];
-    const playerB = slots[i + 1];
+    const teamA = slots[i];
+    const teamB = slots[i + 1];
 
-    // Both null → phantom: skip
-    if (!playerA && !playerB) {
+    if (!teamA && !teamB) {
       r0EffectiveSlots.push({ type: 'empty' });
       continue;
     }
 
-    const isBye = !playerA || !playerB;
-    const winnerId = isBye ? (playerA?.employee_id || playerB?.employee_id) : null;
+    const isBye = !teamA || !teamB;
+    const winnerTeamId = isBye ? (teamA?.id || teamB?.id) : null;
     const matchNum = r0Matches.length + 1;
     const matchCode = `${round0Code}${matchNum}`;
 
@@ -369,17 +254,17 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
       round:                 round0Code,
       match_number:          matchNum,
       match_code:            matchCode,
-      player_a_employee_id:  playerA?.employee_id || null,
-      player_b_employee_id:  playerB?.employee_id || null,
+      team_a_id:             teamA?.id || null,
+      team_b_id:             teamB?.id || null,
       status:                isBye ? 'bye' : 'scheduled',
-      winner_employee_id:    winnerId,
+      winner_team_id:        winnerTeamId,
       score_a:               null,
       score_b:               null,
-      _bye_winner:           winnerId,
+      _bye_winner:           winnerTeamId,
       _feeds_into:           null,
       _feeds_from_a:         null,
       _feeds_from_b:         null,
-      _has_advanced:         false,  // Track if this has been advanced
+      _has_advanced:         false,
     };
 
     r0Matches.push(match);
@@ -387,7 +272,7 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
 
     r0EffectiveSlots.push(
       isBye
-        ? { type: 'bye', playerId: winnerId, matchCode, hasAdvanced: false }
+        ? { type: 'bye', teamId: winnerTeamId, matchCode, hasAdvanced: false }
         : { type: 'match', matchCode, hasAdvanced: false }
     );
   }
@@ -400,7 +285,6 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
     });
   }
 
-  // ── Subsequent rounds ────────────────────────────────────────────────────
   let prevEffective = r0EffectiveSlots;
   const numRounds = Math.log2(size);
 
@@ -420,55 +304,32 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
       const slotA = prevEffective[i]   || { type: 'empty' };
       const slotB = prevEffective[i+1] || { type: 'empty' };
 
-      // Both empty → propagate empty
       if (slotA.type === 'empty' && slotB.type === 'empty') {
         nextEffective.push({ type: 'empty' });
         continue;
       }
 
-      // ── ONE EMPTY ─────────────────────────────────────────────────────────
-      // One slot is empty, the other is real (bye or match).
-      // The real slot advances ONE round, but we need to check:
-      // If it's a bye, it should only advance if it hasn't already been advanced.
       if (slotA.type === 'empty' || slotB.type === 'empty') {
         const real = slotA.type !== 'empty' ? slotA : slotB;
-        
-        // CRITICAL FIX: If this is a match (not a bye), it advances as a match
-        // If it's a bye, it advances as a bye (but only ONE round)
-        // The key is: a bye winner should advance, but should NOT be chained
-        // through multiple rounds without playing.
-        
-        // Mark the source match as having advanced
         if (real.matchCode) {
           const sourceMatch = matchByCode.get(real.matchCode);
           if (sourceMatch) {
             sourceMatch._has_advanced = true;
           }
         }
-        
-        // The slot advances as-is (bye or match)
-        nextEffective.push({ 
+        nextEffective.push({
           ...real,
           hasAdvanced: true,
         });
         continue;
       }
 
-      // ── BOTH REAL ─────────────────────────────────────────────────────────
-      // Both slots are real. They should be paired into a single match.
-      // This is the case where both feeders have winners (or will have winners).
-
       const matchNum = roundMatches.length + 1;
       const matchCode = `${roundCode}${matchNum}`;
 
-      // Determine player IDs for the new match
-      // If a slot is a bye, we know the player ID
-      // If a slot is a match, the winner is TBD (so player is null)
-      const playerAId = slotA.type === 'bye' ? slotA.playerId : null;
-      const playerBId = slotB.type === 'bye' ? slotB.playerId : null;
+      const teamAId = slotA.type === 'bye' ? slotA.teamId : null;
+      const teamBId = slotB.type === 'bye' ? slotB.teamId : null;
 
-      // Back-fill _feeds_into on both feeder matches
-      // This creates the pointer chain: QF → SF → F
       for (const slot of [slotA, slotB]) {
         if (slot.matchCode) {
           const feeder = matchByCode.get(slot.matchCode);
@@ -478,49 +339,34 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
         }
       }
 
-      // Determine the status of the new match
-      // - Both byes: they play each other → scheduled
-      // - One bye + one match: they play each other → scheduled
-      // - Both matches: they play each other → scheduled
-      // - Solo bye (one empty + one bye) was handled above
-      const bothAreByes = slotA.type === 'bye' && slotB.type === 'bye';
-      const isSoloBye = false; // Solo bye is handled in the "one empty" case above
-      
-      // For both byes, we know both players, so they play each other
-      // For one bye + one match, the match winner is TBD, so it's scheduled
-      const status = 'scheduled'; // Always scheduled when both are real
-
-      // If both are byes, we know both players, so they play each other
-      // The winner is not determined yet (they need to play)
-      const winnerId = null;
+      const status = 'scheduled';
+      const winnerTeamId = null;
 
       const newMatch = {
         round:                 roundCode,
         match_number:          matchNum,
         match_code:            matchCode,
-        player_a_employee_id:  playerAId,
-        player_b_employee_id:  playerBId,
+        team_a_id:             teamAId,
+        team_b_id:             teamBId,
         status:                status,
-        winner_employee_id:    winnerId,
+        winner_team_id:        winnerTeamId,
         score_a:               null,
         score_b:               null,
-        _preplace_a:           slotA.type === 'bye' ? slotA.playerId : null,
-        _preplace_b:           slotB.type === 'bye' ? slotB.playerId : null,
+        _preplace_a:           slotA.type === 'bye' ? slotA.teamId : null,
+        _preplace_b:           slotB.type === 'bye' ? slotB.teamId : null,
         _feeds_from_a:         slotA.type === 'match' ? slotA.matchCode : null,
         _feeds_from_b:         slotB.type === 'match' ? slotB.matchCode : null,
         _bye_winner:           null,
         _feeds_into:           null,
-        _both_byes:            bothAreByes,
+        _both_byes:            slotA.type === 'bye' && slotB.type === 'bye',
         _has_advanced:         false,
       };
 
       roundMatches.push(newMatch);
       matchByCode.set(matchCode, newMatch);
 
-      // The effective slot for this pair is a match (winner TBD)
-      // Even if both are byes, they still need to play each other
-      nextEffective.push({ 
-        type: 'match', 
+      nextEffective.push({
+        type: 'match',
         matchCode,
         hasAdvanced: false,
       });
@@ -537,146 +383,35 @@ export const buildKnockoutFixturePlan = (participants = [], opts = {}) => {
     prevEffective = nextEffective;
   }
 
-  // Inject team members for 2v2+ matches
-  let finalRounds = ppt > 1 ? injectTeamPlayers(rounds, teamMap) : rounds;
-
-  // Stamp scheduled times if a start date was provided
   if (tournamentStartDate) {
-    finalRounds = stampScheduledTimes(finalRounds, tournamentStartDate, {
+    rounds = stampScheduledTimes(rounds, tournamentStartDate, {
       startHour, intervalMinutes, timezone,
     });
   }
 
-  return { rounds: finalRounds, bracketSize: size };
+  return { rounds, bracketSize: size };
 };
 
-// ─── UI helpers ───────────────────────────────────────────────────────────
-
-/**
- * Returns true when a match record has no players at all (TBD vs TBD).
- * These should never appear in the DB with the new engine, but guard
- * defensively in the UI.
- */
-export const isPhantomMatch = (m) =>
-  !m.player_a_employee_id && !m.player_b_employee_id;
-
-/**
- * Returns true when a match is a bye — only one real player, or the
- * `status` field is explicitly 'bye'.
- */
-export const isByeMatch = (m) =>
-  String(m.status || '').toLowerCase() === 'bye' ||
-  (!m.player_a_employee_id && !!m.player_b_employee_id) ||
-  (!!m.player_a_employee_id && !m.player_b_employee_id);
-
-// ─── Smart Refresh helper ─────────────────────────────────────────────────
-
-/**
- * refreshKnockoutPlan(existingMatches, participants)
- *
- * Compares the current participant list with existing fixtures and returns
- * an action plan describing what needs to change.
- *
- * Returns:
- * {
- *   status: 'up_to_date' | 'changed',
- *   message: string,
- *   matchesToDelete: string[],   // IDs of pending matches to remove
- *   newRounds: Round[],          // new rounds to insert (from buildKnockoutFixturePlan)
- * }
- */
-export const refreshKnockoutPlan = (existingMatches = [], participants = []) => {
-  const DONE = new Set(['completed', 'walkover', 'no_show', 'bye', 'draw', 'cancelled']);
-  const doneMatches    = existingMatches.filter((m) => DONE.has(String(m.status || '').toLowerCase()));
-  const pendingMatches = existingMatches.filter((m) => !DONE.has(String(m.status || '').toLowerCase()));
-
-  const currentIds = new Set(participants.map((p) => p.employee_id));
-  const playedIds  = new Set(
-    doneMatches.flatMap((m) => [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean))
-  );
-
-  const addedIds   = [...currentIds].filter((id) => !playedIds.has(id));
-  const removedIds = [...playedIds].filter((id) => !currentIds.has(id));
-
-  if (pendingMatches.length === 0 && addedIds.length === 0 && removedIds.length === 0) {
-    return {
-      status:           'up_to_date',
-      message:          'Fixtures are already up to date.',
-      matchesToDelete:  [],
-      newRounds:        [],
-    };
-  }
-
-  // Players eliminated in done matches cannot be re-entered
-  const decidedWinners = new Set(
-    doneMatches.filter((m) => m.winner_employee_id).map((m) => m.winner_employee_id)
-  );
-  const eliminatedIds = new Set(
-    doneMatches
-      .filter((m) => m.winner_employee_id && String(m.status || '') !== 'bye')
-      .flatMap((m) => [m.player_a_employee_id, m.player_b_employee_id].filter(Boolean))
-      .filter((id) => !decidedWinners.has(id))
-  );
-
-  const stillActive = participants.filter((p) => !eliminatedIds.has(p.employee_id));
-
-  if (stillActive.length < 2) {
-    return {
-      status:           'up_to_date',
-      message:          'Tournament is effectively over — no pending rounds to rebuild.',
-      matchesToDelete:  [],
-      newRounds:        [],
-    };
-  }
-
-  const newPlan = buildKnockoutFixturePlan(stillActive);
-  const deleted = pendingMatches.length;
-  const added   = newPlan.rounds.reduce((sum, r) => sum + r.matches.length, 0);
-
-  return {
-    status:           'changed',
-    message:          `Removed ${deleted} pending match${deleted !== 1 ? 'es' : ''} and regenerated ${added} match${added !== 1 ? 'es' : ''} for remaining rounds.`,
-    matchesToDelete:  pendingMatches.map((m) => m.id),
-    newRounds:        newPlan.rounds,
-  };
-};
-
-/**
- * @param {object[]} participants
- * @param {object}   opts  — same shape as buildKnockoutFixturePlan opts
- */
-export const buildRoundRobinFixturePlan = (participants = [], opts = {}) => {
+export const buildRoundRobinFixturePlan = (teams = [], opts = {}) => {
   const {
-    playersPerTeam      = 1,
     tournamentStartDate = null,
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
   } = opts;
 
-  const ppt = Math.max(1, Number(playersPerTeam) || 1);
-
-  let teamMap = {};
-  let bracketParticipants = participants;
-
-  if (ppt > 1) {
-    const teams = groupIntoTeams(participants, ppt);
-    teamMap = Object.fromEntries(teams.map((t) => [t.captain.employee_id, t]));
-    bracketParticipants = teams.map((t) => t.captain);
-  }
-
   const matches = [];
   let counter = 1;
-  for (let i = 0; i < bracketParticipants.length; i += 1) {
-    for (let j = i + 1; j < bracketParticipants.length; j += 1) {
+  for (let i = 0; i < teams.length; i += 1) {
+    for (let j = i + 1; j < teams.length; j += 1) {
       matches.push({
         round: 'RR',
         match_number: counter,
         match_code: `RR${counter}`,
-        player_a_employee_id: bracketParticipants[i]?.employee_id || null,
-        player_b_employee_id: bracketParticipants[j]?.employee_id || null,
+        team_a_id: teams[i]?.id || null,
+        team_b_id: teams[j]?.id || null,
         status: 'scheduled',
-        winner_employee_id: null,
+        winner_team_id: null,
         score_a: null,
         score_b: null,
       });
@@ -686,7 +421,6 @@ export const buildRoundRobinFixturePlan = (participants = [], opts = {}) => {
 
   let rounds = [{ round: 'RR', label: 'Round Robin', matches }];
 
-  if (ppt > 1) rounds = injectTeamPlayers(rounds, teamMap);
   if (tournamentStartDate) {
     rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
   }
@@ -697,8 +431,8 @@ export const buildRoundRobinFixturePlan = (participants = [], opts = {}) => {
 const buildOpponentMap = (matches = []) => {
   const map = new Map();
   for (const match of matches) {
-    const a = String(match.player_a_employee_id || '').toUpperCase();
-    const b = String(match.player_b_employee_id || '').toUpperCase();
+    const a = String(match.team_a_id || '').toUpperCase();
+    const b = String(match.team_b_id || '').toUpperCase();
     if (a && b) {
       if (!map.has(a)) map.set(a, new Set());
       if (!map.has(b)) map.set(b, new Set());
@@ -709,22 +443,22 @@ const buildOpponentMap = (matches = []) => {
   return map;
 };
 
-const hasByeBefore = (employeeId, matches = []) =>
+const hasByeBefore = (teamId, matches = []) =>
   matches.some((match) =>
     String(match.status || '').toLowerCase() === 'bye' &&
-    String(match.winner_employee_id || '').toUpperCase() === String(employeeId || '').toUpperCase()
+    String(match.winner_team_id || '').toUpperCase() === String(teamId || '').toUpperCase()
   );
 
-export const computeSwissStandings = (participants = [], matches = []) => {
+export const computeSwissStandings = (teams = [], matches = []) => {
   const stats = new Map();
   const opponentMap = buildOpponentMap(matches);
 
-  for (const participant of participants) {
-    const id = String(participant.employee_id || '').toUpperCase();
+  for (const team of teams) {
+    const id = String(team.id || '').toUpperCase();
     if (!id) continue;
     stats.set(id, {
-      employee_id: participant.employee_id,
-      seed: participant.seed || 0,
+      team_id: team.id,
+      seed: team.seed || 0,
       matches_played: 0,
       wins: 0,
       losses: 0,
@@ -737,9 +471,9 @@ export const computeSwissStandings = (participants = [], matches = []) => {
 
   for (const match of matches) {
     const status = String(match.status || '').toLowerCase();
-    const a = String(match.player_a_employee_id || '').toUpperCase();
-    const b = String(match.player_b_employee_id || '').toUpperCase();
-    const winner = String(match.winner_employee_id || '').toUpperCase();
+    const a = String(match.team_a_id || '').toUpperCase();
+    const b = String(match.team_b_id || '').toUpperCase();
+    const winner = String(match.winner_team_id || '').toUpperCase();
     if (!a && !b) continue;
 
     const bumpPlayed = (id) => {
@@ -792,18 +526,15 @@ export const computeSwissStandings = (participants = [], matches = []) => {
   });
 };
 
-// ── Round-Robin standings ────────────────────────────────────────────────────
-// Tallies wins / draws / losses from completed RR matches and returns a sorted
-// array of participant stat objects (best-to-worst).
-export const computeRoundRobinStandings = (matches = [], participants = []) => {
+export const computeRoundRobinStandings = (matches = [], teams = []) => {
   const stats = {};
 
-  for (const p of participants) {
-    const id = String(p.employee_id || '').toUpperCase();
+  for (const t of teams) {
+    const id = String(t.id || '').toUpperCase();
     if (!id) continue;
     stats[id] = {
-      employee_id: p.employee_id,
-      seed: p.seed || 0,
+      team_id: t.id,
+      seed: t.seed || 0,
       played: 0,
       won: 0,
       lost: 0,
@@ -814,8 +545,6 @@ export const computeRoundRobinStandings = (matches = [], participants = []) => {
   }
 
   for (const m of matches) {
-    // Only round-robin phase matches — skip KO phase matches (identified by
-    // match_code prefix "KO_", since their round values are QF/SF/F).
     const round     = String(m.round      || '').toUpperCase();
     const matchCode = String(m.match_code || '').toUpperCase();
     if (!round.startsWith('RR') || matchCode.startsWith('KO_')) continue;
@@ -823,14 +552,13 @@ export const computeRoundRobinStandings = (matches = [], participants = []) => {
     const status = String(m.status || '').toLowerCase();
     if (!['completed', 'walkover', 'no_show', 'draw'].includes(status)) continue;
 
-    const a = String(m.player_a_employee_id || '').toUpperCase();
-    const b = String(m.player_b_employee_id || '').toUpperCase();
+    const a = String(m.team_a_id || '').toUpperCase();
+    const b = String(m.team_b_id || '').toUpperCase();
     if (!a || !b) continue;
 
     if (stats[a]) stats[a].played += 1;
     if (stats[b]) stats[b].played += 1;
 
-    // Score differential (used as secondary tiebreaker)
     const sa = Number(m.score_a ?? 0);
     const sb = Number(m.score_b ?? 0);
     if (stats[a]) stats[a].score_diff += sa - sb;
@@ -842,7 +570,7 @@ export const computeRoundRobinStandings = (matches = [], participants = []) => {
       continue;
     }
 
-    const winner = String(m.winner_employee_id || '').toUpperCase();
+    const winner = String(m.winner_team_id || '').toUpperCase();
     const loser  = winner === a ? b : a;
     if (stats[winner]) { stats[winner].won += 1; stats[winner].points += 3; }
     if (stats[loser])  { stats[loser].lost  += 1; }
@@ -857,83 +585,63 @@ export const computeRoundRobinStandings = (matches = [], participants = []) => {
   });
 };
 
-// ── Round-Robin → Knockout phase ─────────────────────────────────────────────
-// Takes the standings from the RR phase and builds the knockout bracket:
-//   • Top 5 qualify
-//   • Seeds 1, 2, 3 → automatic BYE into Semifinals
-//   • Seed 4 vs Seed 5 → KO_QF (sole Quarterfinal)
-//   • KO_SF1: Seed 1  vs winner of KO_QF
-//   • KO_SF2: Seed 2  vs Seed 3
-//   • KO_F  : winner of KO_SF1 vs winner of KO_SF2
-//
-// Returns an array of match payload objects ready for Supabase insert
-// (tournament_id must be set by the caller).
 export const buildRoundRobinKnockoutPlan = (standings = [], opts = {}) => {
   const top5 = standings.slice(0, 5);
   if (top5.length < 2) return [];
 
-  const seed = (n) => top5[n - 1]?.employee_id || null;
+  const seed = (n) => top5[n - 1]?.team_id || null;
 
-  // round values must satisfy the DB check constraint — use the standard
-  // round codes (QF / SF / F). The match_code prefix "KO_" is what we use
-  // in JS to identify these as the RR-knockout phase (not a pure knockout
-  // tournament bracket).
   const matches = [
-    // Quarterfinal — Seed 4 vs Seed 5
     {
       round: 'QF',
       match_number: 1,
       match_code: 'KO_QF1',
-      player_a_employee_id: seed(4),
-      player_b_employee_id: seed(5),
+      team_a_id: seed(4),
+      team_b_id: seed(5),
       status: seed(4) && seed(5) ? 'scheduled' : 'bye',
-      winner_employee_id: !(seed(4) && seed(5)) ? (seed(4) || seed(5)) : null,
+      winner_team_id: !(seed(4) && seed(5)) ? (seed(4) || seed(5)) : null,
       score_a: null,
       score_b: null,
     },
-    // Semifinal 1 — Seed 1 vs winner of KO_QF
     {
       round: 'SF',
       match_number: 1,
       match_code: 'KO_SF1',
-      player_a_employee_id: seed(1),
-      player_b_employee_id: null,          // filled when KO_QF completes
+      team_a_id: seed(1),
+      team_b_id: null,
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
-    // Semifinal 2 — Seed 2 vs Seed 3
     {
       round: 'SF',
       match_number: 2,
       match_code: 'KO_SF2',
-      player_a_employee_id: seed(2),
-      player_b_employee_id: seed(3),
+      team_a_id: seed(2),
+      team_b_id: seed(3),
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
-    // Final — winner SF1 vs winner SF2
     {
       round: 'F',
       match_number: 1,
       match_code: 'KO_F1',
-      player_a_employee_id: null,
-      player_b_employee_id: null,
+      team_a_id: null,
+      team_b_id: null,
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
   ];
 
-  // If only 4 players qualified, skip QF and put seed 4 straight into SF1
   if (!seed(5) && seed(4)) {
     matches[0].status = 'bye';
-    matches[0].winner_employee_id = seed(4);
-    matches[1].player_b_employee_id = seed(4);
+    matches[0].winner_team_id = seed(4);
+    matches[1].team_b_id = seed(4);
   }
 
   const {
@@ -955,59 +663,26 @@ export const buildRoundRobinKnockoutPlan = (standings = [], opts = {}) => {
   return matches;
 };
 
-/**
- * Build a complete League fixture plan:
- *   • ALL round-robin matches (every participant plays each other once)
- *   • Complete knockout bracket SHELLS (QF / SF / Final) with null players = TBD
- *
- * The KO shells are created immediately so the bracket is visible from day 1.
- * As RR results come in, call `updateKnockoutShellsFromStandings` to fill in
- * the actual player slots.
- *
- * KO structure (matches top-5 from standings):
- *   Seed 1, 2, 3 → BYE into SF
- *   KO_QF1: Seed 4 vs Seed 5
- *   KO_SF1: Seed 1 vs winner(KO_QF1)
- *   KO_SF2: Seed 2 vs Seed 3
- *   KO_F1 : winner(KO_SF1) vs winner(KO_SF2)
- *
- * @param {object[]} participants
- * @param {object}   opts
- * @returns {{ rrRounds: Round[], koMatches: object[] }}
- */
-export const buildLeagueFullFixturePlan = (participants = [], opts = {}) => {
+export const buildLeagueFullFixturePlan = (teams = [], opts = {}) => {
   const {
-    playersPerTeam      = 1,
     tournamentStartDate = null,
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
   } = opts;
 
-  const ppt = Math.max(1, Number(playersPerTeam) || 1);
-
-  let teamMap = {};
-  let bracketParticipants = participants;
-
-  if (ppt > 1) {
-    const teams = groupIntoTeams(participants, ppt);
-    teamMap = Object.fromEntries(teams.map((t) => [t.captain.employee_id, t]));
-    bracketParticipants = teams.map((t) => t.captain);
-  }
-
-  // ── Round-Robin matches ─────────────────────────────────────────────────
   const rrMatches = [];
   let counter = 1;
-  for (let i = 0; i < bracketParticipants.length; i++) {
-    for (let j = i + 1; j < bracketParticipants.length; j++) {
+  for (let i = 0; i < teams.length; i++) {
+    for (let j = i + 1; j < teams.length; j++) {
       rrMatches.push({
         round: 'RR',
         match_number: counter,
         match_code: `RR${counter}`,
-        player_a_employee_id: bracketParticipants[i]?.employee_id || null,
-        player_b_employee_id: bracketParticipants[j]?.employee_id || null,
+        team_a_id: teams[i]?.id || null,
+        team_b_id: teams[j]?.id || null,
         status: 'scheduled',
-        winner_employee_id: null,
+        winner_team_id: null,
         score_a: null,
         score_b: null,
       });
@@ -1016,59 +691,52 @@ export const buildLeagueFullFixturePlan = (participants = [], opts = {}) => {
   }
 
   let rrRounds = [{ round: 'RR', label: 'Round Robin', matches: rrMatches }];
-  if (ppt > 1) rrRounds = injectTeamPlayers(rrRounds, teamMap);
   if (tournamentStartDate) {
     rrRounds = stampScheduledTimes(rrRounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
   }
 
-  // ── KO Shell matches (all TBD) ──────────────────────────────────────────
-  // Shells are inserted with null players; they get filled as RR results come in.
   const koMatches = [
-    // QF: Seed 4 vs Seed 5
     {
       round: 'QF',
       match_number: 1,
       match_code: 'KO_QF1',
-      player_a_employee_id: null,
-      player_b_employee_id: null,
+      team_a_id: null,
+      team_b_id: null,
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
-    // SF1: Seed 1 vs winner(QF)
     {
       round: 'SF',
       match_number: 1,
       match_code: 'KO_SF1',
-      player_a_employee_id: null,
-      player_b_employee_id: null,
+      team_a_id: null,
+      team_b_id: null,
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
-    // SF2: Seed 2 vs Seed 3
     {
       round: 'SF',
       match_number: 2,
       match_code: 'KO_SF2',
-      player_a_employee_id: null,
-      player_b_employee_id: null,
+      team_a_id: null,
+      team_b_id: null,
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
-    // Final
     {
       round: 'F',
       match_number: 1,
       match_code: 'KO_F1',
-      player_a_employee_id: null,
-      player_b_employee_id: null,
+      team_a_id: null,
+      team_b_id: null,
       status: 'scheduled',
-      winner_employee_id: null,
+      winner_team_id: null,
       score_a: null,
       score_b: null,
     },
@@ -1077,64 +745,33 @@ export const buildLeagueFullFixturePlan = (participants = [], opts = {}) => {
   return { rrRounds, koMatches };
 };
 
-/**
- * Given current RR standings (sorted best→worst), return the set of Supabase
- * updates needed to fill KO shell matches with the correct players.
- *
- * Only updates slots that can be determined and are not yet filled by a real
- * match result. Returns an array of { matchCode, update } objects.
- *
- * Seeding:
- *   Seed 1 → KO_SF1.player_a
- *   Seed 2 → KO_SF2.player_a
- *   Seed 3 → KO_SF2.player_b
- *   Seed 4 → KO_QF1.player_a
- *   Seed 5 → KO_QF1.player_b
- *
- * @param {object[]} standings   — computeRoundRobinStandings result (sorted)
- * @param {object[]} koMatches   — existing KO match rows from Supabase
- * @returns {Array<{ id: string, update: object }>}
- */
 export const computeKnockoutShellUpdates = (standings = [], koMatches = []) => {
   const byCode = new Map(koMatches.map((m) => [String(m.match_code || '').toUpperCase(), m]));
 
-  const seed = (n) => standings[n - 1]?.employee_id || null;
+  const seed = (n) => standings[n - 1]?.team_id || null;
 
   const updates = [];
 
   const tryUpdate = (code, field, value) => {
-    if (!value) return; // no player determined yet
+    if (!value) return;
     const match = byCode.get(code);
     if (!match) return;
-    // Don't overwrite a slot that already has a real match result player
-    // (i.e. the match is completed/walkover) — only update TBD slots.
     if (String(match.status || '').toLowerCase() === 'completed') return;
-    if (String(match[field] || '') === String(value)) return; // already correct
+    if (String(match[field] || '') === String(value)) return;
     updates.push({ id: match.id, update: { [field]: value } });
   };
 
-  // KO_QF1: Seed4 vs Seed5
-  tryUpdate('KO_QF1', 'player_a_employee_id', seed(4));
-  tryUpdate('KO_QF1', 'player_b_employee_id', seed(5));
-
-  // KO_SF1: Seed1 vs winner(QF) — only fill Seed1 here (QF winner filled by advanceWinner)
-  tryUpdate('KO_SF1', 'player_a_employee_id', seed(1));
-
-  // KO_SF2: Seed2 vs Seed3
-  tryUpdate('KO_SF2', 'player_a_employee_id', seed(2));
-  tryUpdate('KO_SF2', 'player_b_employee_id', seed(3));
+  tryUpdate('KO_QF1', 'team_a_id', seed(4));
+  tryUpdate('KO_QF1', 'team_b_id', seed(5));
+  tryUpdate('KO_SF1', 'team_a_id', seed(1));
+  tryUpdate('KO_SF2', 'team_a_id', seed(2));
+  tryUpdate('KO_SF2', 'team_b_id', seed(3));
 
   return updates;
 };
 
-/**
- * @param {object[]} participants
- * @param {object[]} matches       — existing matches (for standing + opponent tracking)
- * @param {number}   roundNumber
- * @param {object}   opts          — same shape as buildKnockoutFixturePlan opts
- */
-export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber = 1, opts = {}) => {
-  const standings = computeSwissStandings(participants, matches);
+export const buildSwissRoundPlan = (teams = [], matches = [], roundNumber = 1, opts = {}) => {
+  const standings = computeSwissStandings(teams, matches);
   const opponentMap = buildOpponentMap(matches);
   const byPoints = new Map();
 
@@ -1153,9 +790,9 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
 
   const pickOpponent = (player, pool) => {
     for (const candidate of pool) {
-      if (paired.has(candidate.employee_id)) continue;
-      if (candidate.employee_id === player.employee_id) continue;
-      if (!opponentMap.get(player.employee_id)?.has(candidate.employee_id)) return candidate;
+      if (paired.has(candidate.team_id)) continue;
+      if (candidate.team_id === player.team_id) continue;
+      if (!opponentMap.get(player.team_id)?.has(candidate.team_id)) return candidate;
     }
     return null;
   };
@@ -1166,7 +803,7 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
       return (a.seed || 0) - (b.seed || 0);
     });
     for (const player of pool) {
-      if (paired.has(player.employee_id)) continue;
+      if (paired.has(player.team_id)) continue;
       let opponent = pickOpponent(player, pool);
       if (!opponent) {
         const fallbackPools = orderedPoints
@@ -1181,16 +818,16 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
         opponent = pickOpponent(player, fallbackPools);
       }
       if (opponent) {
-        paired.add(player.employee_id);
-        paired.add(opponent.employee_id);
+        paired.add(player.team_id);
+        paired.add(opponent.team_id);
         roundMatches.push({
           round: `SW${roundNumber}`,
           match_number: roundMatches.length + 1,
           match_code: `SW${roundNumber}-${roundMatches.length + 1}`,
-          player_a_employee_id: player.employee_id,
-          player_b_employee_id: opponent.employee_id,
+          team_a_id: player.team_id,
+          team_b_id: opponent.team_id,
           status: 'scheduled',
-          winner_employee_id: null,
+          winner_team_id: null,
           score_a: null,
           score_b: null,
         });
@@ -1207,10 +844,10 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
         round: `SW${roundNumber}`,
         match_number: roundMatches.length + 1,
         match_code: `SW${roundNumber}-${roundMatches.length + 1}`,
-        player_a_employee_id: byePlayer.employee_id,
-        player_b_employee_id: null,
+        team_a_id: byePlayer.team_id,
+        team_b_id: null,
         status: 'bye',
-        winner_employee_id: byePlayer.employee_id,
+        winner_team_id: byePlayer.team_id,
         score_a: 1,
         score_b: 0,
       });
@@ -1218,19 +855,11 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
   }
 
   const {
-    playersPerTeam      = 1,
     tournamentStartDate = null,
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
   } = opts;
-
-  const ppt = Math.max(1, Number(playersPerTeam) || 1);
-  let teamMap = {};
-  if (ppt > 1) {
-    const teams = groupIntoTeams(participants, ppt);
-    teamMap = Object.fromEntries(teams.map((t) => [t.captain.employee_id, t]));
-  }
 
   let rounds = [{
     round: `SW${roundNumber}`,
@@ -1238,10 +867,72 @@ export const buildSwissRoundPlan = (participants = [], matches = [], roundNumber
     matches: roundMatches,
   }];
 
-  if (ppt > 1) rounds = injectTeamPlayers(rounds, teamMap);
   if (tournamentStartDate) {
     rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
   }
 
   return { standings, rounds };
+};
+
+export const isPhantomMatch = (m) =>
+  !m.team_a_id && !m.team_b_id;
+
+export const isByeMatch = (m) =>
+  String(m.status || '').toLowerCase() === 'bye' ||
+  (!m.team_a_id && !!m.team_b_id) ||
+  (!!m.team_a_id && !m.team_b_id);
+
+export const refreshKnockoutPlan = (existingMatches = [], teams = []) => {
+  const DONE = new Set(['completed', 'walkover', 'no_show', 'bye', 'draw', 'cancelled']);
+  const doneMatches    = existingMatches.filter((m) => DONE.has(String(m.status || '').toLowerCase()));
+  const pendingMatches = existingMatches.filter((m) => !DONE.has(String(m.status || '').toLowerCase()));
+
+  const currentIds = new Set(teams.map((t) => t.id));
+  const playedIds  = new Set(
+    doneMatches.flatMap((m) => [m.team_a_id, m.team_b_id].filter(Boolean))
+  );
+
+  const addedIds   = [...currentIds].filter((id) => !playedIds.has(id));
+  const removedIds = [...playedIds].filter((id) => !currentIds.has(id));
+
+  if (pendingMatches.length === 0 && addedIds.length === 0 && removedIds.length === 0) {
+    return {
+      status:           'up_to_date',
+      message:          'Fixtures are already up to date.',
+      matchesToDelete:  [],
+      newRounds:        [],
+    };
+  }
+
+  const decidedWinners = new Set(
+    doneMatches.filter((m) => m.winner_team_id).map((m) => m.winner_team_id)
+  );
+  const eliminatedIds = new Set(
+    doneMatches
+      .filter((m) => m.winner_team_id && String(m.status || '') !== 'bye')
+      .flatMap((m) => [m.team_a_id, m.team_b_id].filter(Boolean))
+      .filter((id) => !decidedWinners.has(id))
+  );
+
+  const stillActive = teams.filter((t) => !eliminatedIds.has(t.id));
+
+  if (stillActive.length < 2) {
+    return {
+      status:           'up_to_date',
+      message:          'Tournament is effectively over — no pending rounds to rebuild.',
+      matchesToDelete:  [],
+      newRounds:        [],
+    };
+  }
+
+  const newPlan = buildKnockoutFixturePlan(stillActive);
+  const deleted = pendingMatches.length;
+  const added   = newPlan.rounds.reduce((sum, r) => sum + r.matches.length, 0);
+
+  return {
+    status:           'changed',
+    message:          `Removed ${deleted} pending match${deleted !== 1 ? 'es' : ''} and regenerated ${added} match${added !== 1 ? 'es' : ''} for remaining rounds.`,
+    matchesToDelete:  pendingMatches.map((m) => m.id),
+    newRounds:        newPlan.rounds,
+  };
 };

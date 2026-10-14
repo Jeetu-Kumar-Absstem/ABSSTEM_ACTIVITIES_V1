@@ -161,35 +161,30 @@ export const AppProvider = ({ children }) => {
 
   const getMatchStatus = (match) => String(match?.status || 'scheduled').toLowerCase();
 
-  const advanceWinnerToNextMatch = async (sourceMatch, winnerEmployeeId) => {
-    if (!sourceMatch?.next_match_winner_id || !winnerEmployeeId) return { success: true };
+  const advanceWinnerToNextMatch = async (sourceMatch, winnerTeamId) => {
+    if (!sourceMatch?.next_match_winner_id || !winnerTeamId) return { success: true };
 
-    // ── Always fetch FRESH data from DB, never stale React state ──────────
-    // If two matches (e.g. SF1 and SF2) both feed the same Final match, the
-    // second call would otherwise read the React state that was current when
-    // this closure was created — before the first call's DB write was reflected
-    // — and incorrectly put the same player into both player_a and player_b.
     const { data: nextMatch, error: fetchErr } = await supabase
       .from('tournament_matches')
-      .select('id, player_a_employee_id, player_b_employee_id')
+      .select('id, team_a_id, team_b_id')
       .eq('id', sourceMatch.next_match_winner_id)
       .single();
     if (fetchErr || !nextMatch) return { success: true };
 
-    if (String(nextMatch.player_a_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
+    if (String(nextMatch.team_a_id || '').toUpperCase() === String(winnerTeamId).toUpperCase()) {
       return { success: true };
     }
-    if (String(nextMatch.player_b_employee_id || '').toUpperCase() === String(winnerEmployeeId).toUpperCase()) {
+    if (String(nextMatch.team_b_id || '').toUpperCase() === String(winnerTeamId).toUpperCase()) {
       return { success: true };
     }
 
     const payload = {};
-    if (!nextMatch.player_a_employee_id) {
-      payload.player_a_employee_id = winnerEmployeeId;
-    } else if (!nextMatch.player_b_employee_id) {
-      payload.player_b_employee_id = winnerEmployeeId;
+    if (!nextMatch.team_a_id) {
+      payload.team_a_id = winnerTeamId;
+    } else if (!nextMatch.team_b_id) {
+      payload.team_b_id = winnerTeamId;
     } else {
-      return { success: false, error: 'Next match already has two players' };
+      return { success: false, error: 'Next match already has two teams' };
     }
 
     const { error } = await supabase
@@ -709,6 +704,22 @@ const loadTournamentMatches = async () => {
       }
     } catch (_) { /* table may not exist yet — degrade gracefully */ }
 
+    // Fetch tournament teams to resolve team_a_id and team_b_id to members
+    let teamsMap = {};
+    try {
+      const { data: teams } = await supabase
+        .from('tournament_teams')
+        .select('id, members, captain_id');
+      if (teams) {
+        teams.forEach(t => {
+          teamsMap[t.id] = {
+            members: t.members || [],
+            captain_id: t.captain_id
+          };
+        });
+      }
+    } catch (_) { /* degrade gracefully */ }
+
     // CRITICAL FIX: We need to restore the _feeds_from_a and _feeds_from_b
     // metadata from the match_code relationships. This can be derived from
     // the next_match_winner_id pointer chain.
@@ -717,17 +728,30 @@ const loadTournamentMatches = async () => {
       const feedsFrom = (data || []).filter(
         prev => prev.next_match_winner_id === m.id
       );
-      
+
       // Sort by match_number to maintain order
       feedsFrom.sort((a, b) => (a.match_number || 0) - (b.match_number || 0));
-      
+
       const feedsFromA = feedsFrom[0]?.match_code || null;
       const feedsFromB = feedsFrom[1]?.match_code || null;
-      
+
+      // Resolve team members from team_a_id/team_b_id if available
+      const teamA = teamsMap[m.team_a_id]?.members || [];
+      const teamB = teamsMap[m.team_b_id]?.members || [];
+      const captainA = teamsMap[m.team_a_id]?.captain_id || null;
+      const captainB = teamsMap[m.team_b_id]?.captain_id || null;
+
       return {
         ...m,
-        team_a_players: playersMap[m.id]?.A || [],
-        team_b_players: playersMap[m.id]?.B || [],
+        // merge members from both sources: specific match junction OR general tournament team
+        team_a_players: (playersMap[m.id]?.A || []).length > 0
+          ? playersMap[m.id].A
+          : teamA.map(id => ({ employee_id: id })),
+        team_b_players: (playersMap[m.id]?.B || []).length > 0
+          ? playersMap[m.id].B
+          : teamB.map(id => ({ employee_id: id })),
+        player_a_employee_id: m.player_a_employee_id || captainA,
+        player_b_employee_id: m.player_b_employee_id || captainB,
         // Restore the feed metadata
         _feeds_from_a: feedsFromA,
         _feeds_from_b: feedsFromB,
@@ -1499,18 +1523,29 @@ const loadTournamentMatches = async () => {
         timezone:            opts.timezone            ?? 'Asia/Kolkata',
       };
 
+      // ── Step 1: Create teams in DB first ─────────────────────────────────
+      const teams = await createTournamentTeams(
+        tournamentId,
+        participants,
+        fixtureOpts.playersPerTeam
+      );
+      if (teams.length === 0) {
+        return { success: false, error: 'Failed to create tournament teams' };
+      }
+
+      // Now pass the persisted teams (with database IDs) to the builder
       const payloads = [];
       let roundPlan = null;
 
       if (format === 'knockout') {
-        roundPlan = buildKnockoutFixturePlan(participants, fixtureOpts);
+        roundPlan = buildKnockoutFixturePlan(teams, fixtureOpts);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             // Include ALL matches — even TBD shell (upcoming) matches.
             // Only skip true phantom matches that have no pre-place hints either.
-            const isPhantom = !match.player_a_employee_id && !match.player_b_employee_id &&
+            const isPhantom = !match.team_a_id && !match.team_b_id &&
                               !match._preplace_a && !match._preplace_b;
-            // For TBD shells (future rounds): player_a/b both null but they
+            // For TBD shells (future rounds): team_a/b both null but they
             // have no _preplace either — we WANT these to show in the bracket.
             // Only skip if both _feeds_from are also null (truly unreachable).
             if (isPhantom && !match._feeds_from_a && !match._feeds_from_b) continue;
@@ -1520,11 +1555,11 @@ const loadTournamentMatches = async () => {
               match_code:            match.match_code,
               round:                 match.round,
               match_number:          match.match_number,
-              player_a_employee_id:  match._preplace_a ?? match.player_a_employee_id,
-              player_b_employee_id:  match._preplace_b ?? match.player_b_employee_id,
+              team_a_id:             match._preplace_a ?? match.team_a_id,
+              team_b_id:             match._preplace_b ?? match.team_b_id,
               score_a:               match.score_a,
               score_b:               match.score_b,
-              winner_employee_id:    match.winner_employee_id,
+              winner_team_id:        match.winner_team_id,
               status:                match.status,
               scheduled_at:          match.scheduled_at ?? null,
               played_at:             match.status === 'bye' ? new Date().toISOString() : null,
@@ -1534,7 +1569,7 @@ const loadTournamentMatches = async () => {
       } else if (format === 'round_robin') {
         // Generate ALL RR matches + KO bracket shells (TBD placeholders) at once.
         // Shells are filled in progressively as RR results arrive via recordMatchResult.
-        const leaguePlan = buildLeagueFullFixturePlan(participants, fixtureOpts);
+        const leaguePlan = buildLeagueFullFixturePlan(teams, fixtureOpts);
         roundPlan = { rounds: leaguePlan.rrRounds };
 
         // RR match payloads
@@ -1545,8 +1580,8 @@ const loadTournamentMatches = async () => {
               match_code:            match.match_code,
               round:                 match.round,
               match_number:          match.match_number,
-              player_a_employee_id:  match.player_a_employee_id,
-              player_b_employee_id:  match.player_b_employee_id,
+              team_a_id:             match.team_a_id,
+              team_b_id:             match.team_b_id,
               status:                match.status,
               scheduled_at:          match.scheduled_at ?? null,
             });
@@ -1566,10 +1601,10 @@ const loadTournamentMatches = async () => {
           match_code:            m.match_code,
           round:                 m.round,
           match_number:          m.match_number,
-          player_a_employee_id:  null,
-          player_b_employee_id:  null,
+          team_a_id:             null,
+          team_b_id:             null,
           status:                'scheduled',
-          winner_employee_id:    null,
+          winner_team_id:        null,
           score_a:               null,
           score_b:               null,
           scheduled_at:          null,
@@ -1599,7 +1634,7 @@ const loadTournamentMatches = async () => {
 
       } else if (format === 'swiss') {
         const nextRoundNumber = latestSwissRound ? latestSwissRound + 1 : 1;
-        roundPlan = buildSwissRoundPlan(participants, existingMatches, nextRoundNumber, fixtureOpts);
+        roundPlan = buildSwissRoundPlan(teams, existingMatches, nextRoundNumber, fixtureOpts);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
             payloads.push({
@@ -1607,11 +1642,11 @@ const loadTournamentMatches = async () => {
               match_code:            match.match_code,
               round:                 match.round,
               match_number:          match.match_number,
-              player_a_employee_id:  match.player_a_employee_id,
-              player_b_employee_id:  match.player_b_employee_id,
+              team_a_id:             match.team_a_id,
+              team_b_id:             match.team_b_id,
               score_a:               match.score_a,
               score_b:               match.score_b,
-              winner_employee_id:    match.winner_employee_id,
+              winner_team_id:        match.winner_team_id,
               status:                match.status,
               scheduled_at:          match.scheduled_at ?? null,
               played_at:             match.status === 'bye' ? new Date().toISOString() : null,
@@ -1681,8 +1716,8 @@ const loadTournamentMatches = async () => {
           if (!targetRow) continue;
           const update = {};
           const [winnerA, winnerB] = winners;
-          if (winnerA) update.player_a_employee_id = winnerA;
-          if (winnerB && winnerB !== winnerA) update.player_b_employee_id = winnerB;
+          if (winnerA) update.team_a_id = winnerA;
+          if (winnerB && winnerB !== winnerA) update.team_b_id = winnerB;
           if (Object.keys(update).length > 0) {
             await supabase
               .from('tournament_matches')
@@ -2000,7 +2035,31 @@ const loadTournamentMatches = async () => {
     }
   };
 
-  // ── Tournament matches (admin for create, participants for results) ─────
+  const createTournamentTeams = async (tournamentId, participants, playersPerTeam = 1) => {
+    try {
+      const teamsData = groupIntoTeams(participants, playersPerTeam);
+      if (teamsData.length === 0) return [];
+
+      const insertPayload = teamsData.map((team) => ({
+        tournament_id: tournamentId,
+        team_name: `Team ${teamsData.indexOf(team) + 1}`,
+        members: team.members.map((m) => m.employee_id),
+        captain_id: team.captain?.employee_id,
+      }));
+
+      const { data, error } = await supabase
+        .from('tournament_teams')
+        .insert(insertPayload)
+        .select();
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('[AppContext] createTournamentTeams error:', err);
+      throw err;
+    }
+  };
+
   const addTournamentMatch = async (matchData) => {
     if (!isAdmin()) {
       return { success: false, error: 'Only admins can create matches' };
@@ -2581,8 +2640,8 @@ const loadTournamentMatches = async () => {
           if (!targetRow) continue;
           const update = {};
           const [winnerA, winnerB] = winners;
-          if (winnerA) update.player_a_employee_id = winnerA;
-          if (winnerB && winnerB !== winnerA) update.player_b_employee_id = winnerB;
+          if (winnerA) update.team_a_id = winnerA;
+          if (winnerB && winnerB !== winnerA) update.team_b_id = winnerB;
           if (Object.keys(update).length > 0) {
             await supabase
               .from('tournament_matches')
