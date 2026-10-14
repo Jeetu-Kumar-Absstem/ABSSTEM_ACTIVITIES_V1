@@ -161,37 +161,83 @@ export const AppProvider = ({ children }) => {
 
   const getMatchStatus = (match) => String(match?.status || 'scheduled').toLowerCase();
 
-  const advanceWinnerToNextMatch = async (sourceMatch, winnerTeamId) => {
-    if (!sourceMatch?.next_match_winner_id || !winnerTeamId) return { success: true };
+  const advanceWinnerToNextMatch = async (sourceMatch, winnerEmpId) => {
+    if (!sourceMatch?.next_match_winner_id || !winnerEmpId) return { success: true };
 
+    // NOTE: team_a_id / team_b_id are bigint (team ids). The winner here is an
+    // employee id (text), so advance into player_a/b_employee_id instead.
     const { data: nextMatch, error: fetchErr } = await supabase
       .from('tournament_matches')
-      .select('id, team_a_id, team_b_id')
+      .select('id, player_a_employee_id, player_b_employee_id')
       .eq('id', sourceMatch.next_match_winner_id)
       .single();
     if (fetchErr || !nextMatch) return { success: true };
 
-    if (String(nextMatch.team_a_id || '').toUpperCase() === String(winnerTeamId).toUpperCase()) {
-      return { success: true };
-    }
-    if (String(nextMatch.team_b_id || '').toUpperCase() === String(winnerTeamId).toUpperCase()) {
-      return { success: true };
-    }
+    const w = String(winnerEmpId).toUpperCase();
+    const aVal = String(nextMatch.player_a_employee_id || '').toUpperCase();
+    const bVal = String(nextMatch.player_b_employee_id || '').toUpperCase();
 
+    // Pick the slot: already holds this winner, else first empty slot.
+    let slot = null;
     const payload = {};
-    if (!nextMatch.team_a_id) {
-      payload.team_a_id = winnerTeamId;
-    } else if (!nextMatch.team_b_id) {
-      payload.team_b_id = winnerTeamId;
-    } else {
-      return { success: false, error: 'Next match already has two teams' };
+    if (aVal === w) slot = 'A';
+    else if (bVal === w) slot = 'B';
+    else if (!nextMatch.player_a_employee_id) { slot = 'A'; payload.player_a_employee_id = winnerEmpId; }
+    else if (!nextMatch.player_b_employee_id) { slot = 'B'; payload.player_b_employee_id = winnerEmpId; }
+    else return { success: false, error: 'Next match already has two players' };
+
+    if (Object.keys(payload).length > 0) {
+      const { error } = await supabase
+        .from('tournament_matches')
+        .update(payload)
+        .match({ id: nextMatch.id });
+      if (error) throw error;
     }
 
-    const { error } = await supabase
-      .from('tournament_matches')
-      .update(payload)
-      .match({ id: nextMatch.id });
-    if (error) throw error;
+    // Carry the winning TEAM (all members, not just the captain) into the next
+    // match via the junction table so the bracket shows the full team.
+    try {
+      const winnerSide =
+        String(sourceMatch.player_a_employee_id || '').toUpperCase() === w ? 'A' : 'B';
+
+      // Read members fresh from the DB (state may be stale); fall back to state.
+      let ids = [];
+      const { data: srcRows, error: srcErr } = await supabase
+        .from('tournament_match_players')
+        .select('employee_id, position')
+        .eq('match_id', sourceMatch.id)
+        .eq('team', winnerSide)
+        .order('position', { ascending: true });
+      if (srcErr) console.error('[advance] read source team failed:', srcErr);
+      ids = (srcRows || []).map((r) => r.employee_id).filter(Boolean);
+      if (ids.length === 0) {
+        const members = (winnerSide === 'A' ? sourceMatch.team_a_players : sourceMatch.team_b_players) || [];
+        ids = members.map((p) => p.employee_id).filter(Boolean);
+      }
+      ids = [...new Set(ids)];
+      console.log('[advance] winner', winnerEmpId, 'side', winnerSide, 'members', ids, '→ next match', nextMatch.id, 'slot', slot);
+
+      const { error: delErr } = await supabase
+        .from('tournament_match_players')
+        .delete()
+        .eq('match_id', nextMatch.id)
+        .eq('team', slot);
+      if (delErr) console.error('[advance] delete old next-match team rows failed:', delErr);
+
+      if (ids.length > 1) {
+        const { error: insErr } = await supabase.from('tournament_match_players').insert(
+          ids.map((empId, idx) => ({
+            match_id: nextMatch.id,
+            employee_id: empId,
+            team: slot,
+            position: idx + 1,
+          }))
+        );
+        if (insErr) console.error('[advance] insert next-match team rows failed:', insErr);
+      }
+    } catch (teamErr) {
+      console.error('[advance] could not copy team members to next match:', teamErr);
+    }
 
     return { success: true };
   };
@@ -757,6 +803,28 @@ const loadTournamentMatches = async () => {
         _feeds_from_b: feedsFromB,
       };
     });
+    // ── Derive full teams for knockout slots filled by advancement ──────────
+    // If a slot only has its captain, but a feeder match was won by that same
+    // captain, reuse the feeder's winning team. This makes the bracket show the
+    // complete team even if nothing was stored for the later match in the DB.
+    const byId = new Map(enriched.map((m) => [m.id, m]));
+    const up = (v) => String(v || '').toUpperCase();
+    for (let pass = 0; pass < 3; pass++) {
+      for (const m of enriched) {
+        const feeders = enriched.filter((f) => f.next_match_winner_id === m.id && f.winner_employee_id);
+        for (const side of ['A', 'B']) {
+          const capKey = side === 'A' ? 'player_a_employee_id' : 'player_b_employee_id';
+          const listKey = side === 'A' ? 'team_a_players' : 'team_b_players';
+          if (!m[capKey] || (m[listKey] || []).length > 1) continue;
+          const src = feeders.find((f) => up(f.winner_employee_id) === up(m[capKey]));
+          if (!src) continue;
+          const srcList = up(src.player_a_employee_id) === up(src.winner_employee_id)
+            ? src.team_a_players
+            : src.team_b_players;
+          if ((srcList || []).length > 1) m[listKey] = srcList.map((p) => ({ ...p }));
+        }
+      }
+    }
     setTournamentMatches(enriched);
   } catch (err) {
     console.error('Error loading tournament matches:', err);
@@ -2220,7 +2288,7 @@ const loadTournamentMatches = async () => {
           ? String(resultData.absent_participant_employee_id).toUpperCase() === String(match.player_a_employee_id || '').toUpperCase()
             ? match.player_b_employee_id
             : match.player_a_employee_id
-          : (resultData.winner_employee_id || null)
+          : (resultData.winner_team_id || resultData.winner_employee_id || null)
       );
 
       const status = (
@@ -2237,7 +2305,8 @@ const loadTournamentMatches = async () => {
       const payload = {
         score_a: resultData.score_a ?? null,
         score_b: resultData.score_b ?? null,
-        winner_employee_id: winner,
+        winner_team_id: (typeof winner === 'number' || (typeof winner === 'string' && /^\d+$/.test(winner))) ? winner : null,
+        winner_employee_id: (typeof winner === 'string' && !/^\d+$/.test(winner)) ? winner : null,
         status,
         played_at: status === 'completed' || status === 'walkover' || status === 'no_show' || status === 'bye'
           ? new Date().toISOString()
@@ -2345,6 +2414,13 @@ const loadTournamentMatches = async () => {
                 .from('tournament_matches')
                 .update(revertPayload)
                 .match({ id: nextMatch.id });
+              try {
+                await supabase
+                  .from('tournament_match_players')
+                  .delete()
+                  .eq('match_id', nextMatch.id)
+                  .eq('team', aMatch ? 'A' : 'B');
+              } catch (_) { /* degrade gracefully */ }
             }
           }
         }

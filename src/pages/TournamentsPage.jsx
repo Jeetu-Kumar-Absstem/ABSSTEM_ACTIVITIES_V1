@@ -661,9 +661,12 @@ const canEditMatch = (m) => {
       const uniqueIds = [...new Set(allIds)];
       const names = uniqueIds.map(id => getEmployeeName(id));
 
-      // If it's a team match (more than 1 player), prefix with "Team"
+      // If it's a team match (more than 1 player), prefix with "Team X" where X is the index
+      // Since we don't have the team index here, we use "Team" and then list players.
+      // To get the actual "Team 1", "Team 2" we'd need the team object.
+      // But as per request: "mark Team- A (Players) VS Team -B (Players)"
       return uniqueIds.length > 1
-        ? `Team - ${names.join(', ')}`
+        ? `Team (${names.join(', ')})`
         : names[0];
     };
 
@@ -777,39 +780,50 @@ const renderMatch = (m) => {
       {/* Player A */}
       <div style={{
         ...styles.matchPlayer,
-        background: hasScore && m.score_a > m.score_b ? 'rgba(46,125,50,0.14)' : 
+        background: hasScore && m.score_a > m.score_b ? 'rgba(46,125,50,0.14)' :
                     waitingForWinnerA ? 'rgba(230,81,0,0.10)' : 'transparent',
         color: isPhantom ? 'var(--muted)'
-              : hasScore && m.score_a > m.score_b ? 'var(--success)' 
+              : hasScore && m.score_a > m.score_b ? 'var(--success)'
               : waitingForWinnerA ? '#e65100'
               : 'var(--text)',
-        fontWeight: hasScore && m.score_a > m.score_b ? 700 : 
+        fontWeight: hasScore && m.score_a > m.score_b ? 700 :
                     waitingForWinnerA ? 600 : 500,
         fontStyle: isPhantom || waitingForWinnerA ? 'italic' : 'normal',
       }}>
         <span style={{ fontSize: '0.7rem' }}>
           {waitingForWinnerA ? `← Winner of ${m._feeds_from_a || 'previous match'}` : a}
         </span>
-        <span>{isPhantom ? '' : (m.score_a ?? '—')}</span>
+        <span style={{ marginLeft: '0.4rem' }}>{isPhantom ? '' : (m.score_a ?? '—')}</span>
+      </div>
+
+      <div style={{
+        textAlign: 'center',
+        fontSize: '0.7rem',
+        fontWeight: 700,
+        color: 'var(--muted)',
+        margin: '0.2rem 0',
+        opacity: isPhantom ? 0 : 1
+      }}>
+        VS
       </div>
 
       {/* Player B */}
       <div style={{
         ...styles.matchPlayer,
-        background: hasScore && m.score_b > m.score_a ? 'rgba(46,125,50,0.14)' : 
+        background: hasScore && m.score_b > m.score_a ? 'rgba(46,125,50,0.14)' :
                     waitingForWinnerB ? 'rgba(230,81,0,0.10)' : 'transparent',
         color: isPhantom ? 'var(--muted)'
               : hasScore && m.score_b > m.score_a ? 'var(--success)'
               : waitingForWinnerB ? '#e65100'
               : (isBye && !m.player_b_employee_id) ? 'var(--muted)' : 'var(--text)',
-        fontWeight: hasScore && m.score_b > m.score_a ? 700 : 
+        fontWeight: hasScore && m.score_b > m.score_a ? 700 :
                     waitingForWinnerB ? 600 : 500,
         fontStyle: isPhantom || (isBye && !m.player_b_employee_id) || waitingForWinnerB ? 'italic' : 'normal',
       }}>
         <span style={{ fontSize: '0.7rem' }}>
           {waitingForWinnerB ? `← Winner of ${m._feeds_from_b || 'previous match'}` : b}
         </span>
-        <span>{isPhantom ? '' : (m.score_b ?? '—')}</span>
+        <span style={{ marginLeft: '0.4rem' }}>{isPhantom ? '' : (m.score_b ?? '—')}</span>
       </div>
 
       {/* Status line */}
@@ -2695,7 +2709,7 @@ const renderMatch = (m) => {
                     {showScoreFields && (
                       <>
                         <div style={styles.formRow}>
-                          <label style={styles.formLabel}>{getEmployeeName(m.player_a_employee_id)} Score</label>
+                          <label style={styles.formLabel}>Team A Score</label>
                           <input
                             style={styles.formInput}
                             type="number"
@@ -2705,7 +2719,7 @@ const renderMatch = (m) => {
                           />
                         </div>
                         <div style={styles.formRow}>
-                          <label style={styles.formLabel}>{getEmployeeName(m.player_b_employee_id)} Score</label>
+                          <label style={styles.formLabel}>Team B Score</label>
                           <input
                             style={styles.formInput}
                             type="number"
