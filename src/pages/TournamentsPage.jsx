@@ -1451,7 +1451,7 @@ const renderMatch = (m) => {
           <table style={{ ...styles.table, minWidth: 1000 }}>
             <thead>
               <tr style={styles.theadRow}>
-                {['Round','Match','Player A','Score A','Score B','Player B','Played','Status','Result','Admin'].map((h, i) => (
+                {['Round','Match','Team A','Score A','Score B','Team B','Played','Status','Result','Admin'].map((h, i) => (
                   <th key={i} style={styles.th}>{h}</th>
                 ))}
               </tr>

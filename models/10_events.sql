@@ -25,7 +25,7 @@ create table if not exists public.events (
   event_status text not null default 'scheduled',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  check (event_type in ('company', 'tournament', 'outstation', 'celebration')),
+  check (event_type in ('company', 'tournament', 'outstation', 'celebration', 'other')),
   check (event_status in ('scheduled', 'ongoing', 'completed', 'cancelled', 'postponed')),
   check (end_date is null or end_date >= start_date)
 );
@@ -66,6 +66,9 @@ alter table if exists public.events
 
 alter table if exists public.events
   add column if not exists banner_color text;
+
+alter table if exists public.events
+  add column if not exists custom_event_type text;
 
 alter table if exists public.events
   add column if not exists icon text;

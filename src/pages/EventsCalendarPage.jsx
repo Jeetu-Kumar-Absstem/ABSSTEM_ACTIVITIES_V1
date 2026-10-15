@@ -22,6 +22,7 @@ const EVENT_TYPE_STYLE = {
   tournament:  { background: 'rgba(106,27,154,0.16)', color: '#d8a4ff' },
   outstation:  { background: 'rgba(46,125,50,0.16)', color: 'var(--success)' },
   celebration: { background: 'rgba(249,168,37,0.16)', color: 'var(--warning)' },
+  other:       { background: 'rgba(158,158,158,0.16)', color: 'var(--text-soft)' },
 };
 
 const STATUS_BADGE = {
@@ -174,6 +175,7 @@ const EventsCalendarPage = () => {
   const [form, setForm] = useState({
     title: '',
     event_type: 'company',
+    custom_event_type: '',
     start_date: fmtDate(year, month, today.getDate()),
     end_date: '',
     start_time: '',
@@ -257,6 +259,7 @@ const EventsCalendarPage = () => {
       ...f,
       title: '',
       event_type: 'company',
+      custom_event_type: '',
       start_date: presetDate || fmtDate(year, month, today.getDate()),
       end_date: '',
       start_time: '',
@@ -285,6 +288,10 @@ const EventsCalendarPage = () => {
       showToast('Title, start date and end date are required', 'error');
       return;
     }
+    if (form.event_type === 'other' && !form.custom_event_type.trim()) {
+      showToast('Custom event name is required for "Other" type', 'error');
+      return;
+    }
     const submitter =
       currentUser?.user_metadata?.name ||
       currentUser?.email?.split('@')[0] ||
@@ -305,7 +312,7 @@ const EventsCalendarPage = () => {
       setShowAddModal(false);
       setShowEditModal(false);
       setForm({
-        title: '', event_type: 'company',
+        title: '', event_type: 'company', custom_event_type: '',
         start_date: fmtDate(year, month, today.getDate()),
         end_date: '', start_time: '', end_time: '',
         venue: '', location: '', organizer: '',
@@ -804,7 +811,16 @@ const EventsCalendarPage = () => {
                     <option value="tournament">Tournament</option>
                     <option value="outstation">Outstation</option>
                     <option value="celebration">Celebration</option>
+                    <option value="other">Other</option>
                   </select>
+                  {form.event_type === 'other' && (
+                    <div style={{ ...styles.formRow, marginTop: '0.6rem' }}>
+                      <label style={styles.formLabel}>Enter event name <span style={{ color: '#e53935' }}>*</span></label>
+                      <input style={styles.formInput} value={form.custom_event_type}
+                             onChange={(e) => setForm(f => ({ ...f, custom_event_type: e.target.value }))}
+                             placeholder="e.g. Charity Fundraiser" />
+                    </div>
+                  )}
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Venue</label>
