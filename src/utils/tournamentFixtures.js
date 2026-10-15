@@ -1,3 +1,5 @@
+import { getPlayoffShape, detectPlayoffShapeFromCodes } from './tournamentPlanner.js';
+
 const roundLabelFromSize = (size) => {
   if (size <= 2) return 'Final';
   if (size === 4) return 'Semi Final';
@@ -102,14 +104,53 @@ export const getMatchTeams = (match) => {
   };
 };
 
-export const groupIntoTeams = (participants = [], playersPerTeam = 1) => {
+// opts.leftoverPolicy: 'exclude' (default, previous behaviour: extra players are
+//                       left out) | 'smaller_team' (extra players form one shorter team)
+// opts.formation:       'registration_order' (default) | 'random' | 'seed_balanced'
+//                       (snake draft by participant.seed so teams are even)
+export const groupIntoTeams = (participants = [], playersPerTeam = 1, opts = {}) => {
   const ppt = Math.max(1, Number(playersPerTeam) || 1);
-  if (ppt === 1) return participants.map((p) => ({ captain: p, members: [p] }));
+  const { leftoverPolicy = 'exclude', formation = 'registration_order' } = opts || {};
+
+  let pool = [...participants];
+  if (formation === 'random') {
+    pool = shuffleArray(pool);
+  } else if (formation === 'seed_balanced') {
+    pool = pool
+      .map((p, i) => ({ p, i }))
+      .sort((x, y) => {
+        const sx = Number(x.p?.seed) || Number.MAX_SAFE_INTEGER;
+        const sy = Number(y.p?.seed) || Number.MAX_SAFE_INTEGER;
+        return sx !== sy ? sx - sy : x.i - y.i;
+      })
+      .map((x) => x.p);
+  }
+
+  if (ppt === 1) return pool.map((p) => ({ captain: p, members: [p] }));
+
+  const fullTeams = Math.floor(pool.length / ppt);
+  const used = pool.slice(0, fullTeams * ppt);
+  const rest = pool.slice(fullTeams * ppt);
 
   const teams = [];
-  for (let i = 0; i + ppt <= participants.length; i += ppt) {
-    const slice = participants.slice(i, i + ppt);
-    teams.push({ captain: slice[0], members: slice });
+  if (formation === 'seed_balanced' && fullTeams > 0) {
+    // Snake draft: row 0 left→right, row 1 right→left, ...
+    const buckets = Array.from({ length: fullTeams }, () => []);
+    used.forEach((p, idx) => {
+      const row = Math.floor(idx / fullTeams);
+      const col = row % 2 === 0 ? idx % fullTeams : fullTeams - 1 - (idx % fullTeams);
+      buckets[col].push(p);
+    });
+    buckets.forEach((members) => teams.push({ captain: members[0], members }));
+  } else {
+    for (let i = 0; i < used.length; i += ppt) {
+      const slice = used.slice(i, i + ppt);
+      teams.push({ captain: slice[0], members: slice });
+    }
+  }
+
+  if (rest.length > 0 && leftoverPolicy === 'smaller_team') {
+    teams.push({ captain: rest[0], members: rest });
   }
   return teams;
 };
@@ -166,6 +207,10 @@ export const buildMatchTimestamp = (
   return new Date(slotMs).toISOString();
 };
 
+// Optional opts (all backwards compatible):
+//   matchesPerSlot – how many matches run at the same time (courts). Default 1.
+//   dayEndHour     – last hour of play each day. When set, matches roll over to
+//                    the next day instead of running past this hour.
 export const stampScheduledTimes = (rounds = [], tournamentStartDate = null, opts = {}) => {
   if (!tournamentStartDate) return rounds;
 
@@ -173,20 +218,33 @@ export const stampScheduledTimes = (rounds = [], tournamentStartDate = null, opt
     startHour       = 10,
     intervalMinutes = 30,
     timezone        = 'Asia/Kolkata',
+    matchesPerSlot  = 1,
+    dayEndHour      = null,
   } = opts;
 
-  let slotIndex = 0;
+  const perSlot = Math.max(1, Math.floor(Number(matchesPerSlot) || 1));
+  const slotsPerDay = dayEndHour != null
+    ? Math.max(1, Math.floor(((Number(dayEndHour) - Number(startHour)) * 60) / intervalMinutes))
+    : null;
+
+  let matchIndex = 0;
   return rounds.map((round) => ({
     ...round,
     matches: round.matches.map((m) => {
-      const scheduled_at = buildMatchTimestamp(
+      const slot = Math.floor(matchIndex / perSlot);
+      const dayOffset = slotsPerDay ? Math.floor(slot / slotsPerDay) : 0;
+      const slotInDay = slotsPerDay ? slot % slotsPerDay : slot;
+      const base = buildMatchTimestamp(
         tournamentStartDate,
-        slotIndex,
+        slotInDay,
         startHour,
         intervalMinutes,
         timezone
       );
-      slotIndex += 1;
+      const scheduled_at = base && dayOffset
+        ? new Date(new Date(base).getTime() + dayOffset * 24 * 60 * 60 * 1000).toISOString()
+        : base;
+      matchIndex += 1;
       return { ...m, scheduled_at };
     }),
   }));
@@ -216,6 +274,8 @@ export const buildKnockoutFixturePlan = (teams = [], opts = {}) => {
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
+    matchesPerSlot      = 1,
+    dayEndHour          = null,
   } = opts;
 
   const shuffled = shuffleArray(teams);
@@ -385,7 +445,7 @@ export const buildKnockoutFixturePlan = (teams = [], opts = {}) => {
 
   if (tournamentStartDate) {
     rounds = stampScheduledTimes(rounds, tournamentStartDate, {
-      startHour, intervalMinutes, timezone,
+      startHour, intervalMinutes, timezone, matchesPerSlot, dayEndHour,
     });
   }
 
@@ -398,6 +458,8 @@ export const buildRoundRobinFixturePlan = (teams = [], opts = {}) => {
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
+    matchesPerSlot      = 1,
+    dayEndHour          = null,
   } = opts;
 
   const matches = [];
@@ -422,7 +484,7 @@ export const buildRoundRobinFixturePlan = (teams = [], opts = {}) => {
   let rounds = [{ round: 'RR', label: 'Round Robin', matches }];
 
   if (tournamentStartDate) {
-    rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
+    rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone, matchesPerSlot, dayEndHour });
   }
 
   return { rounds };
@@ -528,6 +590,8 @@ export const computeSwissStandings = (teams = [], matches = []) => {
 
 export const computeRoundRobinStandings = (matches = [], teams = []) => {
   const stats = {};
+  // head-to-head points: h2h[a][b] = points team a earned in matches vs team b
+  const h2h = {};
 
   for (const t of teams) {
     const id = String(t.id || '').toUpperCase();
@@ -541,8 +605,14 @@ export const computeRoundRobinStandings = (matches = [], teams = []) => {
       drawn: 0,
       points: 0,
       score_diff: 0,
+      score_for: 0,
     };
   }
+
+  const addH2h = (x, y, pts) => {
+    if (!h2h[x]) h2h[x] = {};
+    h2h[x][y] = (h2h[x][y] || 0) + pts;
+  };
 
   for (const m of matches) {
     const round     = String(m.round      || '').toUpperCase();
@@ -561,12 +631,14 @@ export const computeRoundRobinStandings = (matches = [], teams = []) => {
 
     const sa = Number(m.score_a ?? 0);
     const sb = Number(m.score_b ?? 0);
-    if (stats[a]) stats[a].score_diff += sa - sb;
-    if (stats[b]) stats[b].score_diff += sb - sa;
+    if (stats[a]) { stats[a].score_diff += sa - sb; stats[a].score_for += sa; }
+    if (stats[b]) { stats[b].score_diff += sb - sa; stats[b].score_for += sb; }
 
     if (status === 'draw') {
       if (stats[a]) { stats[a].drawn += 1; stats[a].points += 1; }
       if (stats[b]) { stats[b].drawn += 1; stats[b].points += 1; }
+      addH2h(a, b, 1);
+      addH2h(b, a, 1);
       continue;
     }
 
@@ -574,88 +646,90 @@ export const computeRoundRobinStandings = (matches = [], teams = []) => {
     const loser  = winner === a ? b : a;
     if (stats[winner]) { stats[winner].won += 1; stats[winner].points += 3; }
     if (stats[loser])  { stats[loser].lost  += 1; }
+    addH2h(winner, loser, 3);
   }
 
-  return Object.values(stats).sort((a, b) => {
-    if (b.points      !== a.points)      return b.points      - a.points;
-    if (b.won         !== a.won)         return b.won         - a.won;
-    if (b.score_diff  !== a.score_diff)  return b.score_diff  - a.score_diff;
-    if (a.lost        !== b.lost)        return a.lost        - b.lost;
-    return (a.seed || 0) - (b.seed || 0);
+  // 1) points, 2) wins
+  const base = Object.values(stats).sort((x, y) => {
+    if (y.points !== x.points) return y.points - x.points;
+    return y.won - x.won;
   });
+
+  // Within each group tied on points AND wins:
+  //   exactly two teams → head-to-head result decides (if it was decisive)
+  //   otherwise / still level → score diff, score for, fewest losses, seed
+  const tiebreak = (x, y) => {
+    if (y.score_diff !== x.score_diff) return y.score_diff - x.score_diff;
+    if (y.score_for  !== x.score_for)  return y.score_for  - x.score_for;
+    if (x.lost       !== y.lost)       return x.lost       - y.lost;
+    return (x.seed || 0) - (y.seed || 0);
+  };
+
+  const result = [];
+  let i = 0;
+  while (i < base.length) {
+    let j = i + 1;
+    while (j < base.length && base[j].points === base[i].points && base[j].won === base[i].won) j += 1;
+    const group = base.slice(i, j);
+    if (group.length === 2) {
+      const [x, y] = group;
+      const xId = String(x.team_id || '').toUpperCase();
+      const yId = String(y.team_id || '').toUpperCase();
+      const xPts = h2h[xId]?.[yId] || 0;
+      const yPts = h2h[yId]?.[xId] || 0;
+      if (xPts !== yPts) {
+        result.push(...(xPts > yPts ? [x, y] : [y, x]));
+      } else {
+        result.push(...group.sort(tiebreak));
+      }
+    } else {
+      result.push(...group.sort(tiebreak));
+    }
+    i = j;
+  }
+  return result;
 };
 
 export const buildRoundRobinKnockoutPlan = (standings = [], opts = {}) => {
-  const top5 = standings.slice(0, 5);
-  if (top5.length < 2) return [];
+  const qualifiers = standings.slice(0, 5);
+  if (qualifiers.length < 2) return [];
 
-  const seed = (n) => top5[n - 1]?.team_id || null;
+  const shape = getPlayoffShape(standings.length, opts.playoffMode);
+  if (shape.kind === 'none') return [];
 
-  const matches = [
-    {
-      round: 'QF',
-      match_number: 1,
-      match_code: 'KO_QF1',
-      team_a_id: seed(4),
-      team_b_id: seed(5),
-      status: seed(4) && seed(5) ? 'scheduled' : 'bye',
-      winner_team_id: !(seed(4) && seed(5)) ? (seed(4) || seed(5)) : null,
-      score_a: null,
-      score_b: null,
-    },
-    {
-      round: 'SF',
-      match_number: 1,
-      match_code: 'KO_SF1',
-      team_a_id: seed(1),
-      team_b_id: null,
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-    {
-      round: 'SF',
-      match_number: 2,
-      match_code: 'KO_SF2',
-      team_a_id: seed(2),
-      team_b_id: seed(3),
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-    {
-      round: 'F',
-      match_number: 1,
-      match_code: 'KO_F1',
-      team_a_id: null,
-      team_b_id: null,
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-  ];
+  const seed = (n) => qualifiers[n - 1]?.team_id || null;
 
-  if (!seed(5) && seed(4)) {
-    matches[0].status = 'bye';
-    matches[0].winner_team_id = seed(4);
-    matches[1].team_b_id = seed(4);
-  }
+  const matches = shape.matches.map((m) => {
+    const slots = shape.seedMap[m.match_code] || {};
+    const team_a_id = slots.a ? seed(slots.a) : null;
+    const team_b_id = slots.b ? seed(slots.b) : null;
+    const isQf = m.match_code === 'KO_QF1';
+    const bothKnown = Boolean(team_a_id && team_b_id);
+    return {
+      ...m,
+      team_a_id,
+      team_b_id,
+      status: isQf && !bothKnown ? 'bye' : 'scheduled',
+      winner_team_id: isQf && !bothKnown ? (team_a_id || team_b_id) : null,
+      score_a: null,
+      score_b: null,
+    };
+  });
 
   const {
     tournamentStartDate = null,
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
+    matchesPerSlot      = 1,
+    dayEndHour          = null,
   } = opts;
 
   if (tournamentStartDate) {
     const stamped = stampScheduledTimes(
       [{ round: 'KO', label: 'Knockout', matches }],
       tournamentStartDate,
-      { startHour, intervalMinutes, timezone }
+      { startHour, intervalMinutes, timezone, matchesPerSlot, dayEndHour }
     );
     return stamped[0].matches;
   }
@@ -669,6 +743,8 @@ export const buildLeagueFullFixturePlan = (teams = [], opts = {}) => {
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
+    matchesPerSlot      = 1,
+    dayEndHour          = null,
   } = opts;
 
   const rrMatches = [];
@@ -692,57 +768,23 @@ export const buildLeagueFullFixturePlan = (teams = [], opts = {}) => {
 
   let rrRounds = [{ round: 'RR', label: 'Round Robin', matches: rrMatches }];
   if (tournamentStartDate) {
-    rrRounds = stampScheduledTimes(rrRounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
+    rrRounds = stampScheduledTimes(rrRounds, tournamentStartDate, { startHour, intervalMinutes, timezone, matchesPerSlot, dayEndHour });
   }
 
-  const koMatches = [
-    {
-      round: 'QF',
-      match_number: 1,
-      match_code: 'KO_QF1',
-      team_a_id: null,
-      team_b_id: null,
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-    {
-      round: 'SF',
-      match_number: 1,
-      match_code: 'KO_SF1',
-      team_a_id: null,
-      team_b_id: null,
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-    {
-      round: 'SF',
-      match_number: 2,
-      match_code: 'KO_SF2',
-      team_a_id: null,
-      team_b_id: null,
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-    {
-      round: 'F',
-      match_number: 1,
-      match_code: 'KO_F1',
-      team_a_id: null,
-      team_b_id: null,
-      status: 'scheduled',
-      winner_team_id: null,
-      score_a: null,
-      score_b: null,
-    },
-  ];
+  // Playoff shells follow the team count (see getPlayoffShape): 2 teams → none,
+  // 3 → SF1+F1, 4 → SF1+SF2+F1, 5+ → QF1+SF1+SF2+F1.
+  const playoffShape = getPlayoffShape(teams.length, opts.playoffMode);
+  const koMatches = playoffShape.matches.map((m) => ({
+    ...m,
+    team_a_id: null,
+    team_b_id: null,
+    status: 'scheduled',
+    winner_team_id: null,
+    score_a: null,
+    score_b: null,
+  }));
 
-  return { rrRounds, koMatches };
+  return { rrRounds, koMatches, playoffShape };
 };
 
 export const computeKnockoutShellUpdates = (standings = [], koMatches = []) => {
@@ -761,11 +803,12 @@ export const computeKnockoutShellUpdates = (standings = [], koMatches = []) => {
     updates.push({ id: match.id, update: { [field]: value } });
   };
 
-  tryUpdate('KO_QF1', 'team_a_id', seed(4));
-  tryUpdate('KO_QF1', 'team_b_id', seed(5));
-  tryUpdate('KO_SF1', 'team_a_id', seed(1));
-  tryUpdate('KO_SF2', 'team_a_id', seed(2));
-  tryUpdate('KO_SF2', 'team_b_id', seed(3));
+  // Which shells exist decides the shape (QF1 → 5+ teams, SF2 → 4, SF1 → 3).
+  const shape = detectPlayoffShapeFromCodes([...byCode.keys()]);
+  for (const [code, slots] of Object.entries(shape.seedMap)) {
+    if (slots.a) tryUpdate(code, 'team_a_id', seed(slots.a));
+    if (slots.b) tryUpdate(code, 'team_b_id', seed(slots.b));
+  }
 
   return updates;
 };
@@ -859,6 +902,8 @@ export const buildSwissRoundPlan = (teams = [], matches = [], roundNumber = 1, o
     startHour           = 10,
     intervalMinutes     = 30,
     timezone            = 'Asia/Kolkata',
+    matchesPerSlot      = 1,
+    dayEndHour          = null,
   } = opts;
 
   let rounds = [{
@@ -868,7 +913,7 @@ export const buildSwissRoundPlan = (teams = [], matches = [], roundNumber = 1, o
   }];
 
   if (tournamentStartDate) {
-    rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone });
+    rounds = stampScheduledTimes(rounds, tournamentStartDate, { startHour, intervalMinutes, timezone, matchesPerSlot, dayEndHour });
   }
 
   return { standings, rounds };

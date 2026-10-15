@@ -11,10 +11,88 @@ import {
   groupMatchesByRound,
   normalizeTournamentFormat,
 } from '../utils/tournamentFixtures';
+import {
+  planTournament,
+  getEffectiveMaxPlayers,
+  getPlayoffShape,
+} from '../utils/tournamentPlanner';
 import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
 import BottomSheet from '../components/common/BottomSheet';
 import CalendarIcon from '../components/common/CalendarIcon';
+
+// Plan summary: what will happen for this format / player count / team size,
+// plus contradictions (errors), warnings and one-click suggestions to fix them.
+const PlanPanel = ({ plan, registered = null, maxPlayers = null, onApply }) => {
+  if (!plan) return null;
+  const hours = Math.round((plan.estimatedMinutes / 60) * 10) / 10;
+  const formatName = { knockout: 'Knockout', round_robin: 'Round robin / League', swiss: 'Swiss' }[plan.format] || plan.format;
+  const rows = [
+    ['Tournament type', formatName],
+    maxPlayers != null ? ['Max players', maxPlayers] : null,
+    registered != null ? ['Registered players', registered] : null,
+    ['Players per team', plan.playersPerTeam],
+    ['Teams', plan.teams],
+    ['Players left out', plan.leftover],
+    plan.format === 'round_robin' ? ['League matches', plan.leagueMatches] : null,
+    plan.format === 'round_robin'
+      ? ['Playoff matches', plan.playoffMatches
+          ? `${plan.playoffMatches} (${{ sf_final_bye: 'semi-final + final', sf_final: 'semi-finals + final', qf_sf_final: 'quarter-final, semi-finals + final' }[plan.playoffKind] || 'playoff'})`
+          : 'none']
+      : null,
+    plan.format === 'knockout' ? ['Knockout matches', `${plan.knockoutMatches}${plan.byes ? ` (${plan.byes} first-round bye${plan.byes > 1 ? 's' : ''})` : ''}`] : null,
+    plan.format === 'swiss' ? ['Swiss rounds (recommended)', plan.swissRounds] : null,
+    ['Total matches', plan.totalMatches],
+    plan.totalMatches > 0 ? ['Estimated play time', `≈ ${hours} h${plan.estimatedDays > 1 ? ` (~${plan.estimatedDays} days)` : ''}`] : null,
+  ].filter(Boolean);
+
+  return (
+    <div style={{
+      border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', fontSize: '0.74rem',
+      background: 'var(--bg-muted)',
+    }}>
+      <div style={{ padding: '0.45rem 0.7rem', fontWeight: 700, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+        <span>📋 Plan summary</span>
+        <span style={{ color: plan.ok ? 'var(--success)' : 'var(--danger)' }}>{plan.ok ? '✓ Ready' : '⛔ Needs a change'}</span>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          {rows.map(([label, value]) => (
+            <tr key={label} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '0.3rem 0.7rem', color: 'var(--text-soft)' }}>{label}</td>
+              <td style={{
+                padding: '0.3rem 0.7rem', fontWeight: 600, textAlign: 'right',
+                color: label === 'Players left out' && value > 0 ? 'var(--danger)' : 'var(--text)',
+              }}>{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {(plan.errors.length > 0 || plan.warnings.length > 0 || plan.suggestions.length > 0) && (
+        <div style={{ padding: '0.5rem 0.7rem', display: 'grid', gap: '0.3rem' }}>
+          {plan.errors.map((e) => <div key={e} style={{ color: 'var(--danger)', fontWeight: 600 }}>⛔ {e}</div>)}
+          {plan.warnings.map((w) => <div key={w} style={{ color: '#e65100' }}>⚠ {w}</div>)}
+          {plan.suggestions.length > 0 && (
+            <div style={{ marginTop: '0.2rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>💡 How to fix this</div>
+              {plan.suggestions.map((sg) => (
+                <div key={sg.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.2rem 0' }}>
+                  <span style={{ flex: 1 }}>{sg.text}</span>
+                  {sg.apply && onApply && (
+                    <button type="button" onClick={() => onApply(sg.apply)}
+                            style={{ ...styles.tinyEnterBtn, padding: '0.2rem 0.6rem', whiteSpace: 'nowrap' }}>
+                      Apply
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Confirm-delete modal (admin action on a tournament).
 const ConfirmDeleteModal = ({ tournament, onCancel, onConfirm }) => {
@@ -231,6 +309,7 @@ const TournamentsPage = () => {
     approveTournamentRegistration,
     refreshTournamentData,
     refreshKnockoutFixtures,
+    supportsPlayoffMode,
   } = useApp();
   const { showToast } = useToast();
   const { generateCertificate } = useCertificate();
@@ -243,7 +322,22 @@ const TournamentsPage = () => {
       name: '', game: 'Carrom', customGame: '', format: 'knockout',
       players_per_team: 1,
       start_date: '', end_date: '', max_participants: 8,
-      prize_pool: '', description: '',
+      prize_pool: '', description: '', playoff_mode: 'auto',
+    });
+    // Live validation / preview for the New Tournament form.
+    const createPlan = useMemo(
+      () => planTournament({
+        format: tForm.format,
+        maxPlayers: parseInt(tForm.max_participants, 10) || 0,
+        playersPerTeam: tForm.players_per_team,
+        playoffMode: tForm.playoff_mode,
+      }),
+      [tForm.format, tForm.max_participants, tForm.players_per_team, tForm.playoff_mode]
+    );
+    // Generate-fixtures options dialog.
+    const [showGenModal, setShowGenModal] = useState(false);
+    const [genOpts, setGenOpts] = useState({
+      leftoverPolicy: 'block', formation: 'registration_order', matchesPerSlot: 1, dayEndHour: '',
     });
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
   const [mForm, setMForm] = useState({
@@ -922,17 +1016,49 @@ const renderMatch = (m) => {
     const koColLabels = { KO_QF: 'Quarter Final', KO_SF: 'Semi Finals', KO_F: 'Final' };
     const koColColors = { KO_QF: '#8e24aa',        KO_SF: '#618ff4',     KO_F: '#c81c1c' };
 
-    const koMatchGroups = koColKeys.map((colKey) => ({
+    const allKoMatchGroups = koColKeys.map((colKey) => ({
       key: colKey,
       label: koColLabels[colKey],
       matches: koMatches
         .filter((m) => String(m.match_code || '').toUpperCase().startsWith(colKey))
         .sort((a, b) => (a.match_number || 0) - (b.match_number || 0)),
     }));
+    // Hide playoff rounds that do not exist for this team count (e.g. no QF with 3–4 teams).
+    const koMatchGroups = allKoMatchGroups.filter((g) => g.matches.length > 0);
+    const koFlowLabel = koMatchGroups.map((g) => (g.key === 'KO_F' ? 'Final' : g.key === 'KO_SF' ? 'SF' : 'QF')).join(' → ');
 
+    // Matches reference TEAM ids, so standings are built from the teams that
+    // appear in the round-robin matches (not from participant rows).
+    const rrTeams = (() => {
+      if (!isRoundRobin) return [];
+      const map = new Map();
+      rrMatches.forEach((m) => {
+        ['a', 'b'].forEach((x) => {
+          const id = m[`team_${x}_id`];
+          if (id == null || map.has(String(id))) return;
+          const players = (m[`team_${x}_players`] || []).map((pl) => pl.employee_id).filter(Boolean);
+          const captain = m[`player_${x}_employee_id`] || players[0] || null;
+          map.set(String(id), { id, captain, players: players.length ? players : (captain ? [captain] : []) });
+        });
+      });
+      return [...map.values()]
+        .sort((p1, p2) => Number(p1.id) - Number(p2.id))
+        .map((t, i) => ({ ...t, seed: i + 1 }));
+    })();
+    const rrTeamLabel = (teamId) => {
+      const t = rrTeams.find((x) => String(x.id) === String(teamId));
+      if (!t || t.players.length === 0) return 'TBD';
+      const names = [...new Set(t.players)].map((id) => getEmployeeName(id));
+      return names.length > 1 ? `Team (${names.join(', ')})` : names[0];
+    };
     const rrStandings = isRoundRobin
-      ? computeRoundRobinStandings(rrMatches, partsList)
+      ? computeRoundRobinStandings(rrMatches, rrTeams)
       : [];
+    const playoffShapeUi = getPlayoffShape(
+      rrTeams.length,
+      activeTournamentRecord?.playoff_mode || 'auto'
+    );
+    const playoffQualifiers = { none: 0, sf_final_bye: 3, sf_final: 4, qf_sf_final: 5 }[playoffShapeUi.kind] ?? 0;
 
     const rrAllDone = rrMatches.length > 0 && rrMatches.every((m) =>
       ['completed', 'walkover', 'no_show', 'draw', 'bye', 'cancelled'].includes(
@@ -1015,7 +1141,7 @@ const renderMatch = (m) => {
               <table style={{ ...styles.table, minWidth: 700 }}>
                 <thead>
                   <tr style={styles.theadRow}>
-                    {['Rank', 'Player', 'P', 'W', 'D', 'L', 'Pts', 'Qualify'].map((h) => (
+                    {['Rank', 'Team / Player', 'P', 'W', 'D', 'L', 'Pts', 'Qualify'].map((h) => (
                       <th key={h} style={styles.th}>{h}</th>
                     ))}
                   </tr>
@@ -1028,11 +1154,11 @@ const renderMatch = (m) => {
                       </td>
                     </tr>
                   ) : rrStandings.map((row, i) => {
-                    const qualifies = i < 5;
-                    const isTop3    = i < 3;
+                    const qualifies = i < playoffQualifiers;
+                    const isTop3    = playoffShapeUi.kind === 'qf_sf_final' && i < 3;
                     return (
                       <tr
-                        key={row.employee_id}
+                        key={row.team_id}
                         style={{
                           borderBottom: '1px solid var(--border)',
                           background: isTop3 ? 'rgba(46,125,50,0.10)' : qualifies ? 'var(--bg-muted)' : 'transparent',
@@ -1042,7 +1168,7 @@ const renderMatch = (m) => {
                         <td style={{ ...styles.td, fontWeight: 700, color: i === 0 ? '#f9a825' : i === 1 ? 'var(--muted-strong)' : i === 2 ? '#d84315' : 'var(--text-soft)'  }}>
                           {i + 1}
                         </td>
-                        <td style={{ ...styles.td, fontWeight: 600  }}>{getEmployeeName(row.employee_id)}</td>
+                        <td style={{ ...styles.td, fontWeight: 600  }}>{rrTeamLabel(row.team_id)}</td>
                         <td style={styles.td}>{row.played}</td>
                         <td style={{ ...styles.td, color: 'var(--success)', fontWeight: 600  }}>{row.won}</td>
                         <td style={styles.td}>{row.drawn}</td>
@@ -1076,11 +1202,11 @@ const renderMatch = (m) => {
             <div style={styles.cardHeader}>
               <div style={styles.cardHeaderTitle}>🏆 Knockout Phase</div>
               <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
-                {rrAllDone ? 'Top 5 · QF → SF → Final' : '⏳ Players fill in as league results arrive · QF → SF → Final'}
+                {rrAllDone ? `Top ${playoffQualifiers || koMatchGroups.length} · ${koFlowLabel}` : `⏳ Teams fill in as league results arrive · ${koFlowLabel}`}
               </span>
             </div>
             <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
-              <div style={{ ...styles.bracketGrid, gridTemplateColumns: 'repeat(3, 1fr)', minWidth: 720 }}>
+              <div style={{ ...styles.bracketGrid, gridTemplateColumns: `repeat(${Math.max(1, koMatchGroups.length)}, 1fr)`, minWidth: Math.max(1, koMatchGroups.length) * 240 }}>
                 {koMatchGroups.map(({ key, label, matches: colMatches }) => (
                   <div key={key} style={styles.bracketCol}>
                     <div style={{
@@ -1127,15 +1253,16 @@ const renderMatch = (m) => {
               {isAdmin() && activeTournamentRecord && (
                 <button
                   onClick={async () => {
-                    const result = await generateTournamentFixtures(activeTournamentRecord.id, {
-                      playersPerTeam: activeTournamentRecord.players_per_team || 1,
-                      tournamentStartDate: activeTournamentRecord.start_date || null,
-                    });
-                    if (result.success) {
-                      showToast(activeTournamentFormat === 'swiss' && matchesForActive.length > 0 ? 'Swiss round generated' : 'Fixtures generated');
-                    } else {
-                      showToast(result.error || 'Failed to generate fixtures', 'error');
+                    // Later Swiss rounds reuse the existing teams: no dialog needed.
+                    if (activeTournamentFormat === 'swiss' && matchesForActive.length > 0) {
+                      const result = await generateTournamentFixtures(activeTournamentRecord.id, {
+                        playersPerTeam: activeTournamentRecord.players_per_team || 1,
+                        tournamentStartDate: activeTournamentRecord.start_date || null,
+                      });
+                      showToast(result.success ? 'Swiss round generated' : (result.error || 'Failed to generate fixtures'), result.success ? undefined : 'error');
+                      return;
                     }
+                    setShowGenModal(true);
                   }}
                   disabled={!canGenerateFixtures}
                   style={{
@@ -1154,19 +1281,10 @@ const renderMatch = (m) => {
               {isAdmin() && matchesForActive.length > 0 && (
                 <button
                   onClick={async () => {
-                    if (activeTournamentFormat === 'knockout') {
-                      // Smart refresh: keeps completed matches, rebuilds only pending rounds.
-                      const result = await refreshKnockoutFixtures(activeTournamentRecord.id);
-                      if (result.success) {
-                        showToast(result.message || 'Fixtures refreshed');
-                      } else {
-                        showToast(result.error || 'Refresh failed', 'error');
-                      }
-                    } else {
-                      // Round-robin / Swiss: simple data reload is sufficient.
-                      await refreshTournamentData();
-                      showToast('Fixtures refreshed');
-                    }
+                    // Reload only. (The old knockout "refresh" deleted every match and
+                    // rebuilt the bracket from participants, which destroys results.)
+                    await refreshTournamentData();
+                    showToast('Fixtures refreshed');
                   }}
                   style={{ ...styles.navyBtn, background: 'var(--accent-strong)' }}
                   title="Reload fixtures and participants from the database"
@@ -1917,6 +2035,10 @@ const renderMatch = (m) => {
       showToast('Please enter the game name', 'error');
       return;
     }
+    if (!createPlan.ok) {
+      showToast(createPlan.errors[0], 'error');
+      return;
+    }
     const result = await addTournament({
       ...tForm,
       game: finalGame,
@@ -1926,7 +2048,7 @@ const renderMatch = (m) => {
     if (result.success) {
       showToast(`Tournament "${tForm.name}" created!`);
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '' });
+      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto' });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -2347,13 +2469,43 @@ const renderMatch = (m) => {
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Max Participants</label>
-                  <input style={styles.formInput} type="number" min="2" value={tForm.max_participants}
-                         onChange={(e) => setTForm(f => ({ ...f, max_participants: e.target.value }))} />
+                  <input style={styles.formInput} type="number" min="2" step={tForm.players_per_team || 1} value={tForm.max_participants}
+                         onChange={(e) => setTForm(f => ({ ...f, max_participants: e.target.value }))}
+                         onBlur={() => {
+                           const ppt = parseInt(tForm.players_per_team, 10) || 1;
+                           const raw = parseInt(tForm.max_participants, 10) || 0;
+                           const eff = getEffectiveMaxPlayers(raw, ppt);
+                           if (eff >= ppt * 2 && eff !== raw) {
+                             setTForm(f => ({ ...f, max_participants: eff }));
+                             showToast(`Max players rounded to ${eff} (${eff / ppt} full teams of ${ppt})`);
+                           }
+                         }} />
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Players Per Team</label>
                   <input style={styles.formInput} type="number" min="1" value={tForm.players_per_team}
                          onChange={(e) => setTForm(f => ({ ...f, players_per_team: parseInt(e.target.value, 10) || 1 }))} />
+                </div>
+                {supportsPlayoffMode && ['round_robin', 'league'].includes(tForm.format) && (
+                  <div style={styles.formRow}>
+                    <label style={styles.formLabel}>Playoff after league</label>
+                    <select style={styles.formInput} value={tForm.playoff_mode}
+                            onChange={(e) => setTForm(f => ({ ...f, playoff_mode: e.target.value }))}>
+                      <option value="auto">Auto (semi-finals + final)</option>
+                      <option value="none">None (league winner)</option>
+                    </select>
+                  </div>
+                )}
+                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                  <PlanPanel
+                    plan={createPlan}
+                    maxPlayers={parseInt(tForm.max_participants, 10) || 0}
+                    onApply={(patch) => setTForm((f) => ({
+                      ...f,
+                      ...(patch.max_participants != null ? { max_participants: patch.max_participants } : {}),
+                      ...(patch.players_per_team != null ? { players_per_team: patch.players_per_team } : {}),
+                    }))}
+                  />
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Prize Pool</label>
@@ -2626,6 +2778,107 @@ const renderMatch = (m) => {
         </div>
       )}
 
+      {/* Generate Fixtures dialog (plan summary + leftover / formation / scheduling options) */}
+      {showGenModal && activeTournamentRecord && (() => {
+        const gFormat = normalizeTournamentFormat(activeTournamentRecord.format);
+        const gPlan = planTournament({
+          format: gFormat,
+          maxPlayers: activeTournamentRecord.max_participants || partsList.length,
+          registeredPlayers: partsList.length,
+          playersPerTeam: activeTournamentRecord.players_per_team || 1,
+          playoffMode: activeTournamentRecord.playoff_mode || 'auto',
+          leftoverPolicy: genOpts.leftoverPolicy,
+          matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
+        });
+        const runGenerate = async () => {
+          const result = await generateTournamentFixtures(activeTournamentRecord.id, {
+            playersPerTeam: activeTournamentRecord.players_per_team || 1,
+            tournamentStartDate: activeTournamentRecord.start_date || null,
+            leftoverPolicy: genOpts.leftoverPolicy,
+            formation: genOpts.formation,
+            matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
+            dayEndHour: genOpts.dayEndHour === '' ? null : Number(genOpts.dayEndHour),
+          });
+          if (result.success) {
+            setShowGenModal(false);
+            showToast('Fixtures generated');
+          } else {
+            showToast(result.error || 'Failed to generate fixtures', 'error');
+          }
+        };
+        return (
+          <div onClick={(e) => { if (e.target === e.currentTarget) setShowGenModal(false); }} style={styles.modalBackdrop}>
+            <div style={styles.modalCard}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Generate Fixtures</h3>
+                <button onClick={() => setShowGenModal(false)} style={styles.modalClose}>✕</button>
+              </div>
+              <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+                <PlanPanel
+                  plan={gPlan}
+                  registered={partsList.length}
+                  maxPlayers={activeTournamentRecord.max_participants || null}
+                  onApply={async (patch) => {
+                    if (patch.leftoverPolicy) {
+                      setGenOpts((o) => ({ ...o, leftoverPolicy: patch.leftoverPolicy }));
+                    }
+                    if (patch.players_per_team != null) {
+                      const r = await updateTournament(activeTournamentRecord.id, { players_per_team: patch.players_per_team });
+                      showToast(
+                        r.success ? `Players per team changed to ${patch.players_per_team}` : (r.error || 'Could not change team size'),
+                        r.success ? undefined : 'error'
+                      );
+                    }
+                  }}
+                />
+                <div style={styles.formGrid}>
+                  {gPlan.leftover > 0 || genOpts.leftoverPolicy !== 'block' ? (
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <label style={styles.formLabel}>If players are left over</label>
+                      <select style={styles.formInput} value={genOpts.leftoverPolicy}
+                              onChange={(e) => setGenOpts(o => ({ ...o, leftoverPolicy: e.target.value }))}>
+                        <option value="block">Block (fix the player count first)</option>
+                        <option value="exclude">Leave the extra players out</option>
+                        <option value="smaller_team">Put them in one smaller team</option>
+                      </select>
+                    </div>
+                  ) : null}
+                  {(Number(activeTournamentRecord.players_per_team) || 1) > 1 || gFormat !== 'knockout' ? (
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <label style={styles.formLabel}>How to form teams</label>
+                      <select style={styles.formInput} value={genOpts.formation}
+                              onChange={(e) => setGenOpts(o => ({ ...o, formation: e.target.value }))}>
+                        <option value="registration_order">Registration order</option>
+                        <option value="random">Random draw</option>
+                        <option value="seed_balanced">Balanced by seed</option>
+                      </select>
+                    </div>
+                  ) : null}
+                  <div style={styles.formRow}>
+                    <label style={styles.formLabel}>Matches at the same time</label>
+                    <input style={styles.formInput} type="number" min="1" value={genOpts.matchesPerSlot}
+                           onChange={(e) => setGenOpts(o => ({ ...o, matchesPerSlot: e.target.value }))} />
+                  </div>
+                  <div style={styles.formRow}>
+                    <label style={styles.formLabel}>Last match hour (optional, 24h)</label>
+                    <input style={styles.formInput} type="number" min="11" max="23" placeholder="e.g. 18"
+                           value={genOpts.dayEndHour}
+                           onChange={(e) => setGenOpts(o => ({ ...o, dayEndHour: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div style={styles.modalFooter}>
+                <button onClick={() => setShowGenModal(false)} style={styles.outlineBtn}>Cancel</button>
+                <button onClick={runGenerate} disabled={!gPlan.ok}
+                        style={{ ...styles.navyBtn, opacity: gPlan.ok ? 1 : 0.5, cursor: gPlan.ok ? 'pointer' : 'not-allowed' }}>
+                  Generate
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Result Modal */}
       {resultMatchId && (
         <div onClick={(e) => { if (e.target === e.currentTarget) setResultMatchId(null); }} style={styles.modalBackdrop}>
@@ -2646,6 +2899,9 @@ const renderMatch = (m) => {
                 const showWinnerField = ['completed', 'walkover', 'no_show'].includes(rForm.result_type);
                 const showReasonField = ['walkover', 'rescheduled', 'cancelled', 'disputed', 'no_show'].includes(rForm.result_type);
                 const showScheduleField = rForm.result_type === 'rescheduled';
+                const isKoResult =
+                  normalizeTournamentFormat(activeTournamentRecord?.format) === 'knockout' ||
+                  String(m.match_code || '').toUpperCase().startsWith('KO_');
                 return (
                   <div style={styles.formGrid}>
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
@@ -2666,7 +2922,7 @@ const renderMatch = (m) => {
                         }}
                       >
                         <option value="completed">Completed</option>
-                        <option value="draw">Draw</option>
+                        {!isKoResult && <option value="draw">Draw</option>}
                         <option value="walkover">Walkover</option>
                         <option value="rescheduled">Rescheduled</option>
                         <option value="no_show">No Show</option>
