@@ -3112,43 +3112,104 @@ const renderMatch = (m) => {
                           {/* Player rows */}
                           <div style={{ display: 'grid', gap: '0.35rem', marginBottom: '0.6rem' }}>
                             {isManual ? (
-                              /* Manual 3rd: dropdown to pick player */
-                              <select
-                                style={{ ...styles.formInput, fontWeight: 600  }}
-                                value={firstMember?.employee_id || ''}
-                                onChange={(e) => {
-                                  const empId = e.target.value;
-                                  if (!empId) return;
-                                  const statsMap = {};
+                              /* Manual position: in team games pick each player independently (group); stats are per player */
+                              (() => {
+                                const isTeamGame = (activeTournamentRecord?.players_per_team || 1) > 1;
+                                const picked = members.filter(r => r.employee_id);
+                                const ord = `${pos}${pos === 1 ? 'st' : pos === 2 ? 'nd' : 'rd'}`;
+
+                                const calcStats = (id) => {
+                                  const st = { played: 0, won: 0, lost: 0, points: 0 };
                                   for (const m of matchesForActive) {
                                     if (m.status !== 'completed') continue;
-                                    const aIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)]
-                                      .filter(Boolean).filter((v, idx, a) => a.indexOf(v) === idx);
-                                    const bIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)]
-                                      .filter(Boolean).filter((v, idx, a) => a.indexOf(v) === idx);
+                                    const aIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)].filter(Boolean);
+                                    const bIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)].filter(Boolean);
+                                    const onA = aIds.includes(id);
+                                    if (!onA && !bIds.includes(id)) continue;
                                     const aWon = m.winner_employee_id === m.player_a_employee_id;
-                                    [...aIds, ...bIds].forEach(pid => {
-                                      if (!statsMap[pid]) statsMap[pid] = { played: 0, won: 0, lost: 0, points: 0 };
-                                      statsMap[pid].played += 1;
-                                      const onA = aIds.includes(pid);
-                                      if ((onA && aWon) || (!onA && !aWon)) { statsMap[pid].won += 1; statsMap[pid].points += 3; }
-                                      else statsMap[pid].lost += 1;
-                                    });
+                                    st.played += 1;
+                                    if ((onA && aWon) || (!onA && !aWon)) { st.won += 1; st.points += 3; }
+                                    else st.lost += 1;
                                   }
-                                  const s = statsMap[empId] || { played: 0, won: 0, lost: 0, points: 0 };
+                                  return st;
+                                };
+
+                                const blankRow = () => ({
+                                  employee_id: '', department: '—', position: pos,
+                                  matches_played: 0, wins: 0, losses: 0, points: 0,
+                                  prize_amount: firstMember?.prize_amount || '', prize_description: firstMember?.prize_description || '', _manual: true,
+                                });
+
+                                const addPlayer = (empId) => {
+                                  if (!empId) return;
+                                  const s = calcStats(empId);
                                   const dept = employees.find(e => e.employee_code === empId)?.department || '—';
-                                  setFinalForm(f => f.map(r => r.position === pos && r._manual
-                                    ? { ...r, employee_id: empId, department: dept, matches_played: s.played, wins: s.won, losses: s.lost, points: s.points }
-                                    : r));
-                                }}
-                              >
-                                <option value="">{`— select ${pos}${pos === 1 ? 'st' : pos === 2 ? 'nd' : 'rd'} place player —`}</option>
-                                {partsList
-                                  .filter(p => !finalForm.some(r => r.position !== pos && r.employee_id === p.employee_id))
-                                  .map(p => (
-                                    <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
-                                  ))}
-                              </select>
+                                  const row = {
+                                    ...blankRow(), employee_id: empId, department: dept,
+                                    matches_played: s.played, wins: s.won, losses: s.lost, points: s.points,
+                                  };
+                                  setFinalForm(f => {
+                                    const others = f.filter(r => r.position !== pos);
+                                    const mine = f.filter(r => r.position === pos && r.employee_id);
+                                    return [...others, ...(isTeamGame ? [...mine, row] : [row])];
+                                  });
+                                };
+
+                                const removePlayer = (empId) => {
+                                  setFinalForm(f => {
+                                    const rest = f.filter(r => !(r.position === pos && r.employee_id === empId));
+                                    return rest.some(r => r.position === pos) ? rest : [...rest, blankRow()];
+                                  });
+                                };
+
+                                return (
+                                  <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                    {isTeamGame && picked.map(member => (
+                                      <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.3rem 0' }}>
+                                        <div style={{ minWidth: 130, flex: 1 }}>
+                                          <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-strong)' }}>{getEmployeeName(member.employee_id)}</div>
+                                          <div style={{ fontSize: '0.65rem', color: 'var(--muted)' }}>{member.department}</div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                          {[
+                                            { label: 'Played', val: member.matches_played },
+                                            { label: 'Won',    val: member.wins },
+                                            { label: 'Lost',   val: member.losses },
+                                            { label: 'Pts',    val: member.points },
+                                          ].map(({ label, val }) => (
+                                            <div key={label} style={{ textAlign: 'center', minWidth: 36 }}>
+                                              <div style={{ fontSize: '0.58rem', color: 'var(--muted)', textTransform: 'uppercase' }}>{label}</div>
+                                              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)' }}>{val ?? 0}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <button
+                                          onClick={() => removePlayer(member.employee_id)}
+                                          style={{ ...styles.tinyIconBtn, color: '#c62828', borderColor: '#ffcdd2', fontSize: '0.7rem' }}
+                                          title="Remove this player"
+                                        >✕</button>
+                                      </div>
+                                    ))}
+                                    <select
+                                      style={{ ...styles.formInput, fontWeight: 600 }}
+                                      value={isTeamGame ? '' : (firstMember?.employee_id || '')}
+                                      onChange={(e) => addPlayer(e.target.value)}
+                                    >
+                                      <option value="">
+                                        {isTeamGame
+                                          ? `+ add player to ${ord} place team —`
+                                          : `— select ${ord} place player —`}
+                                      </option>
+                                      {partsList
+                                        .filter(p => !finalForm.some(r => r.position !== pos && r.employee_id === p.employee_id))
+                                        .filter(p => !(isTeamGame && picked.some(r => r.employee_id === p.employee_id)))
+                                        .map(p => (
+                                          <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
+                                        ))}
+                                    </select>
+                                  </div>
+                                );
+                              })()
                             ) : (
                               /* Auto-populated: show each team member with their stats */
                               members.map(member => (
