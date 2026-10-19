@@ -3668,12 +3668,12 @@ const styles = {
 
   swBtn: { width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',  },
 
-  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 120 },
-  modalCard: { background: 'var(--bg-surface-strong)', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.32)',  },
+  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 60, paddingBottom: 20, boxSizing: 'border-box', overflowY: 'auto' },
+  modalCard: { background: 'var(--bg-surface-strong)', borderRadius: 8, width: 540, maxWidth: '96vw', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto', flexShrink: 0, boxShadow: '0 8px 32px rgba(0,0,0,0.32)',  },
   // Modal header is a heading → Lufga Bold
-  modalHeader: { background: 'var(--accent)', color: '#ffffff', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0',  },
+  modalHeader: { background: 'var(--accent)', color: '#ffffff', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '8px 8px 0 0', position: 'sticky', top: 0, zIndex: 2,  },
   modalClose: { background: 'none', border: 'none', color: '#ffffff', fontSize: '1rem', cursor: 'pointer',  },
-  modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: 'var(--bg-muted)', borderRadius: '0 0 8px 8px',  },
+  modalFooter: { padding: '0.7rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', background: 'var(--bg-muted)', borderRadius: '0 0 8px 8px', position: 'sticky', bottom: 0, zIndex: 2,  },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 0.85rem' },
   formRow: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   formLabel: { fontSize: '0.7rem', fontWeight: 400, color: 'var(--text-soft)',  },
