@@ -106,17 +106,23 @@ export const getMatchTeams = (match) => {
 
 // opts.leftoverPolicy: 'exclude' (default, previous behaviour: extra players are
 //                       left out) | 'smaller_team' (extra players form one shorter team)
-// opts.formation:       'registration_order' (default) | 'random' | 'seed_balanced'
-//                       (snake draft by participant.seed so teams are even)
+// opts.formation:       'random' (default: fair draw, registration time has no
+//                       influence on who ends up in which team) | 'seed_balanced'
+//                       (snake draft by participant.seed so teams are even; players
+//                       with equal / missing seeds are ordered randomly)
+//                       | 'registration_order' (admin-only opt-in: first registered
+//                       are grouped together)
 export const groupIntoTeams = (participants = [], playersPerTeam = 1, opts = {}) => {
   const ppt = Math.max(1, Number(playersPerTeam) || 1);
-  const { leftoverPolicy = 'exclude', formation = 'registration_order' } = opts || {};
+  const { leftoverPolicy = 'exclude', formation = 'random' } = opts || {};
 
   let pool = [...participants];
-  if (formation === 'random') {
-    pool = shuffleArray(pool);
+  if (formation === 'registration_order') {
+    // keep registration order as-is (explicit opt-in only)
   } else if (formation === 'seed_balanced') {
-    pool = pool
+    // Shuffle first so ties (same / missing seed) are broken randomly, not by
+    // registration order; the sort below is stable.
+    pool = shuffleArray(pool)
       .map((p, i) => ({ p, i }))
       .sort((x, y) => {
         const sx = Number(x.p?.seed) || Number.MAX_SAFE_INTEGER;
@@ -124,6 +130,9 @@ export const groupIntoTeams = (participants = [], playersPerTeam = 1, opts = {})
         return sx !== sy ? sx - sy : x.i - y.i;
       })
       .map((x) => x.p);
+  } else {
+    // 'random' (default) and any unknown value: fair draw.
+    pool = shuffleArray(pool);
   }
 
   if (ppt === 1) return pool.map((p) => ({ captain: p, members: [p] }));

@@ -337,7 +337,7 @@ const TournamentsPage = () => {
     // Generate-fixtures options dialog.
     const [showGenModal, setShowGenModal] = useState(false);
     const [genOpts, setGenOpts] = useState({
-      leftoverPolicy: 'block', formation: 'registration_order', matchesPerSlot: 1, dayEndHour: '',
+      leftoverPolicy: 'block', formation: 'random', matchesPerSlot: 1, dayEndHour: '',
     });
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
   const [mForm, setMForm] = useState({
@@ -2795,7 +2795,7 @@ const renderMatch = (m) => {
             playersPerTeam: activeTournamentRecord.players_per_team || 1,
             tournamentStartDate: activeTournamentRecord.start_date || null,
             leftoverPolicy: genOpts.leftoverPolicy,
-            formation: genOpts.formation,
+            formation: 'random',
             matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
             dayEndHour: genOpts.dayEndHour === '' ? null : Number(genOpts.dayEndHour),
           });
@@ -2846,12 +2846,9 @@ const renderMatch = (m) => {
                   {(Number(activeTournamentRecord.players_per_team) || 1) > 1 || gFormat !== 'knockout' ? (
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <label style={styles.formLabel}>How to form teams</label>
-                      <select style={styles.formInput} value={genOpts.formation}
-                              onChange={(e) => setGenOpts(o => ({ ...o, formation: e.target.value }))}>
-                        <option value="registration_order">Registration order</option>
-                        <option value="random">Random draw</option>
-                        <option value="seed_balanced">Balanced by seed</option>
-                      </select>
+                      <div style={{ ...styles.formInput, display: 'flex', alignItems: 'center', opacity: 0.85 }}>
+                        Random draw (partners / teams are picked randomly)
+                      </div>
                     </div>
                   ) : null}
                   <div style={styles.formRow}>
