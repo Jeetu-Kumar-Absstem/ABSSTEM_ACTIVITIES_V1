@@ -24,3 +24,13 @@ alter table tournaments
 --    (left behind by failed generations before this update). Review before running:
 --      select t.* from tournament_teams t
 --      where not exists (select 1 from tournament_matches m where m.tournament_id = t.tournament_id);
+
+-- 4) Time per match (minutes) - used to space out match times when fixtures are generated.
+--    No code flag needed: the app saves it automatically once this column exists.
+alter table tournaments
+  add column if not exists match_duration_minutes integer not null default 30;
+
+alter table tournaments
+  drop constraint if exists tournaments_match_duration_minutes_check;
+alter table tournaments
+  add constraint tournaments_match_duration_minutes_check check (match_duration_minutes between 5 and 240);

@@ -323,6 +323,7 @@ const TournamentsPage = () => {
       players_per_team: 1,
       start_date: '', end_date: '', max_participants: 8,
       prize_pool: '', description: '', playoff_mode: 'auto',
+      match_duration_minutes: 30,
     });
     // Live validation / preview for the New Tournament form.
     const createPlan = useMemo(
@@ -331,8 +332,9 @@ const TournamentsPage = () => {
         maxPlayers: parseInt(tForm.max_participants, 10) || 0,
         playersPerTeam: tForm.players_per_team,
         playoffMode: tForm.playoff_mode,
+        intervalMinutes: Number(tForm.match_duration_minutes) || 30,
       }),
-      [tForm.format, tForm.max_participants, tForm.players_per_team, tForm.playoff_mode]
+      [tForm.format, tForm.max_participants, tForm.players_per_team, tForm.playoff_mode, tForm.match_duration_minutes]
     );
     // Generate-fixtures options dialog.
     const [showGenModal, setShowGenModal] = useState(false);
@@ -2044,11 +2046,13 @@ const renderMatch = (m) => {
       game: finalGame,
       max_participants: parseInt(tForm.max_participants, 10) || 8,
       players_per_team: parseInt(tForm.players_per_team, 10) || 1,
+      match_duration_minutes: parseInt(tForm.match_duration_minutes, 10) || 30,
     });
     if (result.success) {
       showToast(`Tournament "${tForm.name}" created!`);
+      if (result.warning) showToast(result.warning, 'error');
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto' });
+      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 30 });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -2486,6 +2490,21 @@ const renderMatch = (m) => {
                   <input style={styles.formInput} type="number" min="1" value={tForm.players_per_team}
                          onChange={(e) => setTForm(f => ({ ...f, players_per_team: parseInt(e.target.value, 10) || 1 }))} />
                 </div>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Time per match (minutes)</label>
+                  <input style={styles.formInput} type="number" min="5" max="240" step="1"
+                         placeholder="e.g. 25"
+                         value={tForm.match_duration_minutes}
+                         onChange={(e) => setTForm(f => ({ ...f, match_duration_minutes: e.target.value }))}
+                         onBlur={() => {
+                           const raw = parseInt(tForm.match_duration_minutes, 10);
+                           const fixed = Number.isFinite(raw) ? Math.min(240, Math.max(5, raw)) : 30;
+                           if (fixed !== raw) {
+                             setTForm(f => ({ ...f, match_duration_minutes: fixed }));
+                             showToast('Time per match must be between 5 and 240 minutes');
+                           }
+                         }} />
+                </div>
                 {supportsPlayoffMode && ['round_robin', 'league'].includes(tForm.format) && (
                   <div style={styles.formRow}>
                     <label style={styles.formLabel}>Playoff after league</label>
@@ -2789,6 +2808,7 @@ const renderMatch = (m) => {
           playoffMode: activeTournamentRecord.playoff_mode || 'auto',
           leftoverPolicy: genOpts.leftoverPolicy,
           matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
+          intervalMinutes: Number(activeTournamentRecord.match_duration_minutes) || 30,
         });
         const runGenerate = async () => {
           const result = await generateTournamentFixtures(activeTournamentRecord.id, {

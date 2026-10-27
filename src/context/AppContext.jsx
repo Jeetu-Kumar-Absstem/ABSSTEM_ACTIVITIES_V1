@@ -54,6 +54,11 @@ const FINISHING_MATCH_STATUSES = new Set(['completed', 'walkover', 'no_show', 'b
 // While false the app never sends / requires that column.
 const SUPPORTS_PLAYOFF_MODE = false;
 
+// Time per match (tournaments.match_duration_minutes, section 4 of
+// tournament_planner.sql). If the column does not exist yet the tournament is
+// still created and match times fall back to 30 minutes per match.
+const DEFAULT_MATCH_MINUTES = 30;
+
 export const useApp = () => useContext(AppContext);
 
 export const AppProvider = ({ children }) => {
@@ -1502,9 +1507,7 @@ const loadTournamentMatches = async () => {
         tournamentData.players_per_team || 1
       );
 
-      const { data, error } = await supabase
-        .from('tournaments')
-        .insert([{
+      const baseRow = {
           code,
           name: tournamentData.name,
           description: tournamentData.description || null,
@@ -1521,11 +1524,23 @@ const loadTournamentMatches = async () => {
           rules: tournamentData.rules || null,
           created_by: submitter,
           ...(SUPPORTS_PLAYOFF_MODE ? { playoff_mode: tournamentData.playoff_mode || 'auto' } : {}),
-        }])
+      };
+      const matchMinutes = Math.min(240, Math.max(5,
+        Math.floor(Number(tournamentData.match_duration_minutes)) || DEFAULT_MATCH_MINUTES));
+
+      let { data, error } = await supabase
+        .from('tournaments')
+        .insert([{ ...baseRow, match_duration_minutes: matchMinutes }])
         .select();
+      let warning = null;
+      if (error && String(error.message || '').includes('match_duration_minutes')) {
+        // Column not added to the database yet: create the tournament without it.
+        ({ data, error } = await supabase.from('tournaments').insert([baseRow]).select());
+        warning = 'Time per match was not saved (run section 4 of tournament_planner.sql in Supabase). Matches will use 30 minutes each.';
+      }
       if (error) throw error;
       await loadTournaments();
-      return { success: true, data: data?.[0] || null };
+      return { success: true, data: data?.[0] || null, warning };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -1730,14 +1745,14 @@ const loadTournamentMatches = async () => {
         playersPerTeam:      opts.playersPerTeam      ?? tournament.players_per_team ?? 1,
         tournamentStartDate: opts.tournamentStartDate ?? tournament.start_date       ?? null,
         startHour:           opts.startHour           ?? 10,
-        intervalMinutes:     opts.intervalMinutes     ?? 30,
+        intervalMinutes:     opts.intervalMinutes     ?? tournament.match_duration_minutes ?? DEFAULT_MATCH_MINUTES,
         timezone:            opts.timezone            ?? 'Asia/Kolkata',
         matchesPerSlot:      opts.matchesPerSlot      ?? 1,
         dayEndHour:          opts.dayEndHour          ?? null,
         playoffMode:         opts.playoffMode         ?? tournament.playoff_mode ?? 'auto',
       };
       const leftoverPolicy = opts.leftoverPolicy ?? 'block';
-      const formation      = opts.formation      ?? 'registration_order';
+      const formation      = opts.formation      ?? 'random';
 
       // ── Step 0: validate BEFORE creating anything ───────────────────────
       // Swiss rounds after the first reuse the teams created in round 1.
@@ -2769,7 +2784,7 @@ const loadTournamentMatches = async () => {
         playersPerTeam:      tournament.players_per_team ?? 1,
         tournamentStartDate: tournament.start_date       ?? null,
         startHour:           10,
-        intervalMinutes:     30,
+        intervalMinutes:     tournament.match_duration_minutes ?? DEFAULT_MATCH_MINUTES,
         timezone:            'Asia/Kolkata',
       };
       const roundPlan = buildKnockoutFixturePlan(approvedParticipants, fixtureOpts);
