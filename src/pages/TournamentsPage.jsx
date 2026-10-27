@@ -269,6 +269,66 @@ const FORMAT_BADGE = {
   swiss:       { label: 'Swiss',       bg: '#fff8e1', color: '#ff6f00' },
 };
 
+// Simple progression view. Fixtures remain the source of truth; this view
+// only displays the participants in each slot or TBD for an unknown slot.
+const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onClose }) => {
+  const format = normalizeTournamentFormat(tournament?.format);
+  const nameForSide = (match, side) => {
+    const captain = match?.[`player_${side}_employee_id`];
+    const players = (match?.[`team_${side}_players`] || []).map((p) => p.employee_id).filter(Boolean);
+    const ids = [...new Set([captain, ...players].filter(Boolean))];
+    return ids.length ? ids.map((id) => getEmployeeName(id)).join(' & ') : 'TBD';
+  };
+
+  const stageGroups = (() => {
+    const isKo = (m) => String(m.match_code || '').toUpperCase().startsWith('KO_');
+    const isRr = (m) => String(m.round || '').toUpperCase().startsWith('RR') && !isKo(m);
+    if (format === 'round_robin' || format === 'league') {
+      const rr = matches.filter(isRr);
+      const ko = matches.filter(isKo);
+      const groups = rr.length ? [{ key: 'RR', label: 'Round Robin', matches: rr }] : [];
+      ['KO_QF', 'KO_SF', 'KO_F'].forEach((key) => {
+        const rows = ko.filter((m) => String(m.match_code || '').toUpperCase().startsWith(key));
+        if (rows.length) groups.push({ key, label: { KO_QF: 'Quarter Final', KO_SF: 'Semi Final', KO_F: 'Final' }[key], matches: rows });
+      });
+      return groups;
+    }
+    return groupMatchesByRound(matches).map((group) => ({ key: group.round, label: group.label, matches: group.matches }));
+  })();
+
+  const playerBox = (match, side) => {
+    const name = nameForSide(match, side);
+    const unknown = name === 'TBD';
+    return <div style={{ padding: '0.35rem 0.45rem', borderRadius: 4, background: unknown ? 'var(--bg-muted)' : 'var(--accent-soft)', color: unknown ? 'var(--muted)' : 'var(--text)', fontStyle: unknown ? 'italic' : 'normal', wordBreak: 'break-word' }}>{name}</div>;
+  };
+
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={styles.modalBackdrop}>
+      <div style={{ ...styles.modalCard, width: 1100, maxWidth: '96vw', maxHeight: 'calc(100vh - 40px)' }}>
+        <div style={styles.modalHeader}>
+          <div><h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>🔀 {tournament?.name} — Check Flow</h3><div style={{ fontSize: '0.65rem', opacity: 0.8, marginTop: 2 }}>Tournament progression</div></div>
+          <button onClick={onClose} style={styles.modalClose}>✕</button>
+        </div>
+        <div style={{ padding: '1rem', overflowX: 'auto' }}>
+          {stageGroups.length === 0 ? <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem' }}>No fixture flow is available yet.</div> : (
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '1rem', minWidth: Math.max(620, stageGroups.length * 220) }}>
+              {stageGroups.map((stage, index) => (
+                <div key={stage.key} style={{ flex: '1 0 190px', minWidth: 190, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                  <div style={{ textAlign: 'center', padding: '0.45rem', borderRadius: 6, background: 'var(--accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stage.label}</div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', gap: '0.7rem', padding: '0.8rem 0.15rem', background: 'var(--bg-soft)', border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 6px 6px' }}>
+                    {stage.matches.map((match) => <div key={match.id || match.match_code} style={{ background: 'var(--bg-surface-strong)', border: '1px solid var(--border)', borderRadius: 7, padding: '0.55rem 0.65rem', boxShadow: 'var(--surface-shadow-soft)', fontSize: '0.76rem' }}><div style={{ display: 'grid', gap: '0.35rem' }}>{playerBox(match, 'a')}<div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.62rem' }}>vs</div>{playerBox(match, 'b')}</div></div>)}
+                  </div>
+                  {index < stageGroups.length - 1 && <div style={{ position: 'absolute', right: '-0.8rem', top: '50%', color: 'var(--accent)', fontSize: '1.2rem', zIndex: 1 }}>→</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const pad2 = (n) => String(n).padStart(2, '0');
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
@@ -342,6 +402,7 @@ const TournamentsPage = () => {
       leftoverPolicy: 'block', formation: 'random', matchesPerSlot: 1, dayEndHour: '',
     });
   const [showNewMatchModal, setShowNewMatchModal] = useState(false);
+  const [showFlowModal, setShowFlowModal] = useState(false);
   const [mForm, setMForm] = useState({
     match_code: '', round: 'QF', match_number: 1,
     scheduled_at: '',
@@ -1292,6 +1353,17 @@ const renderMatch = (m) => {
                   title="Reload fixtures and participants from the database"
                 >🔄 Refresh</button>
               )}
+              <button
+                onClick={() => setShowFlowModal(true)}
+                disabled={matchesForActive.length === 0}
+                style={{
+                  ...styles.navyBtn,
+                  background: matchesForActive.length > 0 ? '#6a1b9a' : 'var(--muted)',
+                  opacity: matchesForActive.length > 0 ? 1 : 0.55,
+                  cursor: matchesForActive.length > 0 ? 'pointer' : 'not-allowed',
+                }}
+                title="Show the tournament progression"
+              >🔀 Check Flow</button>
               {!isAdmin() && activeTournamentRecord?.status === 'registration_open' && (
                 <button
                   onClick={handleRegister}
@@ -3370,6 +3442,15 @@ const renderMatch = (m) => {
           isAdminUser={isAdmin()}
           onCancel={() => setShowRegisterModal(false)}
           onSubmit={handleBatchRegister}
+        />
+      )}
+
+      {showFlowModal && activeTournamentRecord && matchesForActive.length > 0 && (
+        <TournamentFlowModal
+          tournament={activeTournamentRecord}
+          matches={matchesForActive}
+          getEmployeeName={getEmployeeName}
+          onClose={() => setShowFlowModal(false)}
         />
       )}
     </div>
