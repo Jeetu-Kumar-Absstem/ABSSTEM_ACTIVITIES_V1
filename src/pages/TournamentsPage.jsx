@@ -253,6 +253,7 @@ const SUB_TABS = [
   { id: 'results',    label: 'Match Results',      icon: '⚽' },
   { id: 'stopwatch',  label: 'Stopwatch',          icon: '⏱' },
   { id: 'final',      label: 'Final Results',      icon: '🏅' },
+  { id: 'teams',      label: 'Teams',             icon: '👥' },
 ];
 
 const STATUS_BADGE = {
@@ -325,6 +326,147 @@ const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onClose }) 
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeName }) => {
+  const { showToast } = useToast();
+  const [teams, setTeams] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamPoints, setTeamPoints] = useState([]);
+  const [playerPoints, setPlayerPoints] = useState([]);
+  const [name, setName] = useState('');
+  const [parentTeamId, setParentTeamId] = useState('');
+  const [tournamentId, setTournamentId] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [expandedTeams, setExpandedTeams] = useState(new Set());
+  const [editingTeamId, setEditingTeamId] = useState(null);
+
+  const loadTeams = useCallback(async () => {
+    setLoading(true);
+    const [teamResult, memberResult, pointResult, playerPointResult] = await Promise.all([
+      supabase.from('teams').select('*').order('name'),
+      supabase.from('team_members').select('*'),
+      supabase.from('team_cumulative_points').select('*').order('total_points', { ascending: false }),
+      supabase.from('tournament_participants').select('employee_id, points'),
+    ]);
+    setLoading(false);
+    if (teamResult.error || memberResult.error) {
+      showToast('Team tables are unavailable. Apply 29_reusable_teams.sql first.', 'error');
+      return;
+    }
+    setTeams((teamResult.data || []).filter((team) => team.is_active !== false));
+    setTeamMembers(memberResult.data || []);
+    setTeamPoints(pointResult.data || []);
+    setPlayerPoints(playerPointResult.data || []);
+  }, [showToast]);
+
+  useEffect(() => { loadTeams(); }, [loadTeams]);
+
+  const assignedEmployeeIds = useMemo(() => new Set(teamMembers.map((member) => String(member.employee_id).toUpperCase())), [teamMembers]);
+  const availableEmployees = employees.filter((employee) => {
+    const query = playerSearch.trim().toLowerCase();
+    const belongsToEditingTeam = editingTeamId && teamMembers.some((member) => member.team_id === editingTeamId && member.employee_id === employee.employee_code);
+    return (belongsToEditingTeam || !assignedEmployeeIds.has(String(employee.employee_code).toUpperCase())) &&
+      (!query || `${employee.name} ${employee.employee_code}`.toLowerCase().includes(query));
+  });
+  const pointsForPlayer = (employeeId) => playerPoints
+    .filter((row) => String(row.employee_id).toUpperCase() === String(employeeId).toUpperCase())
+    .reduce((sum, row) => sum + (Number(row.points) || 0), 0);
+  const toggleMember = (employeeId) => setSelectedMembers((current) => {
+    const next = new Set(current);
+    if (next.has(employeeId)) next.delete(employeeId); else next.add(employeeId);
+    return next;
+  });
+
+  const createTeam = async () => {
+    if (!isAdminUser) return showToast('Only admins can create reusable teams', 'error');
+    if (!name.trim()) return showToast('Enter a team name', 'error');
+    if (selectedMembers.size === 0) return showToast('Select at least one player', 'error');
+    const teamQuery = editingTeamId
+      ? supabase.from('teams').update({ name: name.trim(), parent_team_id: parentTeamId || null }).eq('id', editingTeamId)
+      : supabase.from('teams').insert({ name: name.trim(), parent_team_id: parentTeamId || null });
+    const { data: team, error: teamError } = await teamQuery.select().single();
+    if (teamError) return showToast(teamError.message, 'error');
+
+    const memberRows = [...selectedMembers].map((employeeId) => ({ team_id: team.id, employee_id: employeeId, role: 'member' }));
+    if (editingTeamId) await supabase.from('team_members').delete().eq('team_id', editingTeamId);
+    const { error: memberError } = await supabase.from('team_members').insert(memberRows);
+    if (memberError) return showToast(memberError.message, 'error');
+
+    if (!editingTeamId && tournamentId) {
+      const { error: entryError } = await supabase.from('tournament_team_entries').insert({ tournament_id: tournamentId, team_id: team.id, status: 'registered' });
+      if (entryError) return showToast(entryError.message, 'error');
+    }
+    const wasEditing = Boolean(editingTeamId);
+    setName(''); setParentTeamId(''); setTournamentId(''); setSelectedMembers(new Set()); setEditingTeamId(null); setPlayerSearch('');
+    await loadTeams();
+    showToast(wasEditing ? 'Team updated' : 'Team created');
+  };
+
+  const editTeam = (team) => {
+    setEditingTeamId(team.id);
+    setName(team.name);
+    setParentTeamId(team.parent_team_id || '');
+    setSelectedMembers(new Set(membersFor(team.id).map((member) => member.employee_id)));
+    setPlayerSearch('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteTeam = async (team) => {
+    const { count, error: countError } = await supabase
+      .from('tournament_team_entries').select('id', { count: 'exact', head: true }).eq('team_id', team.id);
+    if (countError) return showToast(countError.message, 'error');
+    if (!window.confirm(count > 0 ? 'This team has tournament history. Archive it instead?' : `Delete ${team.name}?`)) return;
+    const result = count > 0
+      ? await supabase.from('teams').update({ is_active: false }).eq('id', team.id)
+      : await supabase.from('teams').delete().eq('id', team.id);
+    if (result.error) return showToast(result.error.message, 'error');
+    await loadTeams();
+    showToast(count > 0 ? 'Team archived to preserve history' : 'Team deleted');
+  };
+
+  const membersFor = (teamId) => teamMembers.filter((member) => member.team_id === teamId);
+  const pointsFor = (teamId) => teamPoints.find((row) => String(row.team_id) === String(teamId));
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), var(--accent-soft))' }}>
+        <div style={styles.cardHeader}>
+          <div><div style={styles.cardHeaderTitle}>👥 Team workspace</div><div style={{ color: 'var(--text-soft)', fontSize: '0.7rem', marginTop: 3 }}>One player can belong to one reusable team. Teams can be entered into multiple tournaments.</div></div>
+          <button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button>
+        </div>
+        {isAdminUser && <div style={{ background: 'var(--bg-surface-strong)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.7rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)' }}>{editingTeamId ? 'Edit team' : 'Create a team'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Team name" style={styles.formInput} />
+            <select value={parentTeamId} onChange={(e) => setParentTeamId(e.target.value)} style={styles.formInput}><option value="">No parent team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
+            <select value={tournamentId} onChange={(e) => setTournamentId(e.target.value)} style={styles.formInput}><option value="">Assign later</option>{tournaments.filter((t) => t.status === 'registration_open').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+          </div>
+          <input value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} placeholder="Search available players by name or ID" style={styles.formInput} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '0.4rem', maxHeight: 220, overflowY: 'auto' }}>
+            {availableEmployees.map((employee) => <label key={employee.employee_code} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.45rem 0.55rem', border: '1px solid var(--border)', borderRadius: 6, background: selectedMembers.has(employee.employee_code) ? 'var(--accent-soft)' : 'var(--bg-surface-strong)', cursor: 'pointer', fontSize: '0.7rem' }}><input type="checkbox" checked={selectedMembers.has(employee.employee_code)} onChange={() => toggleMember(employee.employee_code)} /><span><strong>{employee.name}</strong><br /><small style={{ color: 'var(--muted)' }}>{employee.employee_code}</small></span></label>)}
+            {availableEmployees.length === 0 && <div style={{ color: 'var(--muted)', fontSize: '0.7rem', padding: '0.7rem' }}>All matching players are already assigned to a team.</div>}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}><span style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>{selectedMembers.size} player{selectedMembers.size === 1 ? '' : 's'} selected</span><div style={{ display: 'flex', gap: '0.4rem' }}>{editingTeamId && <button onClick={() => { setEditingTeamId(null); setName(''); setParentTeamId(''); setSelectedMembers(new Set()); }} style={styles.outlineBtn}>Cancel</button>}<button onClick={createTeam} style={styles.navyBtn}>{editingTeamId ? 'Save Changes' : '+ Create Team'}</button></div></div>
+        </div>}
+      </div>
+      <div className="clay-card" style={styles.card}>
+        <div style={styles.cardHeader}><div><div style={styles.cardHeaderTitle}>Team directory</div><div style={{ color: 'var(--muted)', fontSize: '0.68rem', marginTop: 3 }}>{teams.length} team{teams.length === 1 ? '' : 's'} · click a card to expand members</div></div></div>
+        {loading ? <div style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>Loading teams…</div> : teams.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>No reusable teams created yet.</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.8rem' }}>{teams.map((team) => {
+          const point = pointsFor(team.id);
+          const members = membersFor(team.id);
+          const expanded = expandedTeams.has(team.id);
+          return <div key={team.id} onClick={() => setExpandedTeams((current) => { const next = new Set(current); if (next.has(team.id)) next.delete(team.id); else next.add(team.id); return next; })} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', background: 'var(--bg-surface-strong)', cursor: 'pointer', boxShadow: 'var(--surface-shadow-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'start' }}><div><div style={{ fontWeight: 700, fontSize: '0.86rem' }}>{team.name}</div>{team.parent_team_id && <div style={{ color: 'var(--muted)', fontSize: '0.64rem', marginTop: 2 }}>Child team</div>}</div><span style={{ color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 700 }}>{point?.total_points || 0} pts</span></div>
+            <div style={{ display: 'flex', gap: '0.8rem', margin: '0.65rem 0', color: 'var(--text-soft)', fontSize: '0.66rem' }}><span>👤 {members.length} members</span><span>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto' }}>{expanded ? '▲' : '▼'}</span></div>
+            {expanded && <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.45rem', display: 'grid', gap: '0.25rem' }}>{members.map((member) => <div key={member.employee_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.7rem' }}><span><strong>{getEmployeeName(member.employee_id)}</strong><small style={{ color: 'var(--muted)', marginLeft: 5 }}>{member.employee_id}</small></span><span style={{ color: 'var(--accent)', fontWeight: 700 }}>{pointsForPlayer(member.employee_id)} pts</span></div>)}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.45rem' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem' }}>✎ Edit</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.65rem' }}>🗑 Delete</button></div>}</div>}
+          </div>;
+        })}</div>}
       </div>
     </div>
   );
@@ -2404,6 +2546,7 @@ const renderMatch = (m) => {
       {sub === 'results' && renderResults()}
       {sub === 'stopwatch' && renderStopwatch()}
       {sub === 'final' && renderFinalResults()}
+      {sub === 'teams' && <ReusableTeamsPanel employees={employees} tournaments={tournaments} isAdminUser={isAdmin()} getEmployeeName={getEmployeeName} />}
 
       {/* Admin: Edit Tournament Status / Registration Modal */}
       {editTournamentId && isAdmin() && (() => {
