@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { supabase } from '../utils/supabase';
 import EventsTopBar from '../components/events/EventsTopBar';
 import { useCertificate } from '../hooks/useCertificate';
 import {
@@ -383,7 +384,7 @@ const TournamentsPage = () => {
       players_per_team: 1,
       start_date: '', end_date: '', max_participants: 8,
       prize_pool: '', description: '', playoff_mode: 'auto',
-      match_duration_minutes: 30,
+      match_duration_minutes: 10,
     });
     // Live validation / preview for the New Tournament form.
     const createPlan = useMemo(
@@ -392,7 +393,7 @@ const TournamentsPage = () => {
         maxPlayers: parseInt(tForm.max_participants, 10) || 0,
         playersPerTeam: tForm.players_per_team,
         playoffMode: tForm.playoff_mode,
-        intervalMinutes: Number(tForm.match_duration_minutes) || 30,
+        intervalMinutes: Number(tForm.match_duration_minutes) || 10,
       }),
       [tForm.format, tForm.max_participants, tForm.players_per_team, tForm.playoff_mode, tForm.match_duration_minutes]
     );
@@ -1596,7 +1597,7 @@ const renderMatch = (m) => {
   };
 
   const renderStopwatch = () => {
-    return <StopwatchPanel matches={matchesForActive} tournament={activeTournamentRecord} getEmployeeName={getEmployeeName} />;
+    return <SharedStopwatchPanel matches={matchesForActive} tournament={activeTournamentRecord} getEmployeeName={getEmployeeName} currentUser={currentUser} />;
   };
 
   const renderFinalResults = () => {
@@ -2118,13 +2119,13 @@ const renderMatch = (m) => {
       game: finalGame,
       max_participants: parseInt(tForm.max_participants, 10) || 8,
       players_per_team: parseInt(tForm.players_per_team, 10) || 1,
-      match_duration_minutes: parseInt(tForm.match_duration_minutes, 10) || 30,
+      match_duration_minutes: parseInt(tForm.match_duration_minutes, 10) || 10,
     });
     if (result.success) {
       showToast(`Tournament "${tForm.name}" created!`);
       if (result.warning) showToast(result.warning, 'error');
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 30 });
+      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 10 });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -2880,7 +2881,7 @@ const renderMatch = (m) => {
           playoffMode: activeTournamentRecord.playoff_mode || 'auto',
           leftoverPolicy: genOpts.leftoverPolicy,
           matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
-          intervalMinutes: Number(activeTournamentRecord.match_duration_minutes) || 30,
+          intervalMinutes: Number(activeTournamentRecord.match_duration_minutes) || 10,
         });
         const runGenerate = async () => {
           const result = await generateTournamentFixtures(activeTournamentRecord.id, {
@@ -3457,7 +3458,289 @@ const renderMatch = (m) => {
   );
 };
 
-// ── Stopwatch sub-component (with countdown) ────────────────────────
+// ── Shared match clock ──────────────────────────────────────────────
+const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, currentUser }) => {
+  const { showToast } = useToast();
+  const [selectedMatchId, setSelectedMatchId] = useState(() => matches[0]?.id || '');
+  const [clock, setClock] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  const [loading, setLoading] = useState(false);
+  const [durationChoice, setDurationChoice] = useState('tournament');
+  const [customMinutes, setCustomMinutes] = useState('');
+
+  const selectedMatch = matches.find((m) => String(m.id) === String(selectedMatchId)) || null;
+  const isChess = String(tournament?.game || '').trim().toLowerCase() === 'chess';
+  const defaultMinutes = Math.max(5, Number(tournament?.match_duration_minutes) || 10);
+  const defaultSeconds = defaultMinutes * 60;
+  const selectedDurationSeconds = Math.max(
+    300,
+    (durationChoice === 'tournament'
+      ? defaultMinutes
+      : durationChoice === 'custom'
+        ? Number(customMinutes) || defaultMinutes
+        : Number(durationChoice) || defaultMinutes) * 60
+  );
+  const updaterEmployeeId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.user_metadata?.empId || null;
+
+  useEffect(() => {
+    if (!selectedMatchId && matches[0]?.id) setSelectedMatchId(matches[0].id);
+    if (selectedMatchId && !matches.some((m) => String(m.id) === String(selectedMatchId))) {
+      setSelectedMatchId(matches[0]?.id || '');
+    }
+  }, [matches, selectedMatchId]);
+
+  const loadClock = useCallback(async () => {
+    if (!selectedMatchId || !currentUser) return;
+    setClock(null);
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('tournament_match_clocks')
+      .select('*')
+      .eq('match_id', selectedMatchId)
+      .maybeSingle();
+    setLoading(false);
+    if (error) {
+      console.error('Error loading shared match clock:', error);
+      showToast('Clock storage is unavailable. Apply the clock database migration first.', 'error');
+      setClock(null);
+      return;
+    }
+    setClock(data || null);
+  }, [currentUser, selectedMatchId, showToast]);
+
+  useEffect(() => { loadClock(); }, [loadClock]);
+
+  useEffect(() => {
+    if (!clock) {
+      setDurationChoice('tournament');
+      setCustomMinutes('');
+      return;
+    }
+    const minutes = Math.round(Number(clock.duration_seconds || defaultSeconds) / 60);
+    if (minutes === defaultMinutes) {
+      setDurationChoice('tournament');
+      setCustomMinutes('');
+    } else if ([10, 15, 20, 30].includes(minutes)) {
+      setDurationChoice(String(minutes));
+      setCustomMinutes('');
+    } else {
+      setDurationChoice('custom');
+      setCustomMinutes(String(minutes));
+    }
+  }, [clock, defaultMinutes, defaultSeconds]);
+
+  useEffect(() => {
+    if (!selectedMatchId || !currentUser) return undefined;
+    const channel = supabase
+      .channel(`tournament-match-clock-${selectedMatchId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'tournament_match_clocks',
+        filter: `match_id=eq.${selectedMatchId}`,
+      }, (payload) => setClock(payload.new || null))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser, selectedMatchId]);
+
+  useEffect(() => {
+    if (!clock || clock.status !== 'running') return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [clock]);
+
+  const liveValues = useMemo(() => {
+    if (!clock) return null;
+    let remaining = Number(clock.remaining_seconds ?? clock.duration_seconds ?? defaultSeconds);
+    let remainingA = Number(clock.chess_remaining_a_seconds ?? defaultSeconds);
+    let remainingB = Number(clock.chess_remaining_b_seconds ?? defaultSeconds);
+    if (clock.status === 'running' && clock.started_at) {
+      const elapsed = Math.max(0, Math.floor((now - new Date(clock.started_at).getTime()) / 1000));
+      if (clock.mode === 'chess') {
+        if (clock.chess_active_side === 'A') remainingA = Math.max(0, remainingA - elapsed);
+        if (clock.chess_active_side === 'B') remainingB = Math.max(0, remainingB - elapsed);
+      } else {
+        remaining = Math.max(0, remaining - elapsed);
+      }
+    }
+    return { remaining, remainingA, remainingB };
+  }, [clock, defaultSeconds, now]);
+
+  const sideName = (side) => {
+    const captain = selectedMatch?.[`player_${side}_employee_id`];
+    const players = (selectedMatch?.[`team_${side}_players`] || []).map((p) => p.employee_id).filter(Boolean);
+    const ids = [...new Set([captain, ...players].filter(Boolean))];
+    return ids.length ? ids.map((id) => getEmployeeName(id)).join(' & ') : 'TBD';
+  };
+
+  const formatClock = (seconds) => {
+    const safe = Math.max(0, Math.floor(seconds || 0));
+    return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
+  };
+
+  const ensureClock = async () => {
+    if (clock) return clock;
+    const payload = {
+      tournament_id: tournament.id,
+      match_id: selectedMatchId,
+      mode: isChess ? 'chess' : 'countdown',
+      duration_seconds: selectedDurationSeconds,
+      remaining_seconds: selectedDurationSeconds,
+      chess_remaining_a_seconds: selectedDurationSeconds,
+      chess_remaining_b_seconds: selectedDurationSeconds,
+      chess_active_side: 'A',
+      status: 'paused',
+    };
+    const { data, error } = await supabase.from('tournament_match_clocks').insert(payload).select().single();
+    if (error) { showToast(error.message || 'Unable to create match clock', 'error'); return null; }
+    setClock(data);
+    return data;
+  };
+
+  const applyDuration = async () => {
+    if (clock?.status === 'running') return;
+    const base = await ensureClock();
+    if (!base) return;
+    await saveClock({
+      status: 'paused',
+      started_at: null,
+      stopped_at: null,
+      duration_seconds: selectedDurationSeconds,
+      remaining_seconds: selectedDurationSeconds,
+      chess_remaining_a_seconds: selectedDurationSeconds,
+      chess_remaining_b_seconds: selectedDurationSeconds,
+      chess_active_side: 'A',
+    });
+    showToast(`Clock duration set to ${Math.round(selectedDurationSeconds / 60)} minutes`);
+  };
+
+  const saveClock = async (next) => {
+    const { data, error } = await supabase
+      .from('tournament_match_clocks')
+      .update({ ...next, updated_by: updaterEmployeeId, updated_at: new Date().toISOString() })
+      .eq('match_id', selectedMatchId)
+      .select()
+      .single();
+    if (error) { showToast(error.message || 'Unable to update shared clock', 'error'); return null; }
+    setClock(data);
+    return data;
+  };
+
+  const pauseOrStart = async () => {
+    const base = await ensureClock();
+    if (!base) return;
+    const values = liveValues || { remaining: base.remaining_seconds, remainingA: base.chess_remaining_a_seconds, remainingB: base.chess_remaining_b_seconds };
+    if (base.status === 'running') {
+      await saveClock({ status: 'paused', started_at: null, remaining_seconds: values.remaining, chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB });
+    } else if ((isChess ? values.remainingA : values.remaining) > 0) {
+      await saveClock({ status: 'running', started_at: new Date().toISOString() });
+    }
+  };
+
+  const stopClock = async () => {
+    const base = await ensureClock();
+    if (!base) return;
+    const values = liveValues || { remaining: base.remaining_seconds, remainingA: base.chess_remaining_a_seconds, remainingB: base.chess_remaining_b_seconds };
+    await saveClock({ status: 'stopped', started_at: null, remaining_seconds: values.remaining, chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB, stopped_at: new Date().toISOString() });
+  };
+
+  const resetToDefault = async () => {
+    const base = await ensureClock();
+    if (!base) return;
+    await saveClock({
+      status: 'paused',
+      started_at: null,
+      stopped_at: null,
+      duration_seconds: defaultSeconds,
+      remaining_seconds: defaultSeconds,
+      chess_remaining_a_seconds: defaultSeconds,
+      chess_remaining_b_seconds: defaultSeconds,
+      chess_active_side: 'A',
+    });
+    setDurationChoice('tournament');
+    setCustomMinutes('');
+    showToast(`Clock reset to ${defaultMinutes} minutes`);
+  };
+
+  const completeMove = async (side) => {
+    if (!clock || clock.status !== 'running' || clock.mode !== 'chess' || clock.chess_active_side !== side) return;
+    const values = liveValues;
+    const nextSide = side === 'A' ? 'B' : 'A';
+    await saveClock({ chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB, chess_active_side: nextSide, started_at: new Date().toISOString(), status: values[side === 'A' ? 'remainingA' : 'remainingB'] <= 0 ? 'stopped' : 'running' });
+  };
+
+  useEffect(() => {
+    if (!clock || clock.status !== 'running' || !liveValues) return;
+    const expired = clock.mode === 'chess'
+      ? (clock.chess_active_side === 'A' ? liveValues.remainingA : liveValues.remainingB) <= 0
+      : liveValues.remaining <= 0;
+    if (!expired) return;
+    saveClock({
+      status: 'stopped',
+      started_at: null,
+      remaining_seconds: liveValues.remaining,
+      chess_remaining_a_seconds: liveValues.remainingA,
+      chess_remaining_b_seconds: liveValues.remainingB,
+      stopped_at: new Date().toISOString(),
+    });
+  }, [clock, liveValues]);
+
+  if (!currentUser) return <div className="clay-card" style={{ ...styles.card, textAlign: 'center' }}>Please log in to use the shared match clock.</div>;
+
+  return (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <div className="clay-card" style={styles.card}>
+        <div style={styles.cardHeader}>
+          <div style={styles.cardHeaderTitle}>⏱ Shared Match Clock</div>
+          <span style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>{isChess ? 'Chess clock' : 'Countdown timer'}</span>
+        </div>
+        <select value={selectedMatchId} onChange={(e) => setSelectedMatchId(e.target.value)} style={{ ...styles.formInput, marginBottom: '1rem' }}>
+          <option value="">— Select a match —</option>
+          {matches.map((m) => <option key={m.id} value={m.id}>{m.match_code || `Match ${m.match_number}`} · {sideNameForMatch(m, 'a', getEmployeeName)} vs {sideNameForMatch(m, 'b', getEmployeeName)}</option>)}
+        </select>
+        {selectedMatch && (
+          <div style={{ display: 'flex', alignItems: 'end', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <div style={{ ...styles.formRow, minWidth: 190, flex: 1 }}>
+              <label style={styles.formLabel}>Time for this match</label>
+              <select value={durationChoice} onChange={(e) => setDurationChoice(e.target.value)} disabled={clock?.status === 'running'} style={styles.formInput}>
+                <option value="tournament">Tournament default ({defaultMinutes} min)</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="20">20 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            {durationChoice === 'custom' && <div style={{ ...styles.formRow, width: 120 }}><label style={styles.formLabel}>Minutes</label><input type="number" min="5" max="240" value={customMinutes} onChange={(e) => setCustomMinutes(e.target.value)} disabled={clock?.status === 'running'} style={styles.formInput} /></div>}
+            <button onClick={applyDuration} disabled={clock?.status === 'running' || (durationChoice === 'custom' && Number(customMinutes) < 5)} style={{ ...styles.outlineBtn, opacity: clock?.status === 'running' || (durationChoice === 'custom' && Number(customMinutes) < 5) ? 0.5 : 1 }}>Apply Time</button>
+          </div>
+        )}
+        {loading ? <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>Loading shared clock…</div> : !selectedMatch ? <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>Select a match to begin.</div> : (
+          <>
+            {isChess ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                {['A', 'B'].map((side) => <div key={side} style={{ background: clock?.chess_active_side === side && clock?.status === 'running' ? '#1a3c6e' : 'var(--bg-muted)', color: clock?.chess_active_side === side && clock?.status === 'running' ? '#fff' : 'var(--text)', borderRadius: 10, padding: '1rem', textAlign: 'center' }}><div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{sideName(side)}</div><div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: '2.7rem', fontWeight: 700 }}>{formatClock(side === 'A' ? liveValues?.remainingA : liveValues?.remainingB)}</div><button onClick={() => completeMove(side)} disabled={!clock || clock.status !== 'running' || clock.chess_active_side !== side} style={{ ...styles.navyBtn, marginTop: '0.7rem', opacity: !clock || clock.status !== 'running' || clock.chess_active_side !== side ? 0.5 : 1 }}>Move Complete</button></div>)}
+              </div>
+            ) : <div style={{ background: '#112244', color: '#fff', borderRadius: 10, padding: '1.3rem', textAlign: 'center', fontFamily: "'Roboto Mono', monospace", fontSize: '3.4rem', fontWeight: 700 }}>{formatClock(liveValues?.remaining)}</div>}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+              <button onClick={pauseOrStart} style={{ ...styles.navyBtn, background: clock?.status === 'running' ? '#f9a825' : '#388e3c' }}>{clock?.status === 'running' ? '⏸ Pause' : '▶ Start'}</button>
+              <button onClick={stopClock} disabled={!clock || clock.status === 'stopped'} style={{ ...styles.outlineBtn, opacity: !clock || clock.status === 'stopped' ? 0.5 : 1 }}>⏹ Stop</button>
+              <button onClick={resetToDefault} disabled={!selectedMatch} style={{ ...styles.outlineBtn, opacity: !selectedMatch ? 0.5 : 1 }}>↺ Reset to Default</button>
+            </div>
+            <div style={{ textAlign: 'center', marginTop: '0.6rem', color: 'var(--muted)', fontSize: '0.68rem' }}>Shared for all logged-in users · refresh-safe</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const sideNameForMatch = (match, side, getEmployeeName) => {
+  const captain = match?.[`player_${side}_employee_id`];
+  const players = (match?.[`team_${side}_players`] || []).map((p) => p.employee_id).filter(Boolean);
+  const ids = [...new Set([captain, ...players].filter(Boolean))];
+  return ids.length ? ids.map((id) => getEmployeeName(id)).join(' & ') : 'TBD';
+};
+
+// ── Legacy local stopwatch kept below for reference ─────────────────
 // eslint-disable-next-line no-unused-vars
 const StopwatchPanel = ({ matches, tournament: _tournament, getEmployeeName }) => {
   const { showToast } = useToast();

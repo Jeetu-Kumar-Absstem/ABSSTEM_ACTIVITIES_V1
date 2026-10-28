@@ -28,7 +28,7 @@ alter table tournaments
 -- 4) Time per match (minutes) - used to space out match times when fixtures are generated.
 --    No code flag needed: the app saves it automatically once this column exists.
 alter table tournaments
-  add column if not exists match_duration_minutes integer not null default 30;
+  add column if not exists match_duration_minutes integer not null default 10;
 
 alter table tournaments
   drop constraint if exists tournaments_match_duration_minutes_check;

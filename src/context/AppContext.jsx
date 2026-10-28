@@ -56,8 +56,8 @@ const SUPPORTS_PLAYOFF_MODE = false;
 
 // Time per match (tournaments.match_duration_minutes, section 4 of
 // tournament_planner.sql). If the column does not exist yet the tournament is
-// still created and match times fall back to 30 minutes per match.
-const DEFAULT_MATCH_MINUTES = 30;
+// still created and match times fall back to 10 minutes per match.
+const DEFAULT_MATCH_MINUTES = 10;
 
 export const useApp = () => useContext(AppContext);
 
