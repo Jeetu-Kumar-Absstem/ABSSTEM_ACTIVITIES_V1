@@ -21,6 +21,7 @@ import useViewport from '../hooks/useViewport';
 import MobileTable from '../components/common/MobileTable';
 import BottomSheet from '../components/common/BottomSheet';
 import CalendarIcon from '../components/common/CalendarIcon';
+import { Eye, EyeOff } from 'lucide-react';
 
 // Plan summary: what will happen for this format / player count / team size,
 // plus contradictions (errors), warnings and one-click suggestions to fix them.
@@ -337,6 +338,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const [teamMembers, setTeamMembers] = useState([]);
   const [teamPoints, setTeamPoints] = useState([]);
   const [playerPoints, setPlayerPoints] = useState([]);
+  const [employeeDirectory, setEmployeeDirectory] = useState(employees || []);
   const [name, setName] = useState('');
   const [parentTeamId, setParentTeamId] = useState('');
   const [tournamentId, setTournamentId] = useState('');
@@ -345,14 +347,21 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const [playerSearch, setPlayerSearch] = useState('');
   const [expandedTeams, setExpandedTeams] = useState(new Set());
   const [editingTeamId, setEditingTeamId] = useState(null);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [showUserDirectory, setShowUserDirectory] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userForm, setUserForm] = useState({ employee_code: '', name: '', email: '', department: '', is_active: true });
+  const [editingEmployeeCode, setEditingEmployeeCode] = useState(null);
+  const [openUserMenu, setOpenUserMenu] = useState(null);
 
   const loadTeams = useCallback(async () => {
     setLoading(true);
-    const [teamResult, memberResult, pointResult, playerPointResult] = await Promise.all([
+    const [teamResult, memberResult, pointResult, playerPointResult, employeeResult] = await Promise.all([
       supabase.from('teams').select('*').order('name'),
       supabase.from('team_members').select('*'),
       supabase.from('team_cumulative_points').select('*').order('total_points', { ascending: false }),
-      supabase.from('tournament_participants').select('employee_id, points'),
+      supabase.from('team_match_score_entries').select('employee_id, score'),
+      supabase.from('employees').select('*').eq('is_active', true).order('name'),
     ]);
     setLoading(false);
     if (teamResult.error || memberResult.error) {
@@ -362,13 +371,14 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     setTeams((teamResult.data || []).filter((team) => team.is_active !== false));
     setTeamMembers(memberResult.data || []);
     setTeamPoints(pointResult.data || []);
-    setPlayerPoints(playerPointResult.data || []);
+    setPlayerPoints((playerPointResult.data || []).map((row) => ({ employee_id: row.employee_id, points: row.score })));
+    if (!employeeResult.error) setEmployeeDirectory(employeeResult.data || []);
   }, [showToast]);
 
   useEffect(() => { loadTeams(); }, [loadTeams]);
 
   const assignedEmployeeIds = useMemo(() => new Set(teamMembers.map((member) => String(member.employee_id).toUpperCase())), [teamMembers]);
-  const availableEmployees = employees.filter((employee) => {
+  const availableEmployees = employeeDirectory.filter((employee) => {
     const query = playerSearch.trim().toLowerCase();
     const belongsToEditingTeam = editingTeamId && teamMembers.some((member) => member.team_id === editingTeamId && member.employee_id === employee.employee_code);
     return (belongsToEditingTeam || !assignedEmployeeIds.has(String(employee.employee_code).toUpperCase())) &&
@@ -430,17 +440,101 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     showToast(count > 0 ? 'Team archived to preserve history' : 'Team deleted');
   };
 
+  const saveUser = async () => {
+    if (!isAdminUser) return showToast('Only admins can manage users', 'error');
+    const payload = {
+      employee_code: userForm.employee_code.trim().toUpperCase(),
+      name: userForm.name.trim(),
+      email: userForm.email.trim(),
+      department: userForm.department.trim(),
+      is_active: userForm.is_active,
+    };
+    if (!payload.employee_code || !payload.name || !payload.department) {
+      return showToast('Employee ID, name, and department are required', 'error');
+    }
+    const query = editingEmployeeCode
+      ? supabase.from('employees').update(payload).eq('employee_code', editingEmployeeCode)
+      : supabase.from('employees').insert(payload);
+    const { error } = await query;
+    if (error) return showToast(error.message, 'error');
+    const wasEditing = Boolean(editingEmployeeCode);
+    setUserForm({ employee_code: '', name: '', email: '', department: '', is_active: true });
+    setEditingEmployeeCode(null);
+    setOpenUserMenu(null);
+    setShowUserForm(false);
+    await loadTeams();
+    showToast(wasEditing ? 'User updated' : 'User added');
+  };
+
+  const editUser = (employee) => {
+    setEditingEmployeeCode(employee.employee_code);
+    setUserForm({
+      employee_code: employee.employee_code || '',
+      name: employee.name || '',
+      email: employee.email || '',
+      department: employee.department || '',
+      is_active: employee.is_active !== false,
+    });
+    setShowUserForm(true);
+    setOpenUserMenu(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteUser = async (employee) => {
+    if (!isAdminUser) return;
+    const [{ count: participantCount }, { count: memberCount }] = await Promise.all([
+      supabase.from('tournament_participants').select('id', { count: 'exact', head: true }).eq('employee_id', employee.employee_code),
+      supabase.from('team_members').select('employee_id', { count: 'exact', head: true }).eq('employee_id', employee.employee_code),
+    ]);
+    const referenced = (participantCount || 0) > 0 || (memberCount || 0) > 0;
+    if (!window.confirm(referenced ? `${employee.name} is used in records. Archive this user?` : `Delete ${employee.name}?`)) return;
+    const result = referenced
+      ? await supabase.from('employees').update({ is_active: false }).eq('employee_code', employee.employee_code)
+      : await supabase.from('employees').delete().eq('employee_code', employee.employee_code);
+    if (result.error) return showToast(result.error.message, 'error');
+    await loadTeams();
+    showToast(referenced ? 'User archived to preserve history' : 'User deleted');
+  };
+
   const membersFor = (teamId) => teamMembers.filter((member) => member.team_id === teamId);
   const pointsFor = (teamId) => teamPoints.find((row) => String(row.team_id) === String(teamId));
+  const visibleEmployees = employeeDirectory.filter((employee) => {
+    const query = userSearch.trim().toLowerCase();
+    return !query || `${employee.name} ${employee.employee_code} ${employee.department}`.toLowerCase().includes(query);
+  });
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), var(--accent-soft))' }}>
+      <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
+        <div style={styles.cardHeader}>
+          <div><div style={styles.cardHeaderTitle}>👤 Users Management</div><div style={{ color: 'var(--muted)', fontSize: '0.68rem', marginTop: 3 }}>{employeeDirectory.length} active users</div></div>
+          {isAdminUser && <button onClick={() => setShowUserForm((current) => !current)} style={styles.navyBtn}>{showUserForm ? '✕ Close' : '+ Add User'}</button>}
+        </div>
+        <button onClick={() => { setShowUserDirectory((current) => !current); loadTeams(); }} aria-label={showUserDirectory ? 'Hide users' : 'Show users'} style={{ width: 'fit-content', display: 'inline-flex', alignItems: 'center', gap: '0.48rem', background: 'var(--bg-muted)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.55rem 0.72rem', color: 'var(--text-soft)', cursor: 'pointer', fontSize: '0.7rem', textAlign: 'left' }}>{showUserDirectory ? <EyeOff size={15} strokeWidth={2.2} aria-hidden="true" /> : <Eye size={15} strokeWidth={2.2} aria-hidden="true" />}<span style={{ fontWeight: 700, letterSpacing: '0.01em' }}>{showUserDirectory ? 'Hide Users' : 'Show Users'}</span></button>
+        {showUserForm && isAdminUser && <div style={{ display: 'grid', gap: '0.7rem', padding: '0.8rem', background: 'var(--bg-muted)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>{editingEmployeeCode ? 'Edit employee details. Employee ID, name, and department are required.' : 'Employee ID, name, and department are required. Email is optional.'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
+            <div style={styles.formRow}><label style={styles.formLabel}>Employee ID *</label><input value={userForm.employee_code} onChange={(e) => setUserForm((f) => ({ ...f, employee_code: e.target.value }))} placeholder="TEST_EMP_ID_25" style={styles.formInput} /></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Name *</label><input value={userForm.name} onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))} placeholder="Player name" style={styles.formInput} /></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Email <span style={{ color: 'var(--muted)' }}>(optional)</span></label><input type="email" value={userForm.email} onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))} placeholder="player@example.com" style={styles.formInput} /></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Department *</label><input value={userForm.department} onChange={(e) => setUserForm((f) => ({ ...f, department: e.target.value }))} placeholder="Department" style={styles.formInput} /></div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem' }}><input type="checkbox" checked={userForm.is_active} onChange={(e) => setUserForm((f) => ({ ...f, is_active: e.target.checked }))} /> Active user</label>
+          <div style={{ display: 'flex', gap: '0.45rem' }}>{editingEmployeeCode && <button onClick={() => { setEditingEmployeeCode(null); setUserForm({ employee_code: '', name: '', email: '', department: '', is_active: true }); setShowUserForm(false); }} style={styles.outlineBtn}>Cancel</button>}<button onClick={saveUser} style={styles.navyBtn}>{editingEmployeeCode ? 'Save Changes' : 'Save User'}</button></div>
+        </div>}
+        {showUserDirectory && <div style={{ marginTop: '0.8rem', display: 'grid', gap: '0.6rem' }}>
+          <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="⌕  Search users by name, ID or department…" style={{ ...styles.formInput, maxWidth: 340 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.55rem' }}>
+            {visibleEmployees.map((employee, index) => { const hue = (index * 47) % 360; const menuOpen = openUserMenu === employee.employee_code; return <div key={employee.employee_code} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.55rem 0.65rem', borderRadius: 9, border: '1px solid var(--border)', background: `linear-gradient(135deg, hsla(${hue},70%,55%,0.16), var(--bg-surface-strong))`, minWidth: 0 }}><div style={{ width: 30, height: 30, borderRadius: '50%', background: `hsl(${hue},55%,42%)`, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: '0.7rem', flexShrink: 0 }}>{String(employee.name || '?').trim().charAt(0).toUpperCase()}</div><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{employee.name}</div><div style={{ color: 'var(--muted)', fontSize: '0.61rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{employee.employee_code} · {employee.department}</div></div>{isAdminUser && <div style={{ position: 'relative' }}><button onClick={() => setOpenUserMenu(menuOpen ? null : employee.employee_code)} title="User actions" aria-label={`Actions for ${employee.name}`} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.75rem' }}>⋮</button>{menuOpen && <div style={{ position: 'absolute', right: 0, top: '1.45rem', zIndex: 10, minWidth: 118, padding: '0.25rem', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--bg-surface-strong)', boxShadow: 'var(--surface-shadow-soft)' }}><button onClick={() => editUser(employee)} style={{ display: 'block', width: '100%', padding: '0.38rem 0.5rem', border: 0, borderRadius: 5, background: 'transparent', color: 'var(--text)', textAlign: 'left', cursor: 'pointer', fontSize: '0.68rem' }}>✎ Edit</button><button onClick={() => { setOpenUserMenu(null); deleteUser(employee); }} style={{ display: 'block', width: '100%', padding: '0.38rem 0.5rem', border: 0, borderRadius: 5, background: 'transparent', color: 'var(--danger)', textAlign: 'left', cursor: 'pointer', fontSize: '0.68rem' }}>🗑 Delete</button></div>}</div>}</div>; })}
+          </div>
+        </div>}
+      </div>
+      <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={styles.cardHeader}>
           <div><div style={styles.cardHeaderTitle}>👥 Team workspace</div><div style={{ color: 'var(--text-soft)', fontSize: '0.7rem', marginTop: 3 }}>One player can belong to one reusable team. Teams can be entered into multiple tournaments.</div></div>
           <button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button>
         </div>
-        {isAdminUser && <div style={{ background: 'var(--bg-surface-strong)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.7rem' }}>
+        {isAdminUser && <div style={{ background: 'rgba(255,255,255,0.38)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.7rem' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)' }}>{editingTeamId ? 'Edit team' : 'Create a team'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Team name" style={styles.formInput} />
@@ -448,25 +542,31 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
             <select value={tournamentId} onChange={(e) => setTournamentId(e.target.value)} style={styles.formInput}><option value="">Assign later</option>{tournaments.filter((t) => t.status === 'registration_open').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
           </div>
           <input value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} placeholder="Search available players by name or ID" style={styles.formInput} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '0.4rem', maxHeight: 220, overflowY: 'auto' }}>
-            {availableEmployees.map((employee) => <label key={employee.employee_code} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.45rem 0.55rem', border: '1px solid var(--border)', borderRadius: 6, background: selectedMembers.has(employee.employee_code) ? 'var(--accent-soft)' : 'var(--bg-surface-strong)', cursor: 'pointer', fontSize: '0.7rem' }}><input type="checkbox" checked={selectedMembers.has(employee.employee_code)} onChange={() => toggleMember(employee.employee_code)} /><span><strong>{employee.name}</strong><br /><small style={{ color: 'var(--muted)' }}>{employee.employee_code}</small></span></label>)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '0.45rem', maxHeight: 220, overflowY: 'auto' }}>
+            {availableEmployees.map((employee, index) => { const hue = (index * 47) % 360; return <label key={employee.employee_code} style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', padding: '0.5rem 0.55rem', border: '1px solid var(--border)', borderRadius: 7, background: selectedMembers.has(employee.employee_code) ? 'var(--accent-soft)' : 'var(--bg-surface-strong)', cursor: 'pointer', fontSize: '0.68rem' }}><input type="checkbox" checked={selectedMembers.has(employee.employee_code)} onChange={() => toggleMember(employee.employee_code)} /><span style={{ width: 23, height: 23, borderRadius: '50%', background: `hsl(${hue},55%,42%)`, color: '#fff', display: 'grid', placeItems: 'center', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0 }}>{String(employee.name || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{employee.name}</strong><small style={{ color: 'var(--muted)' }}>{employee.employee_code}</small></span></label>; })}
             {availableEmployees.length === 0 && <div style={{ color: 'var(--muted)', fontSize: '0.7rem', padding: '0.7rem' }}>All matching players are already assigned to a team.</div>}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}><span style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>{selectedMembers.size} player{selectedMembers.size === 1 ? '' : 's'} selected</span><div style={{ display: 'flex', gap: '0.4rem' }}>{editingTeamId && <button onClick={() => { setEditingTeamId(null); setName(''); setParentTeamId(''); setSelectedMembers(new Set()); }} style={styles.outlineBtn}>Cancel</button>}<button onClick={createTeam} style={styles.navyBtn}>{editingTeamId ? 'Save Changes' : '+ Create Team'}</button></div></div>
         </div>}
       </div>
-      <div className="clay-card" style={styles.card}>
-        <div style={styles.cardHeader}><div><div style={styles.cardHeaderTitle}>Team directory</div><div style={{ color: 'var(--muted)', fontSize: '0.68rem', marginTop: 3 }}>{teams.length} team{teams.length === 1 ? '' : 's'} · click a card to expand members</div></div></div>
-        {loading ? <div style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>Loading teams…</div> : teams.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>No reusable teams created yet.</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.8rem' }}>{teams.map((team) => {
-          const point = pointsFor(team.id);
-          const members = membersFor(team.id);
-          const expanded = expandedTeams.has(team.id);
-          return <div key={team.id} onClick={() => setExpandedTeams((current) => { const next = new Set(current); if (next.has(team.id)) next.delete(team.id); else next.add(team.id); return next; })} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', background: 'var(--bg-surface-strong)', cursor: 'pointer', boxShadow: 'var(--surface-shadow-soft)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'start' }}><div><div style={{ fontWeight: 700, fontSize: '0.86rem' }}>{team.name}</div>{team.parent_team_id && <div style={{ color: 'var(--muted)', fontSize: '0.64rem', marginTop: 2 }}>Child team</div>}</div><span style={{ color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 700 }}>{point?.total_points || 0} pts</span></div>
-            <div style={{ display: 'flex', gap: '0.8rem', margin: '0.65rem 0', color: 'var(--text-soft)', fontSize: '0.66rem' }}><span>👤 {members.length} members</span><span>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto' }}>{expanded ? '▲' : '▼'}</span></div>
-            {expanded && <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.45rem', display: 'grid', gap: '0.25rem' }}>{members.map((member) => <div key={member.employee_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.7rem' }}><span><strong>{getEmployeeName(member.employee_id)}</strong><small style={{ color: 'var(--muted)', marginLeft: 5 }}>{member.employee_id}</small></span><span style={{ color: 'var(--accent)', fontWeight: 700 }}>{pointsForPlayer(member.employee_id)} pts</span></div>)}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.45rem' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem' }}>✎ Edit</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.65rem' }}>🗑 Delete</button></div>}</div>}
-          </div>;
-        })}</div>}
+      <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
+        <div style={{ padding: '1rem 1.1rem', background: 'linear-gradient(120deg, #173d73, #245a9b 58%, #3478b8)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+          <div><div style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.01em' }}>👥 Team Directory</div><div style={{ marginTop: 4, fontSize: '0.7rem', opacity: 0.82 }}>Reusable teams, player membership and tournament performance</div></div>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}><span style={{ padding: '0.35rem 0.55rem', borderRadius: 999, background: 'rgba(255,255,255,0.16)', fontSize: '0.68rem', fontWeight: 700 }}>{teams.length} team{teams.length === 1 ? '' : 's'}</span><span style={{ padding: '0.35rem 0.55rem', borderRadius: 999, background: 'rgba(255,255,255,0.16)', fontSize: '0.68rem', fontWeight: 700 }}>{teamMembers.length} players</span></div>
+        </div>
+        <div style={{ padding: '0.9rem 1rem' }}>
+          <div style={{ color: 'var(--muted)', fontSize: '0.7rem', marginBottom: '0.75rem' }}>Click a team card to expand its roster.</div>
+          {loading ? <div style={{ color: 'var(--muted)', fontSize: '0.75rem', padding: '1rem' }}>Loading teams…</div> : teams.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.75rem', padding: '1.2rem', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 10 }}>No reusable teams created yet.</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.85rem' }}>{teams.map((team, index) => {
+            const point = pointsFor(team.id);
+            const members = membersFor(team.id);
+            const expanded = expandedTeams.has(team.id);
+            const accent = ['#2e7d32', '#6a1b9a', '#1565c0', '#ef6c00', '#00838f'][index % 5];
+            return <div key={team.id} onClick={() => setExpandedTeams((current) => { const next = new Set(current); if (next.has(team.id)) next.delete(team.id); else next.add(team.id); return next; })} style={{ border: '1px solid var(--border)', borderTop: `4px solid ${accent}`, borderRadius: 12, background: 'var(--bg-surface-strong)', cursor: 'pointer', overflow: 'hidden', boxShadow: '0 7px 18px rgba(28,48,82,0.08)', transition: 'transform 150ms ease, box-shadow 150ms ease' }}>
+              <div style={{ padding: '0.8rem 0.85rem 0.65rem', background: `linear-gradient(135deg, ${accent}12, transparent)` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>{team.parent_team_id && <span style={{ display: 'inline-block', marginTop: 4, color: accent, fontSize: '0.62rem', fontWeight: 700 }}>CHILD TEAM</span>}</div><div style={{ textAlign: 'right' }}><div style={{ color: accent, fontSize: '0.9rem', fontWeight: 800 }}>{point?.total_points || 0}</div><div style={{ color: 'var(--muted)', fontSize: '0.58rem', fontWeight: 700 }}>POINTS</div></div></div><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: `${accent}14`, color: accent, fontSize: '0.63rem', fontWeight: 700 }}>👤 {members.length} members</span><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.63rem', fontWeight: 700 }}>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '0.65rem', fontWeight: 700 }}>{expanded ? 'Hide roster ▲' : 'View roster ▼'}</span></div></div>
+              {expanded && <div style={{ borderTop: '1px solid var(--border)', padding: '0.45rem 0.85rem 0.75rem', display: 'grid', gap: '0.15rem' }}>{members.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.68rem', padding: '0.5rem 0' }}>No players assigned.</div> : members.map((member, memberIndex) => { const memberName = getEmployeeName(member.employee_id); return <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0', borderBottom: memberIndex < members.length - 1 ? '1px solid var(--border)' : 'none' }}><span style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `${accent}22`, color: accent, fontSize: '0.62rem', fontWeight: 800, flexShrink: 0 }}>{String(memberName || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</strong><small style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>{member.employee_id}</small></span><span style={{ color: accent, fontSize: '0.68rem', fontWeight: 800 }}>{pointsForPlayer(member.employee_id)} pts</span></div>; })}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', borderColor: accent, color: accent }}>✎ Edit team</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Delete</button></div>}</div>}
+            </div>;
+          })}</div>}
+        </div>
       </div>
     </div>
   );
@@ -568,6 +668,7 @@ const TournamentsPage = () => {
   const [finalForm, setFinalForm] = useState([]);
   const [tournamentToDelete, setTournamentToDelete] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [managePlayersTournamentId, setManagePlayersTournamentId] = useState(null);
   // editMatchId: ID of the match being edited by admin in the bracket/fixtures
   const [editMatchId, setEditMatchId] = useState(null);
   const [eForm, setEForm] = useState({ match_code: '', round: 'QF', match_number: 1, scheduled_at: '', team_a: [''], team_b: [''] });
@@ -814,6 +915,13 @@ const canEditMatch = (m) => {
                       >{activeTournament === t.id ? '✓' : '→'}</button>
                       {isAdmin() && (
                         <button
+                          onClick={() => setManagePlayersTournamentId(t.id)}
+                          style={{ ...styles.tinyIconBtn, color: 'var(--accent)', borderColor: 'var(--border)' }}
+                          title="Manage players for this tournament"
+                        >👥</button>
+                      )}
+                      {isAdmin() && (
+                        <button
                           onClick={() => {
                             setTEditForm({
                               status: t.status || 'registration_open',
@@ -847,6 +955,44 @@ const canEditMatch = (m) => {
               {isAdmin() ? '🏆 Register for Multiple Tournaments' : '📝 Request Multiple Tournaments'}
             </button>
           </div>
+
+        {isAdmin() && managePlayersTournamentId != null && (() => {
+          const managedTournament = tournaments.find((tournament) => String(tournament.id) === String(managePlayersTournamentId));
+          if (!managedTournament) return null;
+          const managedParticipants = partsByTournament[managedTournament.id] || [];
+          const registeredIds = new Set(managedParticipants.map((participant) => String(participant.employee_id).toUpperCase()));
+          const canManage = managedTournament.registration_open !== false
+            && managedTournament.status === 'registration_open'
+            && (!managedTournament.start_date || new Date(managedTournament.start_date) > new Date());
+          return (
+            <div style={styles.modalOverlay} onClick={() => setManagePlayersTournamentId(null)}>
+              <div style={{ ...styles.modal, maxWidth: 720 }} onClick={(event) => event.stopPropagation()}>
+                <div style={styles.modalHeader}>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>👥 Manage Players — {managedTournament.name}</h3>
+                  <button onClick={() => setManagePlayersTournamentId(null)} style={styles.modalClose}>✕</button>
+                </div>
+                <div style={{ padding: '0.9rem', display: 'grid', gap: '0.7rem' }}>
+                  {!canManage && <div style={{ color: 'var(--warning)', fontSize: '0.75rem' }}>Players can be added or removed only while registration is open and before the tournament starts.</div>}
+                  <div style={{ color: 'var(--muted)', fontSize: '0.72rem' }}>{managedParticipants.length} / {managedTournament.max_participants || 8} registered · The same employee may be registered in other tournaments.</div>
+                  <div style={{ display: 'grid', gap: '0.4rem', maxHeight: 420, overflowY: 'auto' }}>
+                    {employees.filter((employee) => employee.is_active !== false).map((employee) => {
+                      const employeeId = String(employee.employee_code || '').toUpperCase();
+                      const registered = registeredIds.has(employeeId);
+                      const full = managedParticipants.length >= (managedTournament.max_participants || 8);
+                      return (
+                        <div key={employee.employee_code} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.6rem', border: '1px solid var(--border)', borderRadius: 7 }}>
+                          <div style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.75rem' }}>{employee.name}</strong><span style={{ color: 'var(--muted)', fontSize: '0.65rem' }}>{employee.employee_code} · {employee.department || 'General'}</span></div>
+                          {registered ? <button disabled={!canManage} onClick={async () => { const result = await unregisterFromTournament(managedTournament.id, employee.employee_code); if (result.success) showToast(`${employee.name} removed from ${managedTournament.name}`); else showToast(result.error || 'Failed to remove player', 'error'); }} style={{ ...styles.tinyEnterBtn, background: 'var(--danger)', opacity: canManage ? 1 : 0.5 }}>Remove</button> : <button disabled={!canManage || full} onClick={async () => { const result = await registerForTournament(managedTournament.id, employee.employee_code); if (result.success) showToast(`${employee.name} added to ${managedTournament.name}`); else showToast(result.error || 'Failed to add player', 'error'); }} style={{ ...styles.tinyEnterBtn, background: 'var(--accent)', opacity: canManage && !full ? 1 : 0.5 }}>{full ? 'Full' : 'Add'}</button>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={styles.modalFooter}><button onClick={() => setManagePlayersTournamentId(null)} style={styles.outlineBtn}>Close</button></div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Admin: Pending Registration Requests ─────────────────────── */}
         {isAdmin() && tournamentRegistrationRequests.filter(r => String(r.status||'').toLowerCase() === 'pending').length > 0 && (
@@ -3172,7 +3318,6 @@ const renderMatch = (m) => {
                           value={rForm.winner}
                           onChange={(e) => {
                             const picked = e.target.value;
-                            // Auto-assign 5 pts to winner, 0 to loser
                             const newScoreA = picked === teamAOption ? 5 : picked === teamBOption ? 0 : '';
                             const newScoreB = picked === teamBOption ? 5 : picked === teamAOption ? 0 : '';
                             setRForm(f => ({ ...f, winner: picked, score_a: newScoreA, score_b: newScoreB }));

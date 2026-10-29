@@ -1,78 +1,85 @@
--- Register existing TEST_EMP_ID_N employees into tournaments.
--- Run 30_test_employee_master_data.sql first.
--- Existing registrations are never deleted or changed.
+-- Register only the employee IDs listed below in one open tournament.
+-- Run 30_test_employee_master_data.sql first if these are test employees.
+-- Existing registrations are not deleted or changed.
 
 do $$
 declare
-  target_tournament_id bigint := null;
-  desired_player_count integer := 24;
-  -- With no target ID, only empty registration-open tournaments are filled.
-  fill_empty_open_tournaments boolean := true;
+  -- Set the tournament ID you want to fill.
+  target_tournament_id bigint := 1;
+
+  -- Replace this list with the employees you want to register.
+  employee_ids text[] := array[
+    'TEST_EMP_ID_1',
+    'TEST_EMP_ID_2',
+    'TEST_EMP_ID_3'
+  ];
+
   tournament_row record;
   existing_count integer;
-  target_count integer;
-  needed_count integer;
+  requested_count integer;
+  available_slots integer;
 begin
-  if desired_player_count < 1 then
-    raise exception 'desired_player_count must be at least 1';
+  if target_tournament_id is null then
+    raise exception 'Set target_tournament_id before running this script';
   end if;
 
-  if target_tournament_id is not null then
-    select t.id, t.max_participants into tournament_row
-    from public.tournaments t
-    where t.id = target_tournament_id
-      and t.status = 'registration_open'
-      and t.registration_open = true;
-    if not found then
-      raise exception 'Target tournament is not open for registration';
-    end if;
+  select t.id, t.max_participants
+  into tournament_row
+  from public.tournaments t
+  where t.id = target_tournament_id
+    and t.status = 'registration_open'
+    and t.registration_open = true;
 
-    target_count := least(desired_player_count, tournament_row.max_participants);
-    select count(*) into existing_count
+  if not found then
+    raise exception 'Tournament % is not open for registration', target_tournament_id;
+  end if;
+
+  -- Make sure every listed employee exists and is active.
+  if exists (
+    select 1
+    from unnest(employee_ids) as requested(employee_code)
+    where not exists (
+      select 1
+      from public.employees e
+      where upper(e.employee_code) = upper(trim(requested.employee_code))
+        and e.is_active = true
+    )
+  ) then
+    raise exception 'One or more listed employees do not exist or are inactive';
+  end if;
+
+  select count(*) into existing_count
+  from public.tournament_participants p
+  where p.tournament_id = target_tournament_id;
+
+  select count(distinct upper(trim(employee_code)))
+  into requested_count
+  from unnest(employee_ids) as requested(employee_code)
+  where not exists (
+    select 1
     from public.tournament_participants p
-    where p.tournament_id = tournament_row.id
-      and p.employee_id like 'TEST_EMP_ID_%';
-    needed_count := greatest(target_count - existing_count, 0);
+    where p.tournament_id = target_tournament_id
+      and upper(p.employee_id) = upper(trim(requested.employee_code))
+  );
 
-    if needed_count > 0 then
-      insert into public.tournament_participants
-        (tournament_id, employee_id, status, seed)
-      select tournament_row.id, 'TEST_EMP_ID_' || n, 'registered', n
-      from generate_series(1, desired_player_count) as numbers(n)
-      where exists (
-        select 1 from public.employees e
-        where e.employee_code = 'TEST_EMP_ID_' || n
-      )
-      and not exists (
-        select 1 from public.tournament_participants existing
-        where existing.tournament_id = tournament_row.id
-          and existing.employee_id = 'TEST_EMP_ID_' || n
-      )
-      order by n limit needed_count
-      on conflict (tournament_id, employee_id) do nothing;
-    end if;
-
-  elsif fill_empty_open_tournaments then
-    for tournament_row in
-      select t.id, t.max_participants from public.tournaments t
-      where t.status = 'registration_open'
-        and t.registration_open = true
-        and not exists (
-          select 1 from public.tournament_participants p
-          where p.tournament_id = t.id
-            and p.employee_id like 'TEST_EMP_ID_%'
-        )
-    loop
-      target_count := least(desired_player_count, tournament_row.max_participants);
-      insert into public.tournament_participants
-        (tournament_id, employee_id, status, seed)
-      select tournament_row.id, 'TEST_EMP_ID_' || n, 'registered', n
-      from generate_series(1, target_count) as numbers(n)
-      where exists (
-        select 1 from public.employees e
-        where e.employee_code = 'TEST_EMP_ID_' || n
-      )
-      on conflict (tournament_id, employee_id) do nothing;
-    end loop;
+  available_slots := tournament_row.max_participants - existing_count;
+  if requested_count > available_slots then
+    raise exception 'Only % tournament slots remain, but % new employees were requested', available_slots, requested_count;
   end if;
+
+  insert into public.tournament_participants
+    (tournament_id, employee_id, status, seed)
+  select
+    target_tournament_id,
+    upper(trim(requested.employee_code)),
+    'registered',
+    row_number() over (order by requested.ordinality)::integer
+  from unnest(employee_ids) with ordinality as requested(employee_code, ordinality)
+  where not exists (
+    select 1
+    from public.tournament_participants p
+    where p.tournament_id = target_tournament_id
+      and upper(p.employee_id) = upper(trim(requested.employee_code))
+  )
+  on conflict (tournament_id, employee_id) do nothing;
 end $$;

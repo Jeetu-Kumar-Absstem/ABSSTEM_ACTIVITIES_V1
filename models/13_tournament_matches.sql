@@ -41,6 +41,12 @@ alter table if exists public.tournament_matches
   add column if not exists score_b integer;
 
 alter table if exists public.tournament_matches
+  add column if not exists points_a integer not null default 0;
+
+alter table if exists public.tournament_matches
+  add column if not exists points_b integer not null default 0;
+
+alter table if exists public.tournament_matches
   add column if not exists winner_employee_id text references public.employees(employee_code) on update cascade on delete set null;
 
 alter table if exists public.tournament_matches

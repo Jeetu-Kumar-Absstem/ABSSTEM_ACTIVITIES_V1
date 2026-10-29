@@ -2008,6 +2008,23 @@ const loadTournamentMatches = async () => {
       if (!normalizedEmpId) {
         return { success: false, error: 'Your profile is missing an employee ID' };
       }
+      // Verify the master employee row immediately before inserting. The
+      // tournament participant table has a foreign key to employees, so a
+      // stale directory entry would otherwise produce an unclear FK error.
+      const { data: employeeRow, error: employeeLookupError } = await supabase
+        .from('employees')
+        .select('employee_code, is_active')
+        .eq('employee_code', normalizedEmpId)
+        .maybeSingle();
+      if (employeeLookupError) {
+        return { success: false, error: `Could not verify employee ${normalizedEmpId}: ${employeeLookupError.message}` };
+      }
+      if (!employeeRow) {
+        return { success: false, error: `Employee ${normalizedEmpId} is not present in the employee master data. Refresh Users Management or edit/save this employee first.` };
+      }
+      if (employeeRow.is_active === false) {
+        return { success: false, error: `Employee ${normalizedEmpId} is inactive.` };
+      }
       const userIsAdmin = isAdmin();
       const approvedParticipants = getTournamentApprovedParticipants(tournamentId);
       const registeredParticipant = tournamentParticipants.find(
@@ -2499,11 +2516,14 @@ const loadTournamentMatches = async () => {
             ? (getWinnerSide(match, winner) === 'A' ? match.team_a_id : match.team_b_id) ?? null
             : null);
 
+
       const payload = {
         score_a: resultData.score_a ?? null,
         score_b: resultData.score_b ?? null,
         winner_team_id: resolvedWinnerTeamId,
         winner_employee_id: (typeof winner === 'string' && !winnerIsNumeric) ? winner : null,
+        points_a: Math.max(0, Number(resultData.score_a) || 0),
+        points_b: Math.max(0, Number(resultData.score_b) || 0),
         status,
         played_at: status === 'completed' || status === 'walkover' || status === 'no_show' || status === 'bye'
           ? new Date().toISOString()
@@ -2573,6 +2593,7 @@ const loadTournamentMatches = async () => {
               p_delta: teamAWon ? { match_losses: 1 } : { match_wins: 1 },
             });
           }
+
         }
 
         const tournament = tournaments.find((t) => t.id === match.tournament_id);
@@ -2638,6 +2659,24 @@ const loadTournamentMatches = async () => {
         } catch (shellErr) {
           console.warn('KO shell update failed (non-critical):', shellErr);
         }
+      }
+
+      // Store one score row per player in the match. If two players belong to
+      // the same global team, both rows intentionally contribute to that
+      // team's total. Re-saving a result replaces the match rows.
+      try {
+        const playerIds = [...new Set([...teamA, ...teamB])];
+        const { data: members } = playerIds.length
+          ? await supabase.from('team_members').select('team_id, employee_id').in('employee_id', playerIds)
+          : { data: [] };
+        await supabase.from('team_match_score_entries').delete().eq('match_id', match.id);
+        const scoreRows = [
+          ...teamA.map((employeeId) => ({ team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null, tournament_id: match.tournament_id, match_id: match.id, employee_id: employeeId, side: 'A', score: Math.max(0, Number(resultData.score_a) || 0) })),
+          ...teamB.map((employeeId) => ({ team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null, tournament_id: match.tournament_id, match_id: match.id, employee_id: employeeId, side: 'B', score: Math.max(0, Number(resultData.score_b) || 0) })),
+        ].filter((row) => row.team_id != null);
+        if (scoreRows.length) await supabase.from('team_match_score_entries').insert(scoreRows);
+      } catch (teamPointsErr) {
+        console.warn('Team score aggregation failed (non-critical):', teamPointsErr);
       }
 
       await loadTournamentMatches();

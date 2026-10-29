@@ -221,6 +221,26 @@ body,
   }
 }
 
+@keyframes users-directory-arrow-live {
+  0%, 100% { transform: translateX(0); opacity: 0.72; }
+  50% { transform: translateX(5px); opacity: 1; }
+}
+
+.users-directory-arrow {
+  display: inline-block;
+  color: var(--accent);
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  animation: users-directory-arrow-live 1.15s ease-in-out infinite;
+  transition: transform 180ms ease;
+}
+
+.users-directory-arrow.is-open {
+  animation-name: users-directory-arrow-live;
+  animation-direction: reverse;
+}
+
 .splash-logo {
   width: 120px;
   height: auto;
