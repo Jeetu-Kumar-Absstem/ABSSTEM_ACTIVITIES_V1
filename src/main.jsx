@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import './index.css';
+import './App.css';
 import './styles/claymorphism.css';
 import './styles/responsive.css';
 

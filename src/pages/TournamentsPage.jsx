@@ -274,7 +274,7 @@ const FORMAT_BADGE = {
 
 // Simple progression view. Fixtures remain the source of truth; this view
 // only displays the participants in each slot or TBD for an unknown slot.
-const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onClose }) => {
+export const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onClose, onPrevious, onNext, flowIndex, flowCount }) => {
   const format = normalizeTournamentFormat(tournament?.format);
   const nameForSide = (match, side) => {
     const captain = match?.[`player_${side}_employee_id`];
@@ -310,7 +310,7 @@ const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onClose }) 
       <div style={{ ...styles.modalCard, width: 1100, maxWidth: '96vw', maxHeight: 'calc(100vh - 40px)' }}>
         <div style={styles.modalHeader}>
           <div><h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>🔀 {tournament?.name} — Check Flow</h3><div style={{ fontSize: '0.65rem', opacity: 0.8, marginTop: 2 }}>Tournament progression</div></div>
-          <button onClick={onClose} style={styles.modalClose}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{onPrevious && <button onClick={onPrevious} aria-label="Previous tournament flow" style={{ ...styles.modalClose, position: 'static', fontSize: '1.15rem' }}>‹</button>}{onNext && <button onClick={onNext} aria-label="Next tournament flow" style={{ ...styles.modalClose, position: 'static', fontSize: '1.15rem' }}>›</button>}{flowCount > 1 && <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>{flowIndex + 1}/{flowCount}</span>}<button onClick={onClose} style={styles.modalClose}>✕</button></div>
         </div>
         <div style={{ padding: '1rem', overflowX: 'auto' }}>
           {stageGroups.length === 0 ? <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem' }}>No fixture flow is available yet.</div> : (
@@ -346,6 +346,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const [loading, setLoading] = useState(true);
   const [playerSearch, setPlayerSearch] = useState('');
   const [expandedTeams, setExpandedTeams] = useState(new Set());
+  const [shuffledMembers, setShuffledMembers] = useState({});
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [showUserForm, setShowUserForm] = useState(false);
   const [showUserDirectory, setShowUserDirectory] = useState(false);
@@ -497,6 +498,22 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   };
 
   const membersFor = (teamId) => teamMembers.filter((member) => member.team_id === teamId);
+  const displayMembersFor = (teamId) => {
+    const members = membersFor(teamId);
+    const order = shuffledMembers[teamId];
+    if (!order) return members;
+    const byId = new Map(members.map((member) => [String(member.employee_id), member]));
+    return order.map((id) => byId.get(String(id))).filter(Boolean);
+  };
+  const shuffleTeamMembers = (event, teamId) => {
+    event.stopPropagation();
+    const ids = membersFor(teamId).map((member) => member.employee_id);
+    for (let index = ids.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [ids[index], ids[randomIndex]] = [ids[randomIndex], ids[index]];
+    }
+    setShuffledMembers((current) => ({ ...current, [teamId]: ids }));
+  };
   const pointsFor = (teamId) => teamPoints.find((row) => String(row.team_id) === String(teamId));
   const visibleEmployees = employeeDirectory.filter((employee) => {
     const query = userSearch.trim().toLowerCase();
@@ -562,8 +579,8 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
             const expanded = expandedTeams.has(team.id);
             const accent = ['#2e7d32', '#6a1b9a', '#1565c0', '#ef6c00', '#00838f'][index % 5];
             return <div key={team.id} onClick={() => setExpandedTeams((current) => { const next = new Set(current); if (next.has(team.id)) next.delete(team.id); else next.add(team.id); return next; })} style={{ border: '1px solid var(--border)', borderTop: `4px solid ${accent}`, borderRadius: 12, background: 'var(--bg-surface-strong)', cursor: 'pointer', overflow: 'hidden', boxShadow: '0 7px 18px rgba(28,48,82,0.08)', transition: 'transform 150ms ease, box-shadow 150ms ease' }}>
-              <div style={{ padding: '0.8rem 0.85rem 0.65rem', background: `linear-gradient(135deg, ${accent}12, transparent)` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>{team.parent_team_id && <span style={{ display: 'inline-block', marginTop: 4, color: accent, fontSize: '0.62rem', fontWeight: 700 }}>CHILD TEAM</span>}</div><div style={{ textAlign: 'right' }}><div style={{ color: accent, fontSize: '0.9rem', fontWeight: 800 }}>{point?.total_points || 0}</div><div style={{ color: 'var(--muted)', fontSize: '0.58rem', fontWeight: 700 }}>POINTS</div></div></div><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: `${accent}14`, color: accent, fontSize: '0.63rem', fontWeight: 700 }}>👤 {members.length} members</span><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.63rem', fontWeight: 700 }}>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '0.65rem', fontWeight: 700 }}>{expanded ? 'Hide roster ▲' : 'View roster ▼'}</span></div></div>
-              {expanded && <div style={{ borderTop: '1px solid var(--border)', padding: '0.45rem 0.85rem 0.75rem', display: 'grid', gap: '0.15rem' }}>{members.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.68rem', padding: '0.5rem 0' }}>No players assigned.</div> : members.map((member, memberIndex) => { const memberName = getEmployeeName(member.employee_id); return <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0', borderBottom: memberIndex < members.length - 1 ? '1px solid var(--border)' : 'none' }}><span style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `${accent}22`, color: accent, fontSize: '0.62rem', fontWeight: 800, flexShrink: 0 }}>{String(memberName || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</strong><small style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>{member.employee_id}</small></span><span style={{ color: accent, fontSize: '0.68rem', fontWeight: 800 }}>{pointsForPlayer(member.employee_id)} pts</span></div>; })}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', borderColor: accent, color: accent }}>✎ Edit team</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Delete</button></div>}</div>}
+              <div style={{ padding: '0.8rem 0.85rem 0.65rem', background: `linear-gradient(135deg, ${accent}12, transparent)` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>{team.parent_team_id && <span style={{ display: 'inline-block', marginTop: 4, color: accent, fontSize: '0.62rem', fontWeight: 700 }}>CHILD TEAM</span>}</div><div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}><button onClick={(event) => shuffleTeamMembers(event, team.id)} title="Randomise player order" style={{ ...styles.outlineBtn, padding: '0.35rem 0.48rem', borderColor: accent, color: accent, fontSize: '0.65rem' }}>🔀 Shuffle</button><div style={{ textAlign: 'right' }}><div style={{ color: accent, fontSize: '0.9rem', fontWeight: 800 }}>{point?.total_points || 0}</div><div style={{ color: 'var(--muted)', fontSize: '0.58rem', fontWeight: 700 }}>POINTS</div></div></div></div><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: `${accent}14`, color: accent, fontSize: '0.63rem', fontWeight: 700 }}>👤 {members.length} members</span><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.63rem', fontWeight: 700 }}>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '0.65rem', fontWeight: 700 }}>{expanded ? 'Hide roster ▲' : 'View roster ▼'}</span></div></div>
+              {expanded && <div style={{ borderTop: '1px solid var(--border)', padding: '0.45rem 0.85rem 0.75rem', display: 'grid', gap: '0.15rem' }}>{members.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.68rem', padding: '0.5rem 0' }}>No players assigned.</div> : displayMembersFor(team.id).map((member, memberIndex) => { const memberName = getEmployeeName(member.employee_id); return <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0', borderBottom: memberIndex < members.length - 1 ? '1px solid var(--border)' : 'none' }}><span style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `${accent}22`, color: accent, fontSize: '0.62rem', fontWeight: 800, flexShrink: 0 }}>{String(memberName || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</strong><small style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>{member.employee_id}</small></span><span style={{ color: accent, fontSize: '0.68rem', fontWeight: 800 }}>{pointsForPlayer(member.employee_id)} pts</span></div>; })}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', borderColor: accent, color: accent }}>✎ Edit team</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Delete</button></div>}</div>}
             </div>;
           })}</div>}
         </div>
@@ -697,6 +714,21 @@ const TournamentsPage = () => {
     () => tournaments.find(t => t.id === activeTournament) || null,
     [tournaments, activeTournament]
   );
+  useEffect(() => {
+    const rawNavigation = sessionStorage.getItem('absstem-tournament-navigation');
+    if (!rawNavigation) return;
+    sessionStorage.removeItem('absstem-tournament-navigation');
+    try {
+      const navigation = JSON.parse(rawNavigation);
+      const target = tournaments.find((tournament) => String(tournament.id) === String(navigation.tournamentId));
+      if (!target) return;
+      setActiveTournament(target.id);
+      setSub('bracket');
+      if (navigation.flow) setShowFlowModal(true);
+    } catch (_) {
+      // Ignore malformed dashboard navigation state.
+    }
+  }, [tournaments]);
   const partsList = useMemo(
     () => activeTournament ? getParticipantsByTournament(activeTournament) : [],
     [activeTournament, tournamentParticipants, getParticipantsByTournament]
@@ -3852,11 +3884,22 @@ const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, currentUse
     return { remaining, remainingA, remainingB };
   }, [clock, defaultSeconds, now]);
 
+  const sidePlayerIds = (side) => {
+    const normalizedSide = String(side).toLowerCase();
+    const captain = selectedMatch?.[`player_${normalizedSide}_employee_id`];
+    const players = (selectedMatch?.[`team_${normalizedSide}_players`] || []).map((p) => p.employee_id).filter(Boolean);
+    return [...new Set([captain, ...players].filter(Boolean))];
+  };
+
   const sideName = (side) => {
-    const captain = selectedMatch?.[`player_${side}_employee_id`];
-    const players = (selectedMatch?.[`team_${side}_players`] || []).map((p) => p.employee_id).filter(Boolean);
-    const ids = [...new Set([captain, ...players].filter(Boolean))];
+    const ids = sidePlayerIds(side);
     return ids.length ? ids.map((id) => getEmployeeName(id)).join(' & ') : 'TBD';
+  };
+
+  const sidePlayersForDisplay = (side) => {
+    const ids = sidePlayerIds(side);
+    if (!ids.length) return [{ id: null, name: 'TBD' }];
+    return ids.map((id) => ({ id, name: getEmployeeName(id) }));
   };
 
   const formatClock = (seconds) => {
@@ -3975,17 +4018,18 @@ const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, currentUse
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div className="clay-card" style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div style={styles.cardHeaderTitle}>⏱ Shared Match Clock</div>
-          <span style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>{isChess ? 'Chess clock' : 'Countdown timer'}</span>
+      <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
+        <div style={{ padding: '1rem 1.15rem', background: 'linear-gradient(120deg, #173d73, #245a9b 58%, #3478b8)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+          <div><div style={{ fontSize: '1rem', fontWeight: 800 }}>⏱ Shared Match Clock</div><div style={{ fontSize: '0.7rem', opacity: 0.82, marginTop: 4 }}>{tournament?.name || 'Tournament'} · synchronized for all logged-in users</div></div>
+          <span style={{ padding: '0.35rem 0.55rem', borderRadius: 999, background: 'rgba(255,255,255,0.16)', fontSize: '0.65rem', fontWeight: 800 }}>{isChess ? '♟ CHESS CLOCK' : '⏳ COUNTDOWN'}</span>
         </div>
-        <select value={selectedMatchId} onChange={(e) => setSelectedMatchId(e.target.value)} style={{ ...styles.formInput, marginBottom: '1rem' }}>
-          <option value="">— Select a match —</option>
-          {matches.map((m) => <option key={m.id} value={m.id}>{m.match_code || `Match ${m.match_number}`} · {sideNameForMatch(m, 'a', getEmployeeName)} vs {sideNameForMatch(m, 'b', getEmployeeName)}</option>)}
-        </select>
+        <div style={{ padding: '1rem 1.15rem' }}>
+          <div style={{ display: 'grid', gap: '0.35rem', marginBottom: '1rem' }}><label style={styles.formLabel}>Choose match</label><select value={selectedMatchId} onChange={(e) => setSelectedMatchId(e.target.value)} style={{ ...styles.formInput, fontWeight: 700 }}>
+            <option value="">— Select a match —</option>
+            {matches.map((m) => <option key={m.id} value={m.id}>{m.match_code || `Match ${m.match_number}`} · {sideNameForMatch(m, 'a', getEmployeeName)} vs {sideNameForMatch(m, 'b', getEmployeeName)}</option>)}
+          </select></div>
         {selectedMatch && (
-          <div style={{ display: 'flex', alignItems: 'end', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'end', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem', padding: '0.7rem', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-surface-strong)' }}>
             <div style={{ ...styles.formRow, minWidth: 190, flex: 1 }}>
               <label style={styles.formLabel}>Time for this match</label>
               <select value={durationChoice} onChange={(e) => setDurationChoice(e.target.value)} disabled={clock?.status === 'running'} style={styles.formInput}>
@@ -4004,18 +4048,19 @@ const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, currentUse
         {loading ? <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>Loading shared clock…</div> : !selectedMatch ? <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>Select a match to begin.</div> : (
           <>
             {isChess ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-                {['A', 'B'].map((side) => <div key={side} style={{ background: clock?.chess_active_side === side && clock?.status === 'running' ? '#1a3c6e' : 'var(--bg-muted)', color: clock?.chess_active_side === side && clock?.status === 'running' ? '#fff' : 'var(--text)', borderRadius: 10, padding: '1rem', textAlign: 'center' }}><div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{sideName(side)}</div><div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: '2.7rem', fontWeight: 700 }}>{formatClock(side === 'A' ? liveValues?.remainingA : liveValues?.remainingB)}</div><button onClick={() => completeMove(side)} disabled={!clock || clock.status !== 'running' || clock.chess_active_side !== side} style={{ ...styles.navyBtn, marginTop: '0.7rem', opacity: !clock || clock.status !== 'running' || clock.chess_active_side !== side ? 0.5 : 1 }}>Move Complete</button></div>)}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.8rem' }}>
+                {['A', 'B'].map((side) => { const active = clock?.chess_active_side === side && clock?.status === 'running'; const players = sidePlayersForDisplay(side); const unknown = players[0]?.id == null; return <div key={side} style={{ background: active ? 'linear-gradient(145deg, #173d73, #245a9b)' : 'var(--bg-muted)', color: active ? '#fff' : 'var(--text)', borderRadius: 12, padding: '0.9rem', textAlign: 'center', border: `1px solid ${active ? '#2f6db0' : 'var(--border)'}`, boxShadow: active ? '0 10px 22px rgba(23,61,115,0.2)' : 'none' }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.7rem', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.08em', opacity: 0.78 }}><span>PLAYER {side}</span><span>{active ? '● LIVE' : 'READY'}</span></div><div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.45rem' }}>{players.map((player) => <span key={player.id || 'tbd'} title={player.name} style={{ width: 31, height: 31, borderRadius: '50%', display: 'grid', placeItems: 'center', background: unknown ? 'rgba(148,163,184,0.25)' : active ? 'rgba(255,255,255,0.2)' : 'var(--accent-soft)', color: unknown ? 'var(--muted)' : active ? '#fff' : 'var(--accent)', fontSize: '0.7rem', fontWeight: 800 }}>{unknown ? '?' : String(player.name || '?').trim().charAt(0).toUpperCase()}</span>)}</div><div style={{ minHeight: 22, fontWeight: 800, fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sideName(side)}</div><div style={{ fontFamily: "'Roboto Mono', monospace", fontSize: '2.7rem', fontWeight: 700, marginTop: '0.25rem' }}>{formatClock(side === 'A' ? liveValues?.remainingA : liveValues?.remainingB)}</div><button onClick={() => completeMove(side)} disabled={!clock || clock.status !== 'running' || clock.chess_active_side !== side} style={{ ...styles.navyBtn, marginTop: '0.7rem', opacity: !clock || clock.status !== 'running' || clock.chess_active_side !== side ? 0.5 : 1 }}>{active ? '✓ Move Complete' : 'Move Complete'}</button></div>; })}
               </div>
-            ) : <div style={{ background: '#112244', color: '#fff', borderRadius: 10, padding: '1.3rem', textAlign: 'center', fontFamily: "'Roboto Mono', monospace", fontSize: '3.4rem', fontWeight: 700 }}>{formatClock(liveValues?.remaining)}</div>}
+            ) : <div style={{ display: 'grid', gap: '0.8rem' }}><div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.6rem', padding: '0.8rem', borderRadius: 12, background: 'linear-gradient(135deg, #112244, #1c4272)', color: '#fff' }}><div style={{ textAlign: 'right', fontWeight: 800, fontSize: '0.8rem' }}>{sideName('A')}</div><div style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.16)', fontSize: '0.65rem', fontWeight: 800 }}>VS</div><div style={{ fontWeight: 800, fontSize: '0.8rem' }}>{sideName('B')}</div></div><div style={{ background: '#0b1930', color: '#fff', borderRadius: 12, padding: '1.25rem', textAlign: 'center', fontFamily: "'Roboto Mono', monospace", fontSize: '3.8rem', lineHeight: 1, fontWeight: 800, letterSpacing: '0.04em', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}>{formatClock(liveValues?.remaining)}</div></div>}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem' }}>
               <button onClick={pauseOrStart} style={{ ...styles.navyBtn, background: clock?.status === 'running' ? '#f9a825' : '#388e3c' }}>{clock?.status === 'running' ? '⏸ Pause' : '▶ Start'}</button>
               <button onClick={stopClock} disabled={!clock || clock.status === 'stopped'} style={{ ...styles.outlineBtn, opacity: !clock || clock.status === 'stopped' ? 0.5 : 1 }}>⏹ Stop</button>
               <button onClick={resetToDefault} disabled={!selectedMatch} style={{ ...styles.outlineBtn, opacity: !selectedMatch ? 0.5 : 1 }}>↺ Reset to Default</button>
             </div>
-            <div style={{ textAlign: 'center', marginTop: '0.6rem', color: 'var(--muted)', fontSize: '0.68rem' }}>Shared for all logged-in users · refresh-safe</div>
+            <div style={{ textAlign: 'center', marginTop: '0.7rem', color: 'var(--muted)', fontSize: '0.68rem' }}>Shared for all logged-in users · refresh-safe</div>
           </>
         )}
+        </div>
       </div>
     </div>
   );
