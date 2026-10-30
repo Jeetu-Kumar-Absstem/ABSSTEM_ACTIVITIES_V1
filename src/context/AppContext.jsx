@@ -2553,7 +2553,7 @@ const loadTournamentMatches = async () => {
       // team_a_players / team_b_players are arrays of employee_ids ordered by position.
       const matchId = data?.[0]?.id;
       if (matchId) {
-        if (Array.isArray(matchData.multi_team_ids) && matchData.multi_team_ids.length > 2) {
+        if (Array.isArray(matchData.multi_team_ids) && matchData.multi_team_ids.length >= 2) {
           const { error: multiTeamError } = await supabase
             .from('tournament_match_teams')
             .insert([...new Set(matchData.multi_team_ids.map(Number).filter(Number.isFinite))].map((teamId, index) => ({

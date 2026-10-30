@@ -2751,13 +2751,18 @@ const renderMatch = (m) => {
   const openNewMatchModal = (round) => {
     const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
     const teamMatchCount = matchesForActive.filter((m) => String(m.round || '') === String(round)).length;
+    const registeredTeamIds = isTeamTournament
+      ? tournamentTeamEntries
+        .filter((entry) => String(entry.tournament_id) === String(activeTournamentRecord?.id))
+        .map((entry) => entry.team_id)
+      : [];
     setMForm({
       match_code: `${round}${teamMatchCount + 1}`,
       round, match_number: teamMatchCount + 1,
       scheduled_at: '',
       team_a_id: isTeamTournament ? '' : null,
       team_b_id: isTeamTournament ? '' : null,
-      multi_team_ids: [],
+      multi_team_ids: registeredTeamIds,
       team_a: [],
       team_b: [],
     });
@@ -2771,18 +2776,17 @@ const renderMatch = (m) => {
     const teamA = (mForm.team_a || []).filter(Boolean);
     const teamB = (mForm.team_b || []).filter(Boolean);
 
-    if (isTeamTournament && (!mForm.team_a_id || !mForm.team_b_id || String(mForm.team_a_id) === String(mForm.team_b_id))) {
-      showToast('Choose two different registered teams', 'error');
-      return;
-    }
-
     if (isTeamTournament && (mForm.multi_team_ids || []).length >= 2) {
       // Multi-team game: all selected teams participate in one match.
     } else if (teamA.length === 0 || teamB.length === 0) {
+      if (isTeamTournament) {
+        showToast('Select at least two registered teams for this game', 'error');
+        return;
+      }
       showToast('At least one player per team is required', 'error');
       return;
     }
-    if (ppt > 1 && (teamA.length < 1 || teamB.length < 1)) {
+    if (!isTeamTournament && ppt > 1 && (teamA.length < 1 || teamB.length < 1)) {
       showToast('Captain (Player 1) is required for each team', 'error');
       return;
     }
@@ -3204,7 +3208,7 @@ const renderMatch = (m) => {
               <button onClick={() => setShowNewMatchModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
-              {activeTournamentRecord?.participant_mode === 'team' && <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.7rem', borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--text-soft)', fontSize: '0.7rem', lineHeight: 1.45 }}><strong>Team game:</strong> each added match is one game between two registered teams. You can add the same teams again for another game. For 6 or more teams, use Generate Fixtures to create the knockout path toward one champion.</div>}
+              {activeTournamentRecord?.participant_mode === 'team' && <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.7rem', borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--text-soft)', fontSize: '0.7rem', lineHeight: 1.45 }}><strong>Team game:</strong> one added match can include any number of registered teams. Select every team that will play in this game; the admin enters points for each team and chooses one winner. Add another match later to run another game with the same or different teams.</div>}
               {(() => {
                 const editingMatch = matchesForActive.find((match) => match.id === editMatchId);
                 const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
@@ -3222,7 +3226,6 @@ const renderMatch = (m) => {
                       name: reusableTeams.find((team) => String(team.id) === String(entry.team_id))?.name || `Team ${entry.team_id}`,
                       roster: reusableTeamMembers.filter((member) => String(member.team_id) === String(entry.team_id)).map((member) => ({ employee_id: member.employee_id })),
                     }))
-                    .filter((team) => team.tournamentId != null)
                   : [];
                 const selectedTeamA = registeredTeamOptions.find((team) => String(team.tournamentId) === String(mForm.team_a_id));
                 const selectedTeamB = registeredTeamOptions.find((team) => String(team.tournamentId) === String(mForm.team_b_id));
@@ -3284,8 +3287,8 @@ const renderMatch = (m) => {
                       </div>
                     </div>}
 
-                    {isTeamTournament && <>
-                      <div style={styles.formRow}>
+                    {false && isTeamTournament && <>
+                      <div style={{ ...styles.formRow, display: 'none' }}>
                         <label style={styles.formLabel}>Registered Team A *</label>
                         <select style={styles.formInput} value={mForm.team_a_id || ''} onChange={(e) => {
                           const value = e.target.value;
@@ -3296,7 +3299,7 @@ const renderMatch = (m) => {
                           {registeredTeamOptions.map((team) => <option key={team.tournamentId} value={team.tournamentId}>{team.name}</option>)}
                         </select>
                       </div>
-                      <div style={styles.formRow}>
+                      <div style={{ ...styles.formRow, display: 'none' }}>
                         <label style={styles.formLabel}>Registered Team B *</label>
                         <select style={styles.formInput} value={mForm.team_b_id || ''} onChange={(e) => {
                           const value = e.target.value;
@@ -3307,11 +3310,10 @@ const renderMatch = (m) => {
                           {registeredTeamOptions.map((team) => <option key={team.tournamentId} value={team.tournamentId}>{team.name}</option>)}
                         </select>
                       </div>
-                      {registeredTeamOptions.length < 2 && <div style={{ ...styles.formRow, gridColumn: 'span 2', color: 'var(--danger)', fontSize: '0.72rem' }}>Generate the tournament fixtures first so registered teams can be used in additional matches.</div>}
                     </>}
 
                     {/* Team A */}
-                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2', display: isTeamTournament ? 'none' : undefined }}>
                       <div style={{ background: 'var(--accent-soft)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.45rem'  }}>
                           🔵 {isTeamTournament ? (selectedTeamA?.name || 'Team A') : 'Team A'}
@@ -3340,7 +3342,7 @@ const renderMatch = (m) => {
                     </div>
 
                     {/* Team B */}
-                    <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                    <div style={{ ...styles.formRow, gridColumn: 'span 2', display: isTeamTournament ? 'none' : undefined }}>
                       <div style={{ background: 'rgba(249,168,37,0.10)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.45rem'  }}>
                           🟠 {isTeamTournament ? (selectedTeamB?.name || 'Team B') : 'Team B'}
