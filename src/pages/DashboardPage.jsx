@@ -17,10 +17,40 @@ const displaySide = (match, side, getEmployeeName) => {
   return ids.length ? ids.map((id) => getEmployeeName(id) || id).join(' & ') : 'TBD';
 };
 
+const flowMatchState = (match) => {
+  const status = String(match?.status || '').toLowerCase();
+  if (DONE_STATUSES.has(status)) return 'completed';
+  if (status === 'live' || status === 'in_progress') return 'live';
+  return 'upcoming';
+};
+
+const flowSideState = (match, side) => {
+  if (flowMatchState(match) !== 'completed') return '';
+  if (String(match.status).toLowerCase() === 'bye') return side === 'a' ? 'winner' : 'empty';
+  const own = Number(match[`score_${side}`]);
+  const other = Number(match[`score_${side === 'a' ? 'b' : 'a'}`]);
+  if (own === other && !match.winner_employee_id) return '';
+  if (match.winner_employee_id) return String(match.winner_employee_id).toUpperCase() === String(match[`player_${side}_employee_id`] || '').toUpperCase() ? 'winner' : 'loser';
+  return own > other ? 'winner' : 'loser';
+};
+
 const DashboardFlowPage = ({ tournaments, tournamentMatches, getEmployeeName, onBack, liveCount }) => {
+  const renderBracketMatch = (match) => {
+    const state = flowMatchState(match);
+    return <article className={`dashboard-bracket-match is-${state}`} key={match.id || match.match_code}>
+      <div className="dashboard-bracket-match-meta"><span>{match.match_code || `Match ${match.match_number || ''}`}</span><b>{state === 'live' ? 'LIVE' : state === 'completed' ? 'DONE' : 'UP NEXT'}</b></div>
+      <div className={`flow-player-row is-${flowSideState(match, 'a')}`}><span>{displaySide(match, 'a', getEmployeeName)}</span><b>{match.score_a ?? '—'}</b></div>
+      <span className="flow-vs">VS</span>
+      <div className={`flow-player-row is-${flowSideState(match, 'b')}`}><span>{displaySide(match, 'b', getEmployeeName)}</span><b>{match.score_b ?? '—'}</b></div>
+    </article>;
+  };
+  const renderBracketRound = (stage, side, index) => <section className={`dashboard-bracket-round ${side}-round round-${index + 1}`} key={`${side}-${stage.round}`} style={{ '--match-count': stage.matches.length }}>
+    <div className="dashboard-bracket-round-title"><strong>{stage.label}</strong><small>{stage.matches.length} {stage.matches.length === 1 ? 'MATCH' : 'MATCHES'}</small></div>
+    <div className="dashboard-bracket-match-list">{stage.matches.map(renderBracketMatch)}</div>
+  </section>;
   return <main className="projector-dashboard projector-flow-page">
     <section className="projector-hero"><div><div className="projector-kicker"><Zap size={15} fill="currentColor" /> LIVE ARENA CONTROL</div><h1>Competition Dashboard</h1><p>One projected view for every tournament currently on court.</p></div><div className="projector-hero-meta"><button className="hero-page-arrow" aria-label="Previous dashboard page" onClick={onBack}><ChevronLeft size={17} /></button><span className="live-dot" /> {liveCount} live tournament{liveCount === 1 ? '' : 's'}<button className="hero-page-arrow" aria-label="Next dashboard page" disabled><ChevronRight size={17} /></button></div></section>
-    <section className="dashboard-flow-shell"><div className="dashboard-flow-body">{tournaments.length === 0 ? <div className="flow-empty">No tournaments available.</div> : tournaments.map((tournament) => { const matches = tournamentMatches.filter((match) => String(match.tournament_id) === String(tournament.id)); const stages = groupMatchesByRound(matches); return <section className="dashboard-flow-tournament" key={tournament.id}><div className="dashboard-flow-tournament-title"><span className="live-dot" />{tournament.name}<small>Check Flow</small></div>{stages.length === 0 ? <div className="flow-empty">No fixtures available.</div> : <div className="dashboard-flow-stages">{stages.map((stage, index) => <div className="dashboard-flow-stage" key={stage.round}><div className="dashboard-flow-stage-title"><strong>{stage.label}</strong><small>({stage.matches.length} {stage.matches.length === 1 ? 'match' : 'matches'})</small></div><div className="dashboard-flow-stage-matches">{stage.matches.map((match) => <div className="dashboard-flow-match" key={match.id || match.match_code}><div>{displaySide(match, 'a', getEmployeeName)}<b>{match.score_a ?? '—'}</b></div><span>vs</span><div>{displaySide(match, 'b', getEmployeeName)}<b>{match.score_b ?? '—'}</b></div></div>)}</div>{index < stages.length - 1 && <i>→</i>}</div>)}</div>}</section>; })}</div></section>
+    <section className="dashboard-flow-shell"><div className="dashboard-flow-body">{tournaments.length === 0 ? <div className="flow-empty">No tournaments available.</div> : tournaments.map((tournament) => { const matches = tournamentMatches.filter((match) => String(match.tournament_id) === String(tournament.id)); const stages = groupMatchesByRound(matches); const finalStage = stages[stages.length - 1]; const feederStages = stages.slice(0, -1); const leftStages = feederStages.map((stage) => ({ ...stage, matches: stage.matches.slice(0, Math.ceil(stage.matches.length / 2)) })); const rightStages = feederStages.map((stage) => ({ ...stage, matches: stage.matches.slice(Math.ceil(stage.matches.length / 2)) })).reverse(); return <section className="dashboard-flow-tournament" key={tournament.id}><div className="dashboard-flow-tournament-title"><span className="live-dot" />{tournament.name}<small>Knockout bracket</small></div>{stages.length === 0 ? <div className="flow-empty">No fixtures available.</div> : <div className="dashboard-knockout-bracket"><div className="dashboard-bracket-side dashboard-bracket-left">{leftStages.map((stage, index) => renderBracketRound(stage, 'left', index))}</div><section className="dashboard-bracket-centre"><div className="dashboard-bracket-final-label"><span>CHAMPIONSHIP</span><strong>{finalStage?.label || 'Final'}</strong></div>{finalStage && <div className="dashboard-bracket-final-match">{finalStage.matches.map(renderBracketMatch)}</div>}</section><div className="dashboard-bracket-side dashboard-bracket-right">{rightStages.map((stage, index) => renderBracketRound(stage, 'right', index))}</div></div>}</section>; })}</div></section>
   </main>;
 };
 

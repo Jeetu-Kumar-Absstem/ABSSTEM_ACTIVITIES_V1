@@ -346,7 +346,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const [loading, setLoading] = useState(true);
   const [playerSearch, setPlayerSearch] = useState('');
   const [expandedTeams, setExpandedTeams] = useState(new Set());
-  const [shuffledMembers, setShuffledMembers] = useState({});
+  const [shuffledEmployeeIds, setShuffledEmployeeIds] = useState([]);
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [showUserForm, setShowUserForm] = useState(false);
   const [showUserDirectory, setShowUserDirectory] = useState(false);
@@ -373,7 +373,16 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     setTeamMembers(memberResult.data || []);
     setTeamPoints(pointResult.data || []);
     setPlayerPoints((playerPointResult.data || []).map((row) => ({ employee_id: row.employee_id, points: row.score })));
-    if (!employeeResult.error) setEmployeeDirectory(employeeResult.data || []);
+    if (!employeeResult.error) {
+      const nextEmployees = employeeResult.data || [];
+      setEmployeeDirectory(nextEmployees);
+      setShuffledEmployeeIds((current) => {
+        const availableIds = new Set(nextEmployees.map((employee) => employee.employee_code));
+        const retainedIds = current.filter((id) => availableIds.has(id));
+        const newIds = nextEmployees.map((employee) => employee.employee_code).filter((id) => !retainedIds.includes(id));
+        return [...retainedIds, ...newIds];
+      });
+    }
   }, [showToast]);
 
   useEffect(() => { loadTeams(); }, [loadTeams]);
@@ -497,25 +506,25 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     showToast(referenced ? 'User archived to preserve history' : 'User deleted');
   };
 
+  const employeeOrder = useMemo(() => new Map(shuffledEmployeeIds.map((id, index) => [String(id), index])), [shuffledEmployeeIds]);
+  const orderedEmployees = useMemo(() => {
+    if (shuffledEmployeeIds.length === 0) return employeeDirectory;
+    return [...employeeDirectory].sort((a, b) => (employeeOrder.get(String(a.employee_code)) ?? Number.MAX_SAFE_INTEGER) - (employeeOrder.get(String(b.employee_code)) ?? Number.MAX_SAFE_INTEGER));
+  }, [employeeDirectory, employeeOrder, shuffledEmployeeIds.length]);
   const membersFor = (teamId) => teamMembers.filter((member) => member.team_id === teamId);
   const displayMembersFor = (teamId) => {
-    const members = membersFor(teamId);
-    const order = shuffledMembers[teamId];
-    if (!order) return members;
-    const byId = new Map(members.map((member) => [String(member.employee_id), member]));
-    return order.map((id) => byId.get(String(id))).filter(Boolean);
+    return [...membersFor(teamId)].sort((a, b) => (employeeOrder.get(String(a.employee_id)) ?? Number.MAX_SAFE_INTEGER) - (employeeOrder.get(String(b.employee_id)) ?? Number.MAX_SAFE_INTEGER));
   };
-  const shuffleTeamMembers = (event, teamId) => {
-    event.stopPropagation();
-    const ids = membersFor(teamId).map((member) => member.employee_id);
+  const shuffleEmployees = () => {
+    const ids = employeeDirectory.map((employee) => employee.employee_code);
     for (let index = ids.length - 1; index > 0; index -= 1) {
       const randomIndex = Math.floor(Math.random() * (index + 1));
       [ids[index], ids[randomIndex]] = [ids[randomIndex], ids[index]];
     }
-    setShuffledMembers((current) => ({ ...current, [teamId]: ids }));
+    setShuffledEmployeeIds(ids);
   };
   const pointsFor = (teamId) => teamPoints.find((row) => String(row.team_id) === String(teamId));
-  const visibleEmployees = employeeDirectory.filter((employee) => {
+  const visibleEmployees = orderedEmployees.filter((employee) => {
     const query = userSearch.trim().toLowerCase();
     return !query || `${employee.name} ${employee.employee_code} ${employee.department}`.toLowerCase().includes(query);
   });
@@ -549,7 +558,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
       <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={styles.cardHeader}>
           <div><div style={styles.cardHeaderTitle}>👥 Team workspace</div><div style={{ color: 'var(--text-soft)', fontSize: '0.7rem', marginTop: 3 }}>One player can belong to one reusable team. Teams can be entered into multiple tournaments.</div></div>
-          <button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button><button onClick={shuffleEmployees} title="Randomise the order of all employees in this workspace" style={styles.outlineBtn}>🔀 Shuffle employees</button></div>
         </div>
         {isAdminUser && <div style={{ background: 'rgba(255,255,255,0.38)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.7rem' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)' }}>{editingTeamId ? 'Edit team' : 'Create a team'}</div>
@@ -560,7 +569,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
           </div>
           <input value={playerSearch} onChange={(e) => setPlayerSearch(e.target.value)} placeholder="Search available players by name or ID" style={styles.formInput} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '0.45rem', maxHeight: 220, overflowY: 'auto' }}>
-            {availableEmployees.map((employee, index) => { const hue = (index * 47) % 360; return <label key={employee.employee_code} style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', padding: '0.5rem 0.55rem', border: '1px solid var(--border)', borderRadius: 7, background: selectedMembers.has(employee.employee_code) ? 'var(--accent-soft)' : 'var(--bg-surface-strong)', cursor: 'pointer', fontSize: '0.68rem' }}><input type="checkbox" checked={selectedMembers.has(employee.employee_code)} onChange={() => toggleMember(employee.employee_code)} /><span style={{ width: 23, height: 23, borderRadius: '50%', background: `hsl(${hue},55%,42%)`, color: '#fff', display: 'grid', placeItems: 'center', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0 }}>{String(employee.name || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{employee.name}</strong><small style={{ color: 'var(--muted)' }}>{employee.employee_code}</small></span></label>; })}
+            {orderedEmployees.filter((employee) => availableEmployees.includes(employee)).map((employee, index) => { const hue = (index * 47) % 360; return <label key={employee.employee_code} style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', padding: '0.5rem 0.55rem', border: '1px solid var(--border)', borderRadius: 7, background: selectedMembers.has(employee.employee_code) ? 'var(--accent-soft)' : 'var(--bg-surface-strong)', cursor: 'pointer', fontSize: '0.68rem' }}><input type="checkbox" checked={selectedMembers.has(employee.employee_code)} onChange={() => toggleMember(employee.employee_code)} /><span style={{ width: 23, height: 23, borderRadius: '50%', background: `hsl(${hue},55%,42%)`, color: '#fff', display: 'grid', placeItems: 'center', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0 }}>{String(employee.name || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0 }}><strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{employee.name}</strong><small style={{ color: 'var(--muted)' }}>{employee.employee_code}</small></span></label>; })}
             {availableEmployees.length === 0 && <div style={{ color: 'var(--muted)', fontSize: '0.7rem', padding: '0.7rem' }}>All matching players are already assigned to a team.</div>}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}><span style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>{selectedMembers.size} player{selectedMembers.size === 1 ? '' : 's'} selected</span><div style={{ display: 'flex', gap: '0.4rem' }}>{editingTeamId && <button onClick={() => { setEditingTeamId(null); setName(''); setParentTeamId(''); setSelectedMembers(new Set()); }} style={styles.outlineBtn}>Cancel</button>}<button onClick={createTeam} style={styles.navyBtn}>{editingTeamId ? 'Save Changes' : '+ Create Team'}</button></div></div>
@@ -579,7 +588,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
             const expanded = expandedTeams.has(team.id);
             const accent = ['#2e7d32', '#6a1b9a', '#1565c0', '#ef6c00', '#00838f'][index % 5];
             return <div key={team.id} onClick={() => setExpandedTeams((current) => { const next = new Set(current); if (next.has(team.id)) next.delete(team.id); else next.add(team.id); return next; })} style={{ border: '1px solid var(--border)', borderTop: `4px solid ${accent}`, borderRadius: 12, background: 'var(--bg-surface-strong)', cursor: 'pointer', overflow: 'hidden', boxShadow: '0 7px 18px rgba(28,48,82,0.08)', transition: 'transform 150ms ease, box-shadow 150ms ease' }}>
-              <div style={{ padding: '0.8rem 0.85rem 0.65rem', background: `linear-gradient(135deg, ${accent}12, transparent)` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>{team.parent_team_id && <span style={{ display: 'inline-block', marginTop: 4, color: accent, fontSize: '0.62rem', fontWeight: 700 }}>CHILD TEAM</span>}</div><div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}><button onClick={(event) => shuffleTeamMembers(event, team.id)} title="Randomise player order" style={{ ...styles.outlineBtn, padding: '0.35rem 0.48rem', borderColor: accent, color: accent, fontSize: '0.65rem' }}>🔀 Shuffle</button><div style={{ textAlign: 'right' }}><div style={{ color: accent, fontSize: '0.9rem', fontWeight: 800 }}>{point?.total_points || 0}</div><div style={{ color: 'var(--muted)', fontSize: '0.58rem', fontWeight: 700 }}>POINTS</div></div></div></div><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: `${accent}14`, color: accent, fontSize: '0.63rem', fontWeight: 700 }}>👤 {members.length} members</span><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.63rem', fontWeight: 700 }}>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '0.65rem', fontWeight: 700 }}>{expanded ? 'Hide roster ▲' : 'View roster ▼'}</span></div></div>
+              <div style={{ padding: '0.8rem 0.85rem 0.65rem', background: `linear-gradient(135deg, ${accent}12, transparent)` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>{team.parent_team_id && <span style={{ display: 'inline-block', marginTop: 4, color: accent, fontSize: '0.62rem', fontWeight: 700 }}>CHILD TEAM</span>}</div><div style={{ textAlign: 'right' }}><div style={{ color: accent, fontSize: '0.9rem', fontWeight: 800 }}>{point?.total_points || 0}</div><div style={{ color: 'var(--muted)', fontSize: '0.58rem', fontWeight: 700 }}>POINTS</div></div></div><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: `${accent}14`, color: accent, fontSize: '0.63rem', fontWeight: 700 }}>👤 {members.length} members</span><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.63rem', fontWeight: 700 }}>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '0.65rem', fontWeight: 700 }}>{expanded ? 'Hide roster ▲' : 'View roster ▼'}</span></div></div>
               {expanded && <div style={{ borderTop: '1px solid var(--border)', padding: '0.45rem 0.85rem 0.75rem', display: 'grid', gap: '0.15rem' }}>{members.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.68rem', padding: '0.5rem 0' }}>No players assigned.</div> : displayMembersFor(team.id).map((member, memberIndex) => { const memberName = getEmployeeName(member.employee_id); return <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0', borderBottom: memberIndex < members.length - 1 ? '1px solid var(--border)' : 'none' }}><span style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `${accent}22`, color: accent, fontSize: '0.62rem', fontWeight: 800, flexShrink: 0 }}>{String(memberName || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</strong><small style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>{member.employee_id}</small></span><span style={{ color: accent, fontSize: '0.68rem', fontWeight: 800 }}>{pointsForPlayer(member.employee_id)} pts</span></div>; })}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', borderColor: accent, color: accent }}>✎ Edit team</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Delete</button></div>}</div>}
             </div>;
           })}</div>}
