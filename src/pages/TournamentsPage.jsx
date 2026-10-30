@@ -3779,7 +3779,7 @@ const renderMatch = (m) => {
 };
 
 // ── Shared match clock ──────────────────────────────────────────────
-const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, currentUser }) => {
+export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, currentUser }) => {
   const { showToast } = useToast();
   const [selectedMatchId, setSelectedMatchId] = useState(() => matches[0]?.id || '');
   const [clock, setClock] = useState(null);

@@ -2542,6 +2542,16 @@ const loadTournamentMatches = async () => {
         .match({ id: matchId });
       if (error) throw error;
 
+      // A recorded result ends the shared court clock as well. This keeps the
+      // dashboard and Tournament stopwatch in the same state for every user.
+      if (['completed', 'walkover', 'no_show', 'bye'].includes(status)) {
+        await supabase
+          .from('tournament_match_clocks')
+          .update({ status: 'stopped', started_at: null, stopped_at: new Date().toISOString() })
+          .eq('match_id', matchId)
+          .eq('status', 'running');
+      }
+
       if (status === 'draw') {
         const participantIds = [...new Set([...teamA, ...teamB])];
         for (const empId of participantIds) {
