@@ -648,6 +648,7 @@ const TournamentsPage = () => {
   const [sub, setSub] = useState('active');
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
   const [reusableTeams, setReusableTeams] = useState([]);
+  const [reusableTeamMembers, setReusableTeamMembers] = useState([]);
   const [teamMemberCounts, setTeamMemberCounts] = useState({});
   const [teamEntryPlayerCounts, setTeamEntryPlayerCounts] = useState({});
   const [tournamentTeamEntries, setTournamentTeamEntries] = useState([]);
@@ -661,6 +662,7 @@ const TournamentsPage = () => {
     ]).then(([teamsResult, membersResult, entriesResult, snapshotsResult]) => {
       if (!active) return;
       setReusableTeams(teamsResult.data || []);
+      setReusableTeamMembers(membersResult.data || []);
       const counts = {};
       (membersResult.data || []).forEach((member) => { counts[member.team_id] = (counts[member.team_id] || 0) + 1; });
       setTeamMemberCounts(counts);
@@ -788,6 +790,22 @@ const TournamentsPage = () => {
     return map;
   }, [tournamentRegistrationRequests]);
 
+  // In a team tournament, roster membership is the registration record. Do
+  // not require a duplicate tournament_participants row for each player.
+  const activeTeamPlayerIds = useMemo(() => {
+    if (activeTournamentRecord?.participant_mode !== 'team') return new Set();
+    const entryIds = new Set(
+      tournamentTeamEntries
+        .filter((entry) => String(entry.tournament_id) === String(activeTournamentRecord.id))
+        .map((entry) => String(entry.team_id))
+    );
+    return new Set(
+      reusableTeamMembers
+        .filter((member) => entryIds.has(String(member.team_id)))
+        .map((member) => String(member.employee_id).toUpperCase())
+    );
+  }, [activeTournamentRecord, tournamentTeamEntries, reusableTeamMembers]);
+
   // Participants who have requested withdrawal while tournament is live
   // keyed by tournament_id — used to show admin the approval panel
   const withdrawalPendingByTournament = useMemo(() => {
@@ -815,7 +833,9 @@ const TournamentsPage = () => {
   );
 
   const currentEmpId = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || '';
-  const isRegisteredForActive = partsList.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase());
+  const isRegisteredForActive = activeTournamentRecord?.participant_mode === 'team'
+    ? activeTeamPlayerIds.has(currentEmpId.toUpperCase())
+    : partsList.some(p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase());
 
   // Permission helper for editing a match result.
   // Admin can always edit. Non-admin can edit only if they actually played
@@ -1048,7 +1068,10 @@ const canEditMatch = (m) => {
                   <div style={{ display: 'grid', gap: '0.4rem', maxHeight: 420, overflowY: 'auto' }}>
                     {reusableTeams.map((team) => {
                       const registered = registeredTeamIds.has(String(team.id));
-                      const full = !registered && managedTournament.max_participants && managedTeamEntries.length >= managedTournament.max_participants;
+                      // Team tournaments are roster-based; max_participants is
+                      // an individual-player setting and must not limit the
+                      // number of reusable teams selected after creation.
+                      const full = false;
                       return <div key={team.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.65rem', border: '1px solid var(--border)', borderRadius: 8, background: registered ? 'var(--accent-soft)' : 'var(--bg-surface-strong)' }}>
                         <div style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.75rem' }}>{team.name}</strong><span style={{ color: 'var(--muted)', fontSize: '0.65rem' }}>{teamMemberCounts[team.id] || 0} players · {team.description || 'Flexible roster'}</span></div>
                         {registered ? <button disabled={!canManage} onClick={async () => { const { error } = await supabase.from('tournament_team_entries').delete().match({ tournament_id: managedTournament.id, team_id: team.id }); if (error) showToast(error.message, 'error'); else { setTournamentTeamEntries((current) => current.filter((entry) => !(String(entry.tournament_id) === String(managedTournament.id) && String(entry.team_id) === String(team.id)))); showToast(`${team.name} removed from ${managedTournament.name}`); } }} style={{ ...styles.tinyEnterBtn, background: 'var(--danger)', opacity: canManage ? 1 : 0.5 }}>Remove</button> : <button disabled={!canManage || full} onClick={async () => { const { data, error } = await supabase.from('tournament_team_entries').insert({ tournament_id: managedTournament.id, team_id: team.id, status: 'registered' }).select().single(); if (error) showToast(error.message, 'error'); else { setTournamentTeamEntries((current) => [...current, data]); showToast(`${team.name} added to ${managedTournament.name}`); } }} style={{ ...styles.tinyEnterBtn, background: 'var(--accent)', opacity: canManage && !full ? 1 : 0.5 }}>{full ? 'Full' : 'Add'}</button>}
@@ -1262,21 +1285,24 @@ const renderMatch = (m) => {
   const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
   const hasTeamA = Boolean(m.team_a_id);
   const hasTeamB = Boolean(m.team_b_id);
+  const hasMultiTeams = (m.multi_team_teams || []).length > 1;
   // TBD vs TBD shell matches — show as an upcoming placeholder card
-  const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id && !hasTeamA && !hasTeamB;
+  const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id && !hasTeamA && !hasTeamB && !hasMultiTeams;
 
   // Check if this match is waiting for a winner from a previous match
   const waitingForWinnerA = !isTeamTournament && m._feeds_from_a && !m.player_a_employee_id;
   const waitingForWinnerB = !isTeamTournament && m._feeds_from_b && !m.player_b_employee_id;
   
   // Check if this match has TBD on either side (waiting for previous match)
-  const hasTBD = isTeamTournament
+  const hasTBD = hasMultiTeams
+    ? false
+    : isTeamTournament
     ? !hasTeamA || !hasTeamB
     : !m.player_a_employee_id || !m.player_b_employee_id;
-  const isLineupMissing = isTeamTournament && !isPhantom && (!m.team_a_players?.length || !m.team_b_players?.length);
+  const isLineupMissing = isTeamTournament && !hasMultiTeams && !isPhantom && (!m.team_a_players?.length || !m.team_b_players?.length);
 
-  const a = isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players, m.team_a_name);
-  const b = isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players, m.team_b_name);
+  const a = hasMultiTeams ? `${m.multi_team_teams.length} teams` : isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players, m.team_a_name);
+  const b = hasMultiTeams ? 'Admin enters points for each team' : isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players, m.team_b_name);
   
   const hasScore = m.score_a !== null && m.score_b !== null;
   const isFinal  = String(m.round || '').toUpperCase() === 'F';
@@ -1339,8 +1365,19 @@ const renderMatch = (m) => {
       </div>
 
       {/* Player A */}
+      {hasMultiTeams && (
+        <div style={{ display: 'grid', gap: '0.28rem', margin: '0.35rem 0' }}>
+          {m.multi_team_teams.map((team) => (
+            <div key={team.team_id} style={{ ...styles.matchPlayer, background: team.is_winner ? 'rgba(46,125,50,0.14)' : 'rgba(63,81,181,0.05)', color: team.is_winner ? 'var(--success)' : 'var(--text)', fontWeight: team.is_winner ? 700 : 500 }}>
+              <span style={{ fontSize: '0.72rem' }}>{team.team_name}</span>
+              <span style={{ marginLeft: '0.4rem', fontWeight: 800 }}>{team.score ?? '—'}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{
         ...styles.matchPlayer,
+        display: hasMultiTeams ? 'none' : undefined,
         background: hasScore && m.score_a > m.score_b ? 'rgba(46,125,50,0.14)' :
                     waitingForWinnerA ? 'rgba(230,81,0,0.10)' : 'transparent',
         color: isPhantom ? 'var(--muted)'
@@ -1359,6 +1396,7 @@ const renderMatch = (m) => {
 
       <div style={{
         textAlign: 'center',
+        display: hasMultiTeams ? 'none' : undefined,
         fontSize: '0.7rem',
         fontWeight: 700,
         color: 'var(--muted)',
@@ -1371,6 +1409,7 @@ const renderMatch = (m) => {
       {/* Player B */}
       <div style={{
         ...styles.matchPlayer,
+        display: hasMultiTeams ? 'none' : undefined,
         background: hasScore && m.score_b > m.score_a ? 'rgba(46,125,50,0.14)' :
                     waitingForWinnerB ? 'rgba(230,81,0,0.10)' : 'transparent',
         color: isPhantom ? 'var(--muted)'
@@ -1421,7 +1460,7 @@ const renderMatch = (m) => {
       </div>
 
       {/* Enter/Edit result — ONLY when both players are known and match is not a bye */}
-      {!isBye && !isPhantom && !isTBDMatch && canEditMatch(m) && (
+      {!isBye && !isPhantom && !isTBDMatch && !isLineupMissing && canEditMatch(m) && (
         <button
           onClick={() => openResultModal(m)}
           style={{ ...styles.tinyEnterBtn, marginTop: '0.4rem', width: '100%' }}
@@ -1536,6 +1575,53 @@ const renderMatch = (m) => {
     );
     const hasKoPhase = koMatches.length > 0;
     // KO is now auto-generated alongside RR fixtures — no manual "Generate KO" button needed.
+
+    const isReusableTeamTournament = activeTournamentRecord?.participant_mode === 'team';
+    const activeTeamEntries = isReusableTeamTournament
+      ? tournamentTeamEntries.filter((entry) => String(entry.tournament_id) === String(activeTournamentRecord.id))
+      : [];
+    const activeTeamNames = new Map(reusableTeams.map((team) => [String(team.id), team.name]));
+    const teamParticipantRows = activeTeamEntries.flatMap((entry) =>
+      reusableTeamMembers
+        .filter((member) => String(member.team_id) === String(entry.team_id))
+        .map((member) => ({
+          ...member,
+          team_id: entry.team_id,
+          team_name: activeTeamNames.get(String(entry.team_id)) || `Team ${entry.team_id}`,
+        }))
+    );
+    const participantRows = isReusableTeamTournament ? teamParticipantRows : partsList;
+    const teamContributionMap = new Map();
+    if (isReusableTeamTournament) {
+      matchesForActive.forEach((match) => {
+        if (match.score_a == null && match.score_b == null) return;
+        ['a', 'b'].forEach((side) => {
+          const teamId = match[`team_${side}_id`];
+          if (teamId == null) return;
+          const key = String(teamId);
+          const lineup = (match[`team_${side}_players`] || []).map((player) => player.employee_id).filter(Boolean);
+          const current = teamContributionMap.get(key) || {
+            id: teamId,
+            name: match[`team_${side}_name`] || `Team ${teamId}`,
+            points: 0,
+            matches: 0,
+            wins: 0,
+            lineups: [],
+          };
+          current.points += Math.max(0, Number(match[`score_${side}`]) || 0);
+          current.matches += 1;
+          if (String(match.winner_team_id) === String(teamId)) current.wins += 1;
+          if (lineup.length > 0) {
+            const lineupKey = lineup.join('|');
+            if (!current.lineups.some((entry) => entry.key === lineupKey)) {
+              current.lineups.push({ key: lineupKey, names: [...new Set(lineup)].map((id) => getEmployeeName(id) || id) });
+            }
+          }
+          teamContributionMap.set(key, current);
+        });
+      });
+    }
+    const teamContributionRows = [...teamContributionMap.values()].sort((a, b) => b.points - a.points || b.wins - a.wins);
 
     return (
       <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1664,6 +1750,42 @@ const renderMatch = (m) => {
             </div>
           </div>
         )}
+
+        {isReusableTeamTournament && (
+          <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(106,27,154,0.07))' }}>
+            <div style={styles.cardHeader}>
+              <div>
+                <div style={styles.cardHeaderTitle}>👥 Team Contribution</div>
+                <div style={{ color: 'var(--muted)', fontSize: '0.68rem', marginTop: 3 }}>
+                  Match points are counted once for the team. Selected lineup players are shown as contributors.
+                </div>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ ...styles.table, minWidth: 680 }}>
+                <thead><tr style={styles.theadRow}>{['Team', 'Team points', 'Matches', 'Wins', 'Lineup contributors'].map((heading) => <th key={heading} style={styles.th}>{heading}</th>)}</tr></thead>
+                <tbody>
+                  {teamContributionRows.length === 0 ? (
+                    <tr><td colSpan={5} style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>No team result points recorded yet.</td></tr>
+                  ) : teamContributionRows.map((row) => (
+                    <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ ...styles.td, fontWeight: 700 }}>{row.name}</td>
+                      <td style={{ ...styles.td, color: 'var(--accent)', fontWeight: 800 }}>{row.points}</td>
+                      <td style={styles.td}>{row.matches}</td>
+                      <td style={{ ...styles.td, color: 'var(--success)', fontWeight: 700 }}>{row.wins}</td>
+                      <td style={{ ...styles.td, color: 'var(--text-soft)', fontSize: '0.7rem' }}>
+                        {row.lineups.length === 0 ? 'Lineup not recorded' : row.lineups.map((lineup) => lineup.names.join(' + ')).join(' · ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: '0.65rem 0.8rem', borderTop: '1px solid var(--border)', color: 'var(--muted)', fontSize: '0.68rem', lineHeight: 1.5 }}>
+              In doubles, both selected players contribute to the team result, but the match score is added once to the team total—not once per player. Individual player points are displayed separately where available.
+            </div>
+          </div>
+        )}
   <div> Final knockout fixtures depend on the results of the round-robin phase </div>
         {/* ── Knockout Bracket (round-robin → KO phase) ───────────────── */}
         {isRoundRobin && hasKoPhase && (
@@ -1745,7 +1867,7 @@ const renderMatch = (m) => {
                 </button>
               )}
               {isAdmin() && (
-                <button onClick={() => openNewMatchModal('QF')} style={styles.navyBtn}>+ Add Match</button>
+                <button onClick={() => openNewMatchModal(activeTournamentRecord?.participant_mode === 'team' ? 'GAME' : 'QF')} style={styles.navyBtn}>+ Add Match</button>
               )}
               {isAdmin() && matchesForActive.length > 0 && (
                 <button
@@ -1850,7 +1972,7 @@ const renderMatch = (m) => {
             </div>
             {isAdmin() && (
               <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
-                {partsList.length} registered
+                {participantRows.length} players registered{isReusableTeamTournament ? ` · ${activeTeamEntries.length} teams` : ''}
               </span>
             )}
           </div>
@@ -1858,21 +1980,25 @@ const renderMatch = (m) => {
             <table style={{ ...styles.table, minWidth: 900 }}>
               <thead>
                 <tr style={styles.theadRow}>
-                  {['#','Employee','Department','Registered Tournaments','Matches Played','Won','Lost','Status'].map(h => (
+                  {['#','Employee','Department', isReusableTeamTournament ? 'Registered via Team' : 'Registered Tournaments','Matches Played','Won','Lost','Status'].map(h => (
                     <th key={h} style={styles.th}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {partsList.length === 0 ? (
+                {participantRows.length === 0 ? (
                   <tr><td colSpan="8" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1rem' }}>No participants yet.</td></tr>
-                ) : partsList.map((p, i) => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                ) : participantRows.map((p, i) => (
+                  <tr key={`${p.team_id || 'individual'}-${p.employee_id}-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={styles.td}>{i + 1}</td>
                     <td style={styles.td}><strong>{getEmployeeName(p.employee_id)}</strong></td>
                     <td style={styles.td}>{employees.find(e => e.employee_code === p.employee_id)?.department || '—'}</td>
                     <td style={styles.td}>
-                      {(() => {
+                      {isReusableTeamTournament ? (
+                        <span style={{ ...styles.tinyChip, background: 'var(--accent-soft)', color: 'var(--accent)', fontWeight: 700 }}>
+                          {p.team_name}
+                        </span>
+                      ) : (() => {
                         const count = Object.values(partsByTournament).filter(list =>
                           list.some(x => x.employee_id?.toUpperCase() === p.employee_id?.toUpperCase())
                         ).length;
@@ -2515,10 +2641,6 @@ const renderMatch = (m) => {
       showToast('Please enter the game name', 'error');
       return;
     }
-    if (tForm.participant_mode === 'team' && tForm.team_ids.length < 2) {
-      showToast('Select at least two existing teams', 'error');
-      return;
-    }
     if (!createPlan.ok) {
       showToast(createPlan.errors[0], 'error');
       return;
@@ -2627,13 +2749,17 @@ const renderMatch = (m) => {
   };
 
   const openNewMatchModal = (round) => {
-    const ppt = activeTournamentRecord?.players_per_team || 1;
+    const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
+    const teamMatchCount = matchesForActive.filter((m) => String(m.round || '') === String(round)).length;
     setMForm({
-      match_code: `${round}${matchesForActive.filter(m => m.round === round).length + 1}`,
-      round, match_number: matchesForActive.filter(m => m.round === round).length + 1,
+      match_code: `${round}${teamMatchCount + 1}`,
+      round, match_number: teamMatchCount + 1,
       scheduled_at: '',
-      team_a: Array(ppt).fill(''),
-      team_b: Array(ppt).fill(''),
+      team_a_id: isTeamTournament ? '' : null,
+      team_b_id: isTeamTournament ? '' : null,
+      multi_team_ids: [],
+      team_a: [],
+      team_b: [],
     });
     setShowNewMatchModal(true);
   };
@@ -2641,10 +2767,18 @@ const renderMatch = (m) => {
   const handleCreateMatch = async () => {
     if (!activeTournament) return;
     const ppt = activeTournamentRecord?.players_per_team || 1;
+    const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
     const teamA = (mForm.team_a || []).filter(Boolean);
     const teamB = (mForm.team_b || []).filter(Boolean);
 
-    if (teamA.length === 0 || teamB.length === 0) {
+    if (isTeamTournament && (!mForm.team_a_id || !mForm.team_b_id || String(mForm.team_a_id) === String(mForm.team_b_id))) {
+      showToast('Choose two different registered teams', 'error');
+      return;
+    }
+
+    if (isTeamTournament && (mForm.multi_team_ids || []).length >= 2) {
+      // Multi-team game: all selected teams participate in one match.
+    } else if (teamA.length === 0 || teamB.length === 0) {
       showToast('At least one player per team is required', 'error');
       return;
     }
@@ -2662,6 +2796,9 @@ const renderMatch = (m) => {
       match_code: mForm.match_code,
       round: mForm.round,
       match_number: parseInt(mForm.match_number, 10) || 1,
+      team_a_id: isTeamTournament ? mForm.team_a_id : null,
+      team_b_id: isTeamTournament ? mForm.team_b_id : null,
+      multi_team_ids: isTeamTournament ? mForm.multi_team_ids : null,
       player_a_employee_id: captainA,
       player_b_employee_id: captainB,
       scheduled_at: mForm.scheduled_at
@@ -2700,6 +2837,7 @@ const renderMatch = (m) => {
       winner: activeTournamentRecord?.participant_mode === 'team'
         ? (match.winner_team_id != null ? String(match.winner_team_id) : '')
         : (match.winner_employee_id || ''),
+      multi_team_scores: (match.multi_team_teams || []).map((team) => ({ team_id: team.team_id, team_name: team.team_name, score: team.score ?? '' })),
       duration: match.duration_seconds || '',
       absent_participant_employee_id: '',
       reason: '',
@@ -2721,6 +2859,7 @@ const renderMatch = (m) => {
       score_a: isNonFinishing ? null : (rForm.score_a === '' ? 0 : Number(rForm.score_a)),
       score_b: isNonFinishing ? null : (rForm.score_b === '' ? 0 : Number(rForm.score_b)),
       winner_team_id: isNonFinishing || activeTournamentRecord?.participant_mode !== 'team' ? null : rForm.winner,
+      multi_team_scores: isNonFinishing ? [] : (rForm.multi_team_scores || []),
       winner_employee_id: isNonFinishing || activeTournamentRecord?.participant_mode === 'team' ? null : rForm.winner,
       duration_seconds: parseInt(rForm.duration, 10) || null,
       absent_participant_employee_id: rForm.absent_participant_employee_id,
@@ -3065,11 +3204,30 @@ const renderMatch = (m) => {
               <button onClick={() => setShowNewMatchModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
+              {activeTournamentRecord?.participant_mode === 'team' && <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.7rem', borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--text-soft)', fontSize: '0.7rem', lineHeight: 1.45 }}><strong>Team game:</strong> each added match is one game between two registered teams. You can add the same teams again for another game. For 6 or more teams, use Generate Fixtures to create the knockout path toward one champion.</div>}
               {(() => {
                 const editingMatch = matchesForActive.find((match) => match.id === editMatchId);
                 const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
-                const teamARoster = editingMatch?.team_a_roster || editingMatch?.team_a_players || [];
-                const teamBRoster = editingMatch?.team_b_roster || editingMatch?.team_b_players || [];
+                const tournamentTeamIdByReusableId = new Map();
+                matchesForActive.forEach((match) => {
+                  if (match.reusable_team_a_id != null && match.team_a_id != null) tournamentTeamIdByReusableId.set(String(match.reusable_team_a_id), match.team_a_id);
+                  if (match.reusable_team_b_id != null && match.team_b_id != null) tournamentTeamIdByReusableId.set(String(match.reusable_team_b_id), match.team_b_id);
+                });
+                const registeredTeamOptions = isTeamTournament
+                  ? tournamentTeamEntries
+                    .filter((entry) => String(entry.tournament_id) === String(activeTournamentRecord?.id))
+                    .map((entry) => ({
+                      reusableId: entry.team_id,
+                      tournamentId: tournamentTeamIdByReusableId.get(String(entry.team_id)),
+                      name: reusableTeams.find((team) => String(team.id) === String(entry.team_id))?.name || `Team ${entry.team_id}`,
+                      roster: reusableTeamMembers.filter((member) => String(member.team_id) === String(entry.team_id)).map((member) => ({ employee_id: member.employee_id })),
+                    }))
+                    .filter((team) => team.tournamentId != null)
+                  : [];
+                const selectedTeamA = registeredTeamOptions.find((team) => String(team.tournamentId) === String(mForm.team_a_id));
+                const selectedTeamB = registeredTeamOptions.find((team) => String(team.tournamentId) === String(mForm.team_b_id));
+                const teamARoster = isTeamTournament ? (selectedTeamA?.roster || []) : (editingMatch?.team_a_roster || editingMatch?.team_a_players || []);
+                const teamBRoster = isTeamTournament ? (selectedTeamB?.roster || []) : (editingMatch?.team_b_roster || editingMatch?.team_b_players || []);
                 const ppt = isTeamTournament
                   ? Math.max(teamARoster.length, teamBRoster.length, 1)
                   : (activeTournamentRecord?.players_per_team || 1);
@@ -3112,11 +3270,51 @@ const renderMatch = (m) => {
                              onChange={(e) => setMForm(f => ({ ...f, match_code: e.target.value }))} />
                     </div>
 
+                    {isTeamTournament && <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                      <div style={{ padding: '0.7rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--accent-soft)' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.74rem', color: 'var(--accent)', marginBottom: 4 }}>🏆 Teams in this one game</div>
+                        <div style={{ color: 'var(--text-soft)', fontSize: '0.68rem', marginBottom: 8 }}>Select all teams that will play together. The admin will enter every team’s points and choose one winner after the game.</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 6 }}>
+                          {registeredTeamOptions.map((team) => {
+                            const selected = (mForm.multi_team_ids || []).some((id) => String(id) === String(team.reusableId));
+                            return <label key={team.reusableId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.5rem', border: '1px solid var(--border)', borderRadius: 6, background: selected ? 'var(--bg-surface-strong)' : 'transparent', fontSize: '0.7rem' }}><input type="checkbox" checked={selected} onChange={() => setMForm((form) => ({ ...form, multi_team_ids: selected ? form.multi_team_ids.filter((id) => String(id) !== String(team.reusableId)) : [...form.multi_team_ids, team.reusableId] }))} />{team.name}</label>;
+                          })}
+                        </div>
+                        {registeredTeamOptions.length < 2 && <div style={{ color: 'var(--danger)', fontSize: '0.68rem', marginTop: 6 }}>At least two registered teams are required.</div>}
+                      </div>
+                    </div>}
+
+                    {isTeamTournament && <>
+                      <div style={styles.formRow}>
+                        <label style={styles.formLabel}>Registered Team A *</label>
+                        <select style={styles.formInput} value={mForm.team_a_id || ''} onChange={(e) => {
+                          const value = e.target.value;
+                          const option = registeredTeamOptions.find((team) => String(team.tournamentId) === String(value));
+                          setMForm((form) => ({ ...form, team_a_id: value, team_a: activeTournamentRecord.lineup_mode === 'full_team' ? (option?.roster || []).map((player) => player.employee_id) : [] }));
+                        }}>
+                          <option value="">— select team —</option>
+                          {registeredTeamOptions.map((team) => <option key={team.tournamentId} value={team.tournamentId}>{team.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={styles.formRow}>
+                        <label style={styles.formLabel}>Registered Team B *</label>
+                        <select style={styles.formInput} value={mForm.team_b_id || ''} onChange={(e) => {
+                          const value = e.target.value;
+                          const option = registeredTeamOptions.find((team) => String(team.tournamentId) === String(value));
+                          setMForm((form) => ({ ...form, team_b_id: value, team_b: activeTournamentRecord.lineup_mode === 'full_team' ? (option?.roster || []).map((player) => player.employee_id) : [] }));
+                        }}>
+                          <option value="">— select team —</option>
+                          {registeredTeamOptions.map((team) => <option key={team.tournamentId} value={team.tournamentId}>{team.name}</option>)}
+                        </select>
+                      </div>
+                      {registeredTeamOptions.length < 2 && <div style={{ ...styles.formRow, gridColumn: 'span 2', color: 'var(--danger)', fontSize: '0.72rem' }}>Generate the tournament fixtures first so registered teams can be used in additional matches.</div>}
+                    </>}
+
                     {/* Team A */}
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: 'var(--accent-soft)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.45rem'  }}>
-                          🔵 Team A
+                          🔵 {isTeamTournament ? (selectedTeamA?.name || 'Team A') : 'Team A'}
                           <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({isTeamTournament ? 'choose any lineup' : `${ppt} player${ppt > 1 ? 's' : ''}`})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
@@ -3145,7 +3343,7 @@ const renderMatch = (m) => {
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <div style={{ background: 'rgba(249,168,37,0.10)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.45rem'  }}>
-                          🟠 Team B
+                          🟠 {isTeamTournament ? (selectedTeamB?.name || 'Team B') : 'Team B'}
                           <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
@@ -3439,6 +3637,7 @@ const renderMatch = (m) => {
                 const isKoResult =
                   normalizeTournamentFormat(activeTournamentRecord?.format) === 'knockout' ||
                   String(m.match_code || '').toUpperCase().startsWith('KO_');
+                const isMultiTeamMatch = (m.multi_team_teams || []).length > 1;
                 return (
                   <div style={styles.formGrid}>
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
@@ -3482,23 +3681,29 @@ const renderMatch = (m) => {
                           }}
                         >
                           <option value="">— select —</option>
-                          <option value={teamAOption}>
+                          {!isMultiTeamMatch && <option value={teamAOption}>
                             {(() => {
                               const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
                               return isReusableTeamTournament ? (m.team_a_name || 'Team A') : ids.map(id => getEmployeeName(id)).join(' & ') || 'Player A';
                             })()}
-                          </option>
-                          <option value={teamBOption}>
+                          </option>}
+                          {!isMultiTeamMatch && <option value={teamBOption}>
                             {(() => {
                               const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
                               return isReusableTeamTournament ? (m.team_b_name || 'Team B') : ids.map(id => getEmployeeName(id)).join(' & ') || 'Player B';
                             })()}
-                          </option>
+                          </option>}
+                          {isMultiTeamMatch && (m.multi_team_teams || []).map((team) => <option key={team.team_id} value={team.team_id}>{team.team_name}</option>)}
                         </select>
                       </div>
                     )}
 
-                    {showScoreFields && (
+                    {isMultiTeamMatch ? (
+                      <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                        <label style={styles.formLabel}>Points for each team</label>
+                        {(rForm.multi_team_scores || []).map((entry, index) => <div key={entry.team_id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '0.45rem', alignItems: 'center', marginBottom: 5 }}><span style={{ fontSize: '0.72rem' }}>{entry.team_name}</span><input style={styles.formInput} type="number" min="0" value={entry.score} onChange={(e) => setRForm((form) => ({ ...form, multi_team_scores: form.multi_team_scores.map((item, itemIndex) => itemIndex === index ? { ...item, score: e.target.value } : item) }))} /></div>)}
+                      </div>
+                    ) : showScoreFields && (
                       <>
                         <div style={styles.formRow}>
                           <label style={styles.formLabel}>Team A Score</label>

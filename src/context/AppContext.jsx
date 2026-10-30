@@ -827,11 +827,37 @@ const loadTournamentMatches = async () => {
       }
     } catch (_) { /* table may not exist yet — degrade gracefully */ }
 
-    // Fetch tournament teams to resolve team_a_id and team_b_id to members
-    let tournamentModes = new Map(tournaments.map((tournament) => [String(tournament.id), String(tournament.participant_mode || 'individual').toLowerCase()]));
+    // Optional multi-team game participants. The migration is additive, so
+    // older installations continue to load normal A/B matches.
+    let multiTeamMap = {};
     try {
-      const { data: modeRows } = await supabase.from('tournaments').select('id, participant_mode');
-      (modeRows || []).forEach((row) => tournamentModes.set(String(row.id), String(row.participant_mode || 'individual').toLowerCase()));
+      const { data: multiTeams } = await supabase
+        .from('tournament_match_teams')
+        .select('match_id, team_id, position, score, is_winner, teams(id, name)')
+        .order('position', { ascending: true });
+      (multiTeams || []).forEach((row) => {
+        if (!multiTeamMap[row.match_id]) multiTeamMap[row.match_id] = [];
+        multiTeamMap[row.match_id].push({
+          team_id: row.team_id,
+          team_name: row.teams?.name || `Team ${row.team_id}`,
+          position: row.position,
+          score: row.score ?? 0,
+          is_winner: row.is_winner === true,
+        });
+      });
+    } catch (_) { /* migration 34 may not be applied yet */ }
+
+    // Fetch tournament teams to resolve team_a_id and team_b_id to members
+    let tournamentModes = new Map(tournaments.map((tournament) => [String(tournament.id), {
+      participantMode: String(tournament.participant_mode || 'individual').toLowerCase(),
+      lineupMode: String(tournament.lineup_mode || 'variable').toLowerCase(),
+    }]));
+    try {
+      const { data: modeRows } = await supabase.from('tournaments').select('id, participant_mode, lineup_mode');
+      (modeRows || []).forEach((row) => tournamentModes.set(String(row.id), {
+        participantMode: String(row.participant_mode || 'individual').toLowerCase(),
+        lineupMode: String(row.lineup_mode || 'variable').toLowerCase(),
+      }));
     } catch (_) { /* participant_mode is optional until migration 33 is applied */ }
     let teamsMap = {};
     try {
@@ -870,12 +896,15 @@ const loadTournamentMatches = async () => {
       const teamB = teamsMap[m.team_b_id]?.members || [];
       const captainA = teamsMap[m.team_a_id]?.captain_id || null;
       const captainB = teamsMap[m.team_b_id]?.captain_id || null;
-      const isTeamTournament = tournamentModes.get(String(m.tournament_id)) === 'team';
+      const tournamentMode = tournamentModes.get(String(m.tournament_id)) || {};
+      const isTeamTournament = tournamentMode.participantMode === 'team';
+      const useFullTeamLineup = isTeamTournament && tournamentMode.lineupMode === 'full_team';
       const selectedA = playersMap[m.id]?.A || [];
       const selectedB = playersMap[m.id]?.B || [];
 
       return {
         ...m,
+        multi_team_teams: multiTeamMap[m.id] || [],
         // Team tournaments keep the full roster separate from the selected
         // lineup, so every match can choose a different number of players.
         // Normal individual tournaments also use tournament_teams for their
@@ -887,8 +916,8 @@ const loadTournamentMatches = async () => {
         reusable_team_b_id: teamsMap[m.team_b_id]?.reusable_team_id || null,
         team_a_roster: teamA.map(id => ({ employee_id: id })),
         team_b_roster: teamB.map(id => ({ employee_id: id })),
-        team_a_players: selectedA.length > 0 ? selectedA : (isTeamTournament ? [] : teamA.map(id => ({ employee_id: id }))),
-        team_b_players: selectedB.length > 0 ? selectedB : (isTeamTournament ? [] : teamB.map(id => ({ employee_id: id }))),
+        team_a_players: selectedA.length > 0 ? selectedA : (isTeamTournament && !useFullTeamLineup ? [] : teamA.map(id => ({ employee_id: id }))),
+        team_b_players: selectedB.length > 0 ? selectedB : (isTeamTournament && !useFullTeamLineup ? [] : teamB.map(id => ({ employee_id: id }))),
         player_a_employee_id: m.player_a_employee_id || (isTeamTournament ? null : captainA),
         player_b_employee_id: m.player_b_employee_id || (isTeamTournament ? null : captainB),
         // Restore the feed metadata
@@ -1946,7 +1975,35 @@ const loadTournamentMatches = async () => {
       const payloads = [];
       let roundPlan = null;
 
-      if (format === 'knockout') {
+      if (isTeamTournament) {
+        // A reusable-team event is a single multi-team game by default. All
+        // registered teams participate in the same match; the admin enters
+        // each team's points and selects the winner afterward.
+        const multiPayload = [{
+          tournament_id: tournamentId,
+          match_code: 'GAME1',
+          round: 'GAME',
+          match_number: 1,
+          team_a_id: null,
+          team_b_id: null,
+          status: 'scheduled',
+          scheduled_at: fixtureOpts.tournamentStartDate ? new Date(`${fixtureOpts.tournamentStartDate}T10:00:00+05:30`).toISOString() : null,
+        }];
+        const { data: multiMatches, error: multiMatchError } = await supabase
+          .from('tournament_matches').insert(multiPayload).select();
+        if (multiMatchError) throw multiMatchError;
+        track(multiMatches);
+        const matchId = multiMatches?.[0]?.id;
+        if (!matchId) throw new Error('Multi-team match could not be created');
+        const { error: multiTeamError } = await supabase.from('tournament_match_teams').insert(
+          teamEntries.map((entry, index) => ({ match_id: matchId, team_id: entry.team_id, position: index + 1 }))
+        );
+        if (multiTeamError) throw multiTeamError;
+        await supabase.from('tournaments').update({ status: 'live', registration_open: false }).match({ id: tournamentId });
+        await loadTournaments();
+        await loadTournamentMatches();
+        return { success: true, data: multiMatches };
+      } else if (format === 'knockout') {
         roundPlan = buildKnockoutFixturePlan(teams, fixtureOpts);
         for (const round of roundPlan.rounds) {
           for (const match of round.matches) {
@@ -2480,6 +2537,8 @@ const loadTournamentMatches = async () => {
           match_code: matchData.match_code,
           round: matchData.round || 'QF',
           match_number: matchData.match_number || 1,
+          team_a_id: matchData.team_a_id || null,
+          team_b_id: matchData.team_b_id || null,
           player_a_employee_id: matchData.player_a_employee_id || null,
           player_b_employee_id: matchData.player_b_employee_id || null,
           scheduled_at: matchData.scheduled_at || null,
@@ -2494,6 +2553,18 @@ const loadTournamentMatches = async () => {
       // team_a_players / team_b_players are arrays of employee_ids ordered by position.
       const matchId = data?.[0]?.id;
       if (matchId) {
+        if (Array.isArray(matchData.multi_team_ids) && matchData.multi_team_ids.length > 2) {
+          const { error: multiTeamError } = await supabase
+            .from('tournament_match_teams')
+            .insert([...new Set(matchData.multi_team_ids.map(Number).filter(Number.isFinite))].map((teamId, index) => ({
+              match_id: matchId,
+              team_id: teamId,
+              position: index + 1,
+            })));
+          if (multiTeamError) throw multiTeamError;
+          await loadTournamentMatches();
+          return { success: true, data: data?.[0] || null };
+        }
         const playerRows = [];
         (matchData.team_a_players || []).forEach((empId, idx) => {
           if (empId) playerRows.push({ match_id: matchId, employee_id: empId, team: 'A', position: idx + 1 });
@@ -2619,6 +2690,7 @@ const loadTournamentMatches = async () => {
       const { teamA, teamB } = getMatchPlayerIds(match);
       const resultTournament = tournaments.find((t) => t.id === match.tournament_id);
       const isReusableTeamTournament = String(resultTournament?.participant_mode || '').toLowerCase() === 'team';
+      const isMultiTeamMatch = (match.multi_team_teams || []).length > 1;
       const winner = (
         normalizedType === 'draw' ||
         normalizedType === 'rescheduled' ||
@@ -2643,6 +2715,10 @@ const loadTournamentMatches = async () => {
         'completed'
       );
 
+      if (isReusableTeamTournament && !isMultiTeamMatch && FINISHING_MATCH_STATUSES.has(status) && (!teamA.length || !teamB.length)) {
+        return { success: false, error: 'Select at least one lineup player from both team rosters before saving the result.' };
+      }
+
       // Knockout matches need a winner, so a draw would leave the bracket stuck.
       if (status === 'draw') {
         const tournamentForDraw = tournaments.find((t) => t.id === match.tournament_id);
@@ -2654,7 +2730,9 @@ const loadTournamentMatches = async () => {
       // The UI sends the winning team's captain employee id. Resolve the real
       // team id from the winning side so standings / bracket logic can use it.
       const winnerIsNumeric = typeof winner === 'number' || (typeof winner === 'string' && /^\d+$/.test(winner));
-      const resolvedWinnerTeamId = winnerIsNumeric
+      const resolvedWinnerTeamId = isMultiTeamMatch
+        ? null
+        : winnerIsNumeric
         ? winner
         : (winner
             ? (getWinnerSide(match, winner) === 'A' ? match.team_a_id : match.team_b_id) ?? null
@@ -2685,6 +2763,34 @@ const loadTournamentMatches = async () => {
         .update(payload)
         .match({ id: matchId });
       if (error) throw error;
+
+      if (isMultiTeamMatch && status === 'completed') {
+        const scores = resultData.multi_team_scores || [];
+        const winnerTeamId = String(resultData.winner_team_id || '');
+        const { error: multiUpdateError } = await supabase
+          .from('tournament_match_teams')
+          .update({ score: 0, is_winner: false })
+          .eq('match_id', match.id);
+        if (multiUpdateError) throw multiUpdateError;
+        for (const entry of scores) {
+          await supabase.from('tournament_match_teams').update({
+            score: Math.max(0, Number(entry.score) || 0),
+            is_winner: String(entry.team_id) === winnerTeamId,
+          }).match({ match_id: match.id, team_id: entry.team_id });
+        }
+        const teamIds = (match.multi_team_teams || []).map((team) => team.team_id);
+        const { data: members } = await supabase.from('team_members').select('team_id, employee_id').in('team_id', teamIds);
+        await supabase.from('team_match_score_entries').delete().eq('match_id', match.id);
+        const scoreRows = scores.map((entry) => ({
+          team_id: entry.team_id,
+          tournament_id: match.tournament_id,
+          match_id: match.id,
+          employee_id: (members || []).find((member) => String(member.team_id) === String(entry.team_id))?.employee_id,
+          side: 'A',
+          score: Math.max(0, Number(entry.score) || 0),
+        })).filter((row) => row.employee_id);
+        if (scoreRows.length) await supabase.from('team_match_score_entries').insert(scoreRows);
+      }
 
       // A recorded result ends the shared court clock as well. This keeps the
       // dashboard and Tournament stopwatch in the same state for every user.
@@ -2822,7 +2928,7 @@ const loadTournamentMatches = async () => {
       // Store one score row per player in the match. If two players belong to
       // the same global team, both rows intentionally contribute to that
       // team's total. Re-saving a result replaces the match rows.
-      try {
+      if (!isMultiTeamMatch) try {
         const resultTournament = tournaments.find((t) => t.id === match.tournament_id);
         const isReusableTeamTournament = String(resultTournament?.participant_mode || '').toLowerCase() === 'team';
         const playerIds = [...new Set([...teamA, ...teamB])];
@@ -2839,7 +2945,10 @@ const loadTournamentMatches = async () => {
               ...teamA.map((employeeId) => ({ team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null, tournament_id: match.tournament_id, match_id: match.id, employee_id: employeeId, side: 'A', score: Math.max(0, Number(resultData.score_a) || 0) })),
               ...teamB.map((employeeId) => ({ team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null, tournament_id: match.tournament_id, match_id: match.id, employee_id: employeeId, side: 'B', score: Math.max(0, Number(resultData.score_b) || 0) })),
             ].filter((row) => row.team_id != null);
-        if (scoreRows.length) await supabase.from('team_match_score_entries').insert(scoreRows);
+        if (scoreRows.length) {
+          const { error: scoreInsertError } = await supabase.from('team_match_score_entries').insert(scoreRows);
+          if (scoreInsertError) console.warn('Team contribution could not be stored:', scoreInsertError);
+        }
       } catch (teamPointsErr) {
         console.warn('Team score aggregation failed (non-critical):', teamPointsErr);
       }
