@@ -647,8 +647,33 @@ const TournamentsPage = () => {
 
   const [sub, setSub] = useState('active');
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
+  const [reusableTeams, setReusableTeams] = useState([]);
+  const [teamMemberCounts, setTeamMemberCounts] = useState({});
+  const [teamEntryPlayerCounts, setTeamEntryPlayerCounts] = useState({});
+  const [tournamentTeamEntries, setTournamentTeamEntries] = useState([]);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      supabase.from('teams').select('id, name, description').eq('is_active', true).order('name'),
+      supabase.from('team_members').select('team_id, employee_id'),
+      supabase.from('tournament_team_entries').select('*').order('created_at', { ascending: true }),
+      supabase.from('tournament_team_member_snapshots').select('tournament_team_entry_id, employee_id'),
+    ]).then(([teamsResult, membersResult, entriesResult, snapshotsResult]) => {
+      if (!active) return;
+      setReusableTeams(teamsResult.data || []);
+      const counts = {};
+      (membersResult.data || []).forEach((member) => { counts[member.team_id] = (counts[member.team_id] || 0) + 1; });
+      setTeamMemberCounts(counts);
+      setTournamentTeamEntries(entriesResult.data || []);
+      const snapshotCounts = {};
+      (snapshotsResult.data || []).forEach((snapshot) => { snapshotCounts[snapshot.tournament_team_entry_id] = (snapshotCounts[snapshot.tournament_team_entry_id] || 0) + 1; });
+      setTeamEntryPlayerCounts(snapshotCounts);
+    });
+    return () => { active = false; };
+  }, []);
     const [tForm, setTForm] = useState({
       name: '', game: 'Carrom', customGame: '', format: 'knockout',
+      participant_mode: 'individual', lineup_mode: 'variable', lineup_size: '', team_ids: [],
       players_per_team: 1,
       start_date: '', end_date: '', max_participants: 8,
       prize_pool: '', description: '', playoff_mode: 'auto',
@@ -860,9 +885,12 @@ const canEditMatch = (m) => {
               ) : tournaments.map((t) => {
                 const status = STATUS_BADGE[t.status] || STATUS_BADGE.draft;
                 const format = FORMAT_BADGE[t.format] || FORMAT_BADGE.knockout;
-                const partCount = (partsByTournament[t.id] || []).length;
+                const isTeamTournament = t.participant_mode === 'team';
+                const registeredTeamRows = tournamentTeamEntries.filter((entry) => String(entry.tournament_id) === String(t.id));
+                const teamPlayerCount = registeredTeamRows.reduce((sum, entry) => sum + (teamEntryPlayerCounts[entry.id] ?? teamMemberCounts[entry.team_id] ?? 0), 0);
+                const partCount = isTeamTournament ? teamPlayerCount : (partsByTournament[t.id] || []).length;
                 const cap = t.max_participants || 8;
-                const isFull = partCount >= cap;
+                const isFull = isTeamTournament ? registeredTeamRows.length >= cap : partCount >= cap;
                 const isCompleted = t.status === 'completed' || t.status === 'cancelled';
                 const regOpen = t.registration_open !== false;
                 // Lock registration once the start date has passed.
@@ -876,7 +904,7 @@ const canEditMatch = (m) => {
                 const hasPendingRequest = (pendingByTournament[t.id] || []).some(
                   p => p.employee_id?.toUpperCase() === currentEmpId.toUpperCase()
                 );
-                const canRequest = !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !hasPendingRequest && !!currentEmpId;
+                const canRequest = !isTeamTournament && !isCompleted && regOpen && !startDatePassed && !alreadyRegistered && !hasPendingRequest && !!currentEmpId;
                 const canRegister = isAdmin() ? canRequest && !isFull : canRequest;
                 const regLabel = alreadyRegistered
                   ? '✓ Registered'
@@ -894,31 +922,30 @@ const canEditMatch = (m) => {
                     <td style={styles.td}><strong>{t.code}</strong></td>
                     <td style={styles.td}><strong>{t.name}</strong></td>
                     <td style={styles.td}>{t.game}</td>
-                    <td style={styles.td}><span style={{ ...format, ...styles.tinyChip }}>{format.label}</span></td>
+                    <td style={styles.td}>{isTeamTournament ? <span style={{ ...styles.tinyChip, background: 'rgba(106,27,154,0.12)', color: '#6a1b9a' }}>Team event</span> : <span style={{ ...format, ...styles.tinyChip }}>{format.label}</span>}</td>
                     <td style={styles.td}>{formatDate(t.start_date)}</td>
                     <td style={styles.td}>{formatDate(t.end_date)}</td>
-                    <td style={styles.td}>{partCount} / {cap}</td>
+                    <td style={styles.td}>{isTeamTournament ? <><strong>{partCount} players</strong><small style={{ display: 'block', color: 'var(--muted)', fontSize: '0.62rem' }}>{registeredTeamRows.length} teams</small></> : `${partCount} / ${cap}`}</td>
                     <td style={styles.td}><span style={{ ...status, ...styles.tinyChip }}>{status.label}</span></td>
                     <td style={styles.td}>
                       <button
-                        onClick={() => handleRegisterForOne(t.id)}
-                        disabled={!canRegister}
+                        onClick={() => isTeamTournament ? setManagePlayersTournamentId(t.id) : handleRegisterForOne(t.id)}
+                        disabled={isTeamTournament ? false : !canRegister}
                         style={{
                           ...styles.tinyEnterBtn,
-                        background: alreadyRegistered ? 'var(--success)' : hasPendingRequest ? 'var(--warning)' : isCompleted || startDatePassed || (isAdmin() && isFull) ? 'var(--muted)' : 'var(--accent)',
-                          opacity: canRegister || alreadyRegistered || hasPendingRequest ? 1 : 0.6,
-                          cursor: canRegister || alreadyRegistered || hasPendingRequest ? 'pointer' : 'not-allowed',
+                        background: isTeamTournament ? 'var(--accent)' : alreadyRegistered ? 'var(--success)' : hasPendingRequest ? 'var(--warning)' : isCompleted || startDatePassed || (isAdmin() && isFull) ? 'var(--muted)' : 'var(--accent)',
+                          opacity: isTeamTournament || canRegister || alreadyRegistered || hasPendingRequest ? 1 : 0.6,
+                          cursor: isTeamTournament || canRegister || alreadyRegistered || hasPendingRequest ? 'pointer' : 'not-allowed',
                         }}
-                        title={
+                        title={isTeamTournament ? 'Manage teams for this tournament' :
                           alreadyRegistered ? 'You are already registered'
                           : hasPendingRequest ? 'Your request is waiting for admin approval'
                           : isAdmin() && isFull ? 'Tournament is full'
                           : isCompleted ? 'Tournament is closed'
                           : startDatePassed ? 'Registration closed — tournament has started'
                           : regOpen ? (isAdmin() ? 'Click to register' : 'Click to request approval')
-                          : 'Registration closed'
-                        }
-                      >{regLabel}</button>
+                          : 'Registration closed'}
+                      >{isTeamTournament ? 'Manage Teams' : regLabel}</button>
                     </td>
                     <td style={styles.td}>
                       {alreadyRegistered && !isCompleted && !isAdmin() ? (
@@ -958,7 +985,7 @@ const canEditMatch = (m) => {
                         <button
                           onClick={() => setManagePlayersTournamentId(t.id)}
                           style={{ ...styles.tinyIconBtn, color: 'var(--accent)', borderColor: 'var(--border)' }}
-                          title="Manage players for this tournament"
+                          title={t.participant_mode === 'team' ? 'Manage teams for this tournament' : 'Manage players for this tournament'}
                         >👥</button>
                       )}
                       {isAdmin() && (
@@ -1002,9 +1029,37 @@ const canEditMatch = (m) => {
           if (!managedTournament) return null;
           const managedParticipants = partsByTournament[managedTournament.id] || [];
           const registeredIds = new Set(managedParticipants.map((participant) => String(participant.employee_id).toUpperCase()));
+          const isTeamTournament = managedTournament.participant_mode === 'team';
+          const managedTeamEntries = tournamentTeamEntries.filter((entry) => String(entry.tournament_id) === String(managedTournament.id));
+          const registeredTeamIds = new Set(managedTeamEntries.map((entry) => String(entry.team_id)));
           const canManage = managedTournament.registration_open !== false
             && managedTournament.status === 'registration_open'
             && (!managedTournament.start_date || new Date(managedTournament.start_date) > new Date());
+          if (isTeamTournament) return (
+            <div style={styles.modalOverlay} onClick={() => setManagePlayersTournamentId(null)}>
+              <div style={{ ...styles.modal, maxWidth: 720 }} onClick={(event) => event.stopPropagation()}>
+                <div style={styles.modalHeader}>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>👥 Manage Teams — {managedTournament.name}</h3>
+                  <button onClick={() => setManagePlayersTournamentId(null)} style={styles.modalClose}>✕</button>
+                </div>
+                <div style={{ padding: '0.9rem', display: 'grid', gap: '0.7rem' }}>
+                  {!canManage && <div style={{ color: 'var(--warning)', fontSize: '0.75rem' }}>Teams can be added or removed only while registration is open and before the tournament starts.</div>}
+                  <div style={{ color: 'var(--muted)', fontSize: '0.72rem' }}>{managedTeamEntries.length} teams registered · Team rosters remain flexible and are selected per match.</div>
+                  <div style={{ display: 'grid', gap: '0.4rem', maxHeight: 420, overflowY: 'auto' }}>
+                    {reusableTeams.map((team) => {
+                      const registered = registeredTeamIds.has(String(team.id));
+                      const full = !registered && managedTournament.max_participants && managedTeamEntries.length >= managedTournament.max_participants;
+                      return <div key={team.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.55rem 0.65rem', border: '1px solid var(--border)', borderRadius: 8, background: registered ? 'var(--accent-soft)' : 'var(--bg-surface-strong)' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.75rem' }}>{team.name}</strong><span style={{ color: 'var(--muted)', fontSize: '0.65rem' }}>{teamMemberCounts[team.id] || 0} players · {team.description || 'Flexible roster'}</span></div>
+                        {registered ? <button disabled={!canManage} onClick={async () => { const { error } = await supabase.from('tournament_team_entries').delete().match({ tournament_id: managedTournament.id, team_id: team.id }); if (error) showToast(error.message, 'error'); else { setTournamentTeamEntries((current) => current.filter((entry) => !(String(entry.tournament_id) === String(managedTournament.id) && String(entry.team_id) === String(team.id)))); showToast(`${team.name} removed from ${managedTournament.name}`); } }} style={{ ...styles.tinyEnterBtn, background: 'var(--danger)', opacity: canManage ? 1 : 0.5 }}>Remove</button> : <button disabled={!canManage || full} onClick={async () => { const { data, error } = await supabase.from('tournament_team_entries').insert({ tournament_id: managedTournament.id, team_id: team.id, status: 'registered' }).select().single(); if (error) showToast(error.message, 'error'); else { setTournamentTeamEntries((current) => [...current, data]); showToast(`${team.name} added to ${managedTournament.name}`); } }} style={{ ...styles.tinyEnterBtn, background: 'var(--accent)', opacity: canManage && !full ? 1 : 0.5 }}>{full ? 'Full' : 'Add'}</button>}
+                      </div>;
+                    })}
+                  </div>
+                </div>
+                <div style={styles.modalFooter}><button onClick={() => setManagePlayersTournamentId(null)} style={styles.outlineBtn}>Close</button></div>
+              </div>
+            </div>
+          );
           return (
             <div style={styles.modalOverlay} onClick={() => setManagePlayersTournamentId(null)}>
               <div style={{ ...styles.modal, maxWidth: 720 }} onClick={(event) => event.stopPropagation()}>
@@ -1141,20 +1196,15 @@ const canEditMatch = (m) => {
     }
 
     // Build a display label for a team: "Captain" for 1v1, "P1 & P2 & P3" for multi
-    const teamLabel = (captainId, teamPlayers) => {
+    const teamLabel = (captainId, teamPlayers, teamName = null) => {
+      if (teamName) return teamName;
       const players = (teamPlayers || []).map(p => p.employee_id).filter(Boolean);
       const allIds = [captainId, ...players].filter(Boolean);
       if (allIds.length === 0) return 'TBD';
       const uniqueIds = [...new Set(allIds)];
       const names = uniqueIds.map(id => getEmployeeName(id));
 
-      // If it's a team match (more than 1 player), prefix with "Team X" where X is the index
-      // Since we don't have the team index here, we use "Team" and then list players.
-      // To get the actual "Team 1", "Team 2" we'd need the team object.
-      // But as per request: "mark Team- A (Players) VS Team -B (Players)"
-      return uniqueIds.length > 1
-        ? `Team (${names.join(', ')})`
-        : names[0];
+      return names.join(' & ');
     };
 
     const latestRound = roundGroups[roundGroups.length - 1];
@@ -1177,12 +1227,31 @@ const canEditMatch = (m) => {
         activeTournamentFormat === 'swiss'
           ? !latestRoundOpen
           : activeTournamentFormat === 'round_robin'
-            ? !rrMatchesExist
-            : matchesForActive.length === 0
+            ? !rrMatchesExist || matchesForActive.every((match) => {
+                const status = String(match.status || '').toLowerCase();
+                return ['scheduled', 'pending'].includes(status)
+                  && !match.winner_team_id
+                  && !match.winner_employee_id
+                  && match.score_a == null
+                  && match.score_b == null
+                  && !match.played_at
+                  && match.duration_seconds == null;
+              })
+            : matchesForActive.length === 0 || matchesForActive.every((match) => {
+              const status = String(match.status || '').toLowerCase();
+              return ['scheduled', 'pending'].includes(status)
+                && !match.winner_team_id
+                && !match.winner_employee_id
+                && match.score_a == null
+                && match.score_b == null
+                && !match.played_at
+                && match.duration_seconds == null;
+            })
       );
+    const canRegenerateFixtures = activeTournamentFormat !== 'swiss' && matchesForActive.length > 0;
     const generateLabel = activeTournamentFormat === 'swiss' && matchesForActive.length > 0
       ? 'Generate Next Swiss Round'
-      : 'Generate Fixtures';
+      : canRegenerateFixtures ? 'Regenerate Fixtures' : 'Generate Fixtures';
 
     // In TournamentsPage.jsx, find the renderMatch function inside renderBracket
 // and update the part that displays the player names:
@@ -1190,18 +1259,24 @@ const canEditMatch = (m) => {
 // In TournamentsPage.jsx, update the renderMatch function:
 
 const renderMatch = (m) => {
+  const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
+  const hasTeamA = Boolean(m.team_a_id);
+  const hasTeamB = Boolean(m.team_b_id);
   // TBD vs TBD shell matches — show as an upcoming placeholder card
-  const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id;
+  const isPhantom = !m.player_a_employee_id && !m.player_b_employee_id && !hasTeamA && !hasTeamB;
 
   // Check if this match is waiting for a winner from a previous match
-  const waitingForWinnerA = m._feeds_from_a && !m.player_a_employee_id;
-  const waitingForWinnerB = m._feeds_from_b && !m.player_b_employee_id;
+  const waitingForWinnerA = !isTeamTournament && m._feeds_from_a && !m.player_a_employee_id;
+  const waitingForWinnerB = !isTeamTournament && m._feeds_from_b && !m.player_b_employee_id;
   
   // Check if this match has TBD on either side (waiting for previous match)
-  const hasTBD = !m.player_a_employee_id || !m.player_b_employee_id;
+  const hasTBD = isTeamTournament
+    ? !hasTeamA || !hasTeamB
+    : !m.player_a_employee_id || !m.player_b_employee_id;
+  const isLineupMissing = isTeamTournament && !isPhantom && (!m.team_a_players?.length || !m.team_b_players?.length);
 
-  const a = isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players);
-  const b = isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players);
+  const a = isPhantom ? 'TBD' : teamLabel(m.player_a_employee_id, m.team_a_players, m.team_a_name);
+  const b = isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players, m.team_b_name);
   
   const hasScore = m.score_a !== null && m.score_b !== null;
   const isFinal  = String(m.round || '').toUpperCase() === 'F';
@@ -1226,11 +1301,10 @@ const renderMatch = (m) => {
     : null;
 
   // Determine match status for display
-  const isWaitingForWinner = (waitingForWinnerA || waitingForWinnerB) && !isBye;
   const isTBDMatch = hasTBD && !isBye && !isPhantom;
   
   // Determine if result can be entered
-  const canEnterResult = canEditMatch(m) && !isBye && !isPhantom && !isTBDMatch;
+  const canEnterResult = canEditMatch(m) && !isBye && !isPhantom && !isTBDMatch && !isLineupMissing;
 
   return (
     <div key={m.id || m.match_code} style={{
@@ -1321,7 +1395,9 @@ const renderMatch = (m) => {
         ...(m.status === 'disputed'    ? { color: '#6a1b9a', fontWeight: 600 } : {}),
         ...(m.status === 'no_show'     ? { color: '#5c6bc0', fontWeight: 600 } : {}),
       }}>
-        {isPhantom
+        {isLineupMissing
+          ? '👥 Select the lineup for this match'
+          : isPhantom
           ? '⏳ Awaiting earlier results'
           : m.status === 'completed'
             ? '✓ Final'
@@ -1355,7 +1431,7 @@ const renderMatch = (m) => {
       )}
 
       {/* For TBD matches, show a disabled/info button */}
-      {!isBye && !isPhantom && isTBDMatch && (
+      {!isBye && !isPhantom && (isTBDMatch || isLineupMissing) && (
         <div style={{ 
           marginTop: '0.4rem', 
           padding: '0.2rem 0.55rem', 
@@ -1366,7 +1442,7 @@ const renderMatch = (m) => {
           textAlign: 'center',
           border: '1px dashed #ff9800'
         }}>
-          🔒 Waiting for previous match result
+          {isLineupMissing ? '👥 Choose players from both team rosters before entering the result' : '🔒 Waiting for previous match result'}
         </div>
       )}
 
@@ -2439,6 +2515,10 @@ const renderMatch = (m) => {
       showToast('Please enter the game name', 'error');
       return;
     }
+    if (tForm.participant_mode === 'team' && tForm.team_ids.length < 2) {
+      showToast('Select at least two existing teams', 'error');
+      return;
+    }
     if (!createPlan.ok) {
       showToast(createPlan.errors[0], 'error');
       return;
@@ -2448,13 +2528,17 @@ const renderMatch = (m) => {
       game: finalGame,
       max_participants: parseInt(tForm.max_participants, 10) || 8,
       players_per_team: parseInt(tForm.players_per_team, 10) || 1,
+      participant_mode: tForm.participant_mode,
+      lineup_mode: tForm.lineup_mode,
+      lineup_size: tForm.lineup_mode === 'fixed' ? parseInt(tForm.lineup_size, 10) || null : null,
+      team_ids: tForm.team_ids,
       match_duration_minutes: parseInt(tForm.match_duration_minutes, 10) || 10,
     });
     if (result.success) {
       showToast(`Tournament "${tForm.name}" created!`);
       if (result.warning) showToast(result.warning, 'error');
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 10 });
+      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', participant_mode: 'individual', lineup_mode: 'variable', lineup_size: '', team_ids: [], players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 10 });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -2463,6 +2547,7 @@ const renderMatch = (m) => {
 
   // ── Edit match (admin) — pre-fills eForm from the existing match ─────────
   const openEditMatchModal = (match) => {
+    const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
     const ppt = activeTournamentRecord?.players_per_team || 1;
     const teamA = [
       match.player_a_employee_id,
@@ -2494,8 +2579,8 @@ const renderMatch = (m) => {
             return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
           })()
         : '',
-      team_a: pad(teamA, ppt),
-      team_b: pad(teamB, ppt),
+      team_a: isTeamTournament ? teamA : pad(teamA, ppt),
+      team_b: isTeamTournament ? teamB : pad(teamB, ppt),
     });
     setEditMatchId(match.id);
   };
@@ -2612,7 +2697,9 @@ const renderMatch = (m) => {
                   : 'completed',
       score_a: match.score_a ?? '',
       score_b: match.score_b ?? '',
-      winner: match.winner_employee_id || '',
+      winner: activeTournamentRecord?.participant_mode === 'team'
+        ? (match.winner_team_id != null ? String(match.winner_team_id) : '')
+        : (match.winner_employee_id || ''),
       duration: match.duration_seconds || '',
       absent_participant_employee_id: '',
       reason: '',
@@ -2633,7 +2720,8 @@ const renderMatch = (m) => {
       result_type: rForm.result_type,
       score_a: isNonFinishing ? null : (rForm.score_a === '' ? 0 : Number(rForm.score_a)),
       score_b: isNonFinishing ? null : (rForm.score_b === '' ? 0 : Number(rForm.score_b)),
-      winner_employee_id: isNonFinishing ? null : rForm.winner,
+      winner_team_id: isNonFinishing || activeTournamentRecord?.participant_mode !== 'team' ? null : rForm.winner,
+      winner_employee_id: isNonFinishing || activeTournamentRecord?.participant_mode === 'team' ? null : rForm.winner,
       duration_seconds: parseInt(rForm.duration, 10) || null,
       absent_participant_employee_id: rForm.absent_participant_employee_id,
       reason: rForm.reason,
@@ -2795,7 +2883,7 @@ const renderMatch = (m) => {
                   />
                 </div>
                 <div style={styles.formRow}>
-                  <label style={styles.formLabel}>Max Participants</label>
+                  <label style={styles.formLabel}>{tForm.participant_mode === 'team' ? 'Max Teams' : 'Max Participants'}</label>
                   <input
                     type="number"
                     min="2"
@@ -2854,7 +2942,7 @@ const renderMatch = (m) => {
                     )}
                   </div>
                 </div>
-                <div style={styles.formRow}>
+                {tForm.participant_mode !== 'team' && <div style={styles.formRow}>
                   <label style={styles.formLabel}>Format</label>
                   <select style={styles.formInput} value={tForm.format}
                           onChange={(e) => setTForm(f => ({ ...f, format: e.target.value }))}>
@@ -2863,7 +2951,25 @@ const renderMatch = (m) => {
                     <option value="league">League</option>
                     <option value="swiss">Swiss</option>
                   </select>
+                </div>}
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>Participants</label>
+                  <select style={styles.formInput} value={tForm.participant_mode}
+                          onChange={(e) => setTForm(f => ({ ...f, participant_mode: e.target.value, max_participants: e.target.value === 'team' ? Math.max(2, f.team_ids.length || 2) : f.max_participants }))}>
+                    <option value="individual">Individual players</option>
+                    <option value="team">Existing teams</option>
+                  </select>
                 </div>
+                {tForm.participant_mode === 'team' && (
+                  <div style={{ ...styles.formRow, gridColumn: 'span 2', display: 'grid', gap: '0.55rem' }}>
+                    <div style={{ padding: '0.55rem 0.65rem', border: '1px dashed var(--border-strong)', borderRadius: 8, color: 'var(--text-soft)', fontSize: '0.7rem' }}>Create the tournament first. You can select existing teams afterwards from <strong>Manage Teams</strong> in the tournament list.</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                      <div style={styles.formRow}><label style={styles.formLabel}>Lineup rule</label><select style={styles.formInput} value={tForm.lineup_mode} onChange={(e) => setTForm(f => ({ ...f, lineup_mode: e.target.value }))}><option value="variable">Variable lineup per match</option><option value="fixed">Fixed players per side</option><option value="full_team">Full team</option></select></div>
+                      {tForm.lineup_mode === 'fixed' && <div style={styles.formRow}><label style={styles.formLabel}>Players per side</label><input style={styles.formInput} type="number" min="1" value={tForm.lineup_size} onChange={(e) => setTForm(f => ({ ...f, lineup_size: e.target.value }))} /></div>}
+                    </div>
+                    <div style={{ color: 'var(--text-soft)', fontSize: '0.68rem' }}>Team size is not fixed. Match lineups can use any number of players from each selected team.</div>
+                  </div>
+                )}
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Start Date *</label>
                   <input style={styles.formInput} type="date" value={tForm.start_date}
@@ -2874,7 +2980,7 @@ const renderMatch = (m) => {
                   <input style={styles.formInput} type="date" value={tForm.end_date}
                          onChange={(e) => setTForm(f => ({ ...f, end_date: e.target.value }))} />
                 </div>
-                <div style={styles.formRow}>
+                {tForm.participant_mode !== 'team' && <div style={styles.formRow}>
                   <label style={styles.formLabel}>Max Participants</label>
                   <input style={styles.formInput} type="number" min="2" step={tForm.players_per_team || 1} value={tForm.max_participants}
                          onChange={(e) => setTForm(f => ({ ...f, max_participants: e.target.value }))}
@@ -2887,12 +2993,12 @@ const renderMatch = (m) => {
                              showToast(`Max players rounded to ${eff} (${eff / ppt} full teams of ${ppt})`);
                            }
                          }} />
-                </div>
-                <div style={styles.formRow}>
+                </div>}
+                {tForm.participant_mode !== 'team' && <div style={styles.formRow}>
                   <label style={styles.formLabel}>Players Per Team</label>
                   <input style={styles.formInput} type="number" min="1" value={tForm.players_per_team}
                          onChange={(e) => setTForm(f => ({ ...f, players_per_team: parseInt(e.target.value, 10) || 1 }))} />
-                </div>
+                </div>}
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Time per match (minutes)</label>
                   <input style={styles.formInput} type="number" min="5" max="240" step="1"
@@ -2918,7 +3024,7 @@ const renderMatch = (m) => {
                     </select>
                   </div>
                 )}
-                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                {tForm.participant_mode !== 'team' && <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                   <PlanPanel
                     plan={createPlan}
                     maxPlayers={parseInt(tForm.max_participants, 10) || 0}
@@ -2928,7 +3034,7 @@ const renderMatch = (m) => {
                       ...(patch.players_per_team != null ? { players_per_team: patch.players_per_team } : {}),
                     }))}
                   />
-                </div>
+                </div>}
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Prize Pool</label>
                   <input style={styles.formInput} value={tForm.prize_pool}
@@ -2960,15 +3066,20 @@ const renderMatch = (m) => {
             </div>
             <div style={{ padding: '1rem' }}>
               {(() => {
-                const ppt = activeTournamentRecord?.players_per_team || 1;
+                const editingMatch = matchesForActive.find((match) => match.id === editMatchId);
+                const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
+                const teamARoster = editingMatch?.team_a_roster || editingMatch?.team_a_players || [];
+                const teamBRoster = editingMatch?.team_b_roster || editingMatch?.team_b_players || [];
+                const ppt = isTeamTournament
+                  ? Math.max(teamARoster.length, teamBRoster.length, 1)
+                  : (activeTournamentRecord?.players_per_team || 1);
                 // Collect all currently selected IDs to prevent duplicates across teams
                 const allSelected = [
                   ...(mForm.team_a || []),
                   ...(mForm.team_b || []),
                 ].filter(Boolean);
 
-                const availableFor = (team, slotIdx) =>
-                  partsList.filter(p => {
+                const availableFor = (team, slotIdx) => (isTeamTournament ? (team === 'A' ? teamARoster : teamBRoster) : partsList).filter(p => {
                     const id = p.employee_id;
                     // Allow the currently selected value in this slot
                     const currentVal = team === 'A' ? mForm.team_a[slotIdx] : mForm.team_b[slotIdx];
@@ -3006,7 +3117,7 @@ const renderMatch = (m) => {
                       <div style={{ background: 'var(--accent-soft)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #c5d4ec' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.45rem'  }}>
                           🔵 Team A
-                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({isTeamTournament ? 'choose any lineup' : `${ppt} player${ppt > 1 ? 's' : ''}`})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                           {Array.from({ length: ppt }).map((_, idx) => (
@@ -3136,14 +3247,14 @@ const renderMatch = (m) => {
                           {Array.from({ length: ppt }).map((_, idx) => (
                             <div key={idx} style={styles.formRow}>
                               <label style={styles.formLabel}>
-                                {ppt === 1 ? 'Player A *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1} (optional)`}
+                                {isTeamTournament ? `Player ${idx + 1} (optional)` : ppt === 1 ? 'Player A *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1} (optional)`}
                               </label>
                               <select
                                 style={styles.formInput}
                                 value={(eForm.team_a || [])[idx] || ''}
                                 onChange={(e) => setSlot('A', idx, e.target.value)}
                               >
-                                <option value="">{idx === 0 ? '— select —' : '— none —'}</option>
+                                <option value="">— none —</option>
                                 {availableFor('A', idx).map(p => (
                                   <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
                                 ))}
@@ -3159,20 +3270,20 @@ const renderMatch = (m) => {
                       <div style={{ background: 'rgba(249,168,37,0.10)', borderRadius: 6, padding: '0.65rem 0.75rem', border: '1px solid #f0d49a' }}>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--warning)', marginBottom: '0.45rem'  }}>
                           🟠 Team B
-                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({ppt} player{ppt > 1 ? 's' : ''})</span>
+                          <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}> ({isTeamTournament ? 'choose any lineup' : `${ppt} player${ppt > 1 ? 's' : ''}`})</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: ppt === 1 ? '1fr' : '1fr 1fr', gap: '0.5rem' }}>
                           {Array.from({ length: ppt }).map((_, idx) => (
                             <div key={idx} style={styles.formRow}>
                               <label style={styles.formLabel}>
-                                {ppt === 1 ? 'Player B *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1} (optional)`}
+                                {isTeamTournament ? `Player ${idx + 1} (optional)` : ppt === 1 ? 'Player B *' : idx === 0 ? 'Player 1 (Captain) *' : `Player ${idx + 1} (optional)`}
                               </label>
                               <select
                                 style={styles.formInput}
                                 value={(eForm.team_b || [])[idx] || ''}
                                 onChange={(e) => setSlot('B', idx, e.target.value)}
                               >
-                                <option value="">{idx === 0 ? '— select —' : '— none —'}</option>
+                                <option value="">— none —</option>
                                 {availableFor('B', idx).map(p => (
                                   <option key={p.employee_id} value={p.employee_id}>{getEmployeeName(p.employee_id)}</option>
                                 ))}
@@ -3202,17 +3313,21 @@ const renderMatch = (m) => {
 
       {/* Generate Fixtures dialog (plan summary + leftover / formation / scheduling options) */}
       {showGenModal && activeTournamentRecord && (() => {
+        const isTeamTournament = activeTournamentRecord.participant_mode === 'team';
+        const registeredTeamRows = tournamentTeamEntries.filter((entry) => String(entry.tournament_id) === String(activeTournamentRecord.id));
+        const registeredTeamPlayers = registeredTeamRows.reduce((sum, entry) => sum + (teamEntryPlayerCounts[entry.id] ?? teamMemberCounts[entry.team_id] ?? 0), 0);
         const gFormat = normalizeTournamentFormat(activeTournamentRecord.format);
         const gPlan = planTournament({
           format: gFormat,
           maxPlayers: activeTournamentRecord.max_participants || partsList.length,
-          registeredPlayers: partsList.length,
-          playersPerTeam: activeTournamentRecord.players_per_team || 1,
+          registeredPlayers: isTeamTournament ? registeredTeamRows.length : partsList.length,
+          playersPerTeam: isTeamTournament ? 1 : (activeTournamentRecord.players_per_team || 1),
           playoffMode: activeTournamentRecord.playoff_mode || 'auto',
           leftoverPolicy: genOpts.leftoverPolicy,
           matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
           intervalMinutes: Number(activeTournamentRecord.match_duration_minutes) || 10,
         });
+        const hasExistingFixtures = matchesForActive.length > 0;
         const runGenerate = async () => {
           const result = await generateTournamentFixtures(activeTournamentRecord.id, {
             playersPerTeam: activeTournamentRecord.players_per_team || 1,
@@ -3221,6 +3336,7 @@ const renderMatch = (m) => {
             formation: 'random',
             matchesPerSlot: Number(genOpts.matchesPerSlot) || 1,
             dayEndHour: genOpts.dayEndHour === '' ? null : Number(genOpts.dayEndHour),
+            regenerate: hasExistingFixtures,
           });
           if (result.success) {
             setShowGenModal(false);
@@ -3233,29 +3349,25 @@ const renderMatch = (m) => {
           <div onClick={(e) => { if (e.target === e.currentTarget) setShowGenModal(false); }} style={styles.modalBackdrop}>
             <div style={styles.modalCard}>
               <div style={styles.modalHeader}>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Generate Fixtures</h3>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{hasExistingFixtures ? 'Regenerate Fixtures' : 'Generate Fixtures'}</h3>
                 <button onClick={() => setShowGenModal(false)} style={styles.modalClose}>✕</button>
               </div>
               <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-                <PlanPanel
+                {hasExistingFixtures && <div style={{ border: '1px solid rgba(249,168,37,0.4)', borderRadius: 10, padding: '0.75rem', background: 'rgba(249,168,37,0.10)', fontSize: '0.74rem', lineHeight: 1.5 }}><strong>Existing fixtures will be replaced.</strong><span style={{ display: 'block', color: 'var(--text-soft)' }}>This is allowed because no match has a result yet. Updated registrations and the new participant limit will be used.</span></div>}
+                {isTeamTournament ? <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0.75rem', background: 'var(--accent-soft)', fontSize: '0.74rem', display: 'grid', gap: '0.35rem' }}><strong>Team fixture readiness</strong><span>{registeredTeamRows.length} teams · {registeredTeamPlayers} roster players</span><span style={{ color: 'var(--text-soft)' }}>Fixtures will be generated between registered teams. Player lineups are selected separately for each match.</span>{registeredTeamRows.length < 2 && <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Add at least two teams from Manage Teams before generating fixtures.</span>}</div> : <PlanPanel
                   plan={gPlan}
                   registered={partsList.length}
                   maxPlayers={activeTournamentRecord.max_participants || null}
                   onApply={async (patch) => {
-                    if (patch.leftoverPolicy) {
-                      setGenOpts((o) => ({ ...o, leftoverPolicy: patch.leftoverPolicy }));
-                    }
+                    if (patch.leftoverPolicy) setGenOpts((o) => ({ ...o, leftoverPolicy: patch.leftoverPolicy }));
                     if (patch.players_per_team != null) {
                       const r = await updateTournament(activeTournamentRecord.id, { players_per_team: patch.players_per_team });
-                      showToast(
-                        r.success ? `Players per team changed to ${patch.players_per_team}` : (r.error || 'Could not change team size'),
-                        r.success ? undefined : 'error'
-                      );
+                      showToast(r.success ? `Players per team changed to ${patch.players_per_team}` : (r.error || 'Could not change team size'), r.success ? undefined : 'error');
                     }
                   }}
-                />
+                />}
                 <div style={styles.formGrid}>
-                  {gPlan.leftover > 0 || genOpts.leftoverPolicy !== 'block' ? (
+                  {!isTeamTournament && (gPlan.leftover > 0 || genOpts.leftoverPolicy !== 'block') ? (
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <label style={styles.formLabel}>If players are left over</label>
                       <select style={styles.formInput} value={genOpts.leftoverPolicy}
@@ -3266,7 +3378,7 @@ const renderMatch = (m) => {
                       </select>
                     </div>
                   ) : null}
-                  {(Number(activeTournamentRecord.players_per_team) || 1) > 1 || gFormat !== 'knockout' ? (
+                  {!isTeamTournament && ((Number(activeTournamentRecord.players_per_team) || 1) > 1 || gFormat !== 'knockout') ? (
                     <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
                       <label style={styles.formLabel}>How to form teams</label>
                       <div style={{ ...styles.formInput, display: 'flex', alignItems: 'center', opacity: 0.85 }}>
@@ -3313,8 +3425,13 @@ const renderMatch = (m) => {
                 if (!m) return null;
                 const teamAIds = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id)].filter(Boolean);
                 const teamBIds = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id)].filter(Boolean);
-                const teamAOption = teamAIds.length > 0 ? teamAIds[0] : '';
-                const teamBOption = teamBIds.length > 0 ? teamBIds[0] : '';
+                const isReusableTeamTournament = activeTournamentRecord?.participant_mode === 'team';
+                const teamAOption = isReusableTeamTournament && m.team_a_id != null
+                  ? String(m.team_a_id)
+                  : teamAIds.length > 0 ? teamAIds[0] : '';
+                const teamBOption = isReusableTeamTournament && m.team_b_id != null
+                  ? String(m.team_b_id)
+                  : teamBIds.length > 0 ? teamBIds[0] : '';
                 const showScoreFields = ['completed', 'draw', 'walkover', 'no_show'].includes(rForm.result_type);
                 const showWinnerField = ['completed', 'walkover', 'no_show'].includes(rForm.result_type);
                 const showReasonField = ['walkover', 'rescheduled', 'cancelled', 'disputed', 'no_show'].includes(rForm.result_type);
@@ -3368,13 +3485,13 @@ const renderMatch = (m) => {
                           <option value={teamAOption}>
                             {(() => {
                               const ids = [m.player_a_employee_id, ...(m.team_a_players || []).map(p => p.employee_id).filter(id => id !== m.player_a_employee_id)];
-                              return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team A';
+                              return isReusableTeamTournament ? (m.team_a_name || 'Team A') : ids.map(id => getEmployeeName(id)).join(' & ') || 'Player A';
                             })()}
                           </option>
                           <option value={teamBOption}>
                             {(() => {
                               const ids = [m.player_b_employee_id, ...(m.team_b_players || []).map(p => p.employee_id).filter(id => id !== m.player_b_employee_id)];
-                              return ids.map(id => getEmployeeName(id)).join(' & ') || 'Team B';
+                              return isReusableTeamTournament ? (m.team_b_name || 'Team B') : ids.map(id => getEmployeeName(id)).join(' & ') || 'Player B';
                             })()}
                           </option>
                         </select>

@@ -11,6 +11,8 @@ const palette = ['#5b5ce2', '#e76f51', '#14b8a6', '#f59e0b', '#ec4899', '#38bdf8
 const initials = (value) => String(value || '?').trim().split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 const formatTimer = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 const displaySide = (match, side, getEmployeeName) => {
+  const teamName = match?.[`team_${side}_name`];
+  if (teamName) return teamName;
   const captain = match?.[`player_${side}_employee_id`];
   const members = (match?.[`team_${side}_players`] || []).map((player) => player.employee_id).filter(Boolean);
   const ids = [...new Set([captain, ...members].filter(Boolean))];
