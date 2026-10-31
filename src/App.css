@@ -240,6 +240,15 @@
 .dashboard-shared-clocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }.dashboard-shared-clock { min-width: 0; }.dashboard-clock-label { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: #53627f; font-size: .7rem; font-weight: 800; }.dashboard-shared-clock > div:last-child > div { box-shadow: none; }.dashboard-shared-clock .clay-card { height: 100%; }.dashboard-shared-clock [style*="font-size: 3.8rem"] { font-size: 2.8rem !important; }
 @media (max-width: 900px) { .dashboard-shared-clocks { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .projector-dashboard { margin-top: -4px; padding: 0 10px 30px; }.projector-hero { padding: 20px 18px; flex-direction: column; align-items: flex-start; }.projector-hero-meta { justify-content: flex-start; }.projector-grid, .timers-grid { grid-template-columns: 1fr; }.projector-panel { padding: 16px; }.versus-row { gap: 7px; }.projector-team { grid-template-columns: auto 1fr; }.projector-team .match-score { grid-column: 2; }.projector-team.right { grid-template-columns: 1fr auto; }.projector-team.right .team-avatar, .projector-team.right strong, .projector-team.right .match-score { grid-column: auto; grid-row: auto; }.projector-team em { left: 48px; }.projector-team.right em { right: 48px; left: auto; } }
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .chess-clock-share-shell { padding: 8px !important; align-items: stretch !important; }
+  .chess-clock-share-card { max-width: 100% !important; min-height: calc(100vh - 16px); display: grid; grid-template-columns: minmax(170px, .75fr) minmax(0, 2fr); grid-template-rows: 1fr auto; }
+  .chess-clock-share-card > div:first-child { grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; }
+  .chess-clock-share-board { align-self: center; padding: 10px !important; }
+  .chess-clock-share-card button { align-self: center; width: calc(100% - 20px); margin: 0 10px 8px !important; }
+  .chess-clock-share-card > div:last-child { padding: 0 8px 8px !important; }
+}
 .dashboard-flow-stage > i { display: none; }
 .dashboard-flow-stage:not(:last-child)::after { content: ''; position: absolute; top: 50%; right: -16px; width: 16px; height: 2px; z-index: 3; background: #6e86ad; }
 .dashboard-flow-stage:not(:last-child)::before { content: ''; position: absolute; top: calc(50% - 5px); right: -16px; width: 9px; height: 9px; z-index: 4; border-top: 2px solid #214b84; border-right: 2px solid #214b84; transform: translateX(7px) rotate(45deg); }

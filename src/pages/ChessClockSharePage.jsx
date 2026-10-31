@@ -14,6 +14,12 @@ export default function ChessClockSharePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const completeMove = async () => {
+    if (!clock || clock.status !== 'running') return;
+    const { data, error: moveError } = await supabase.rpc('public_chess_clock_move', { p_share_token: token });
+    if (!moveError && data) setClock(data);
+  };
+
   useEffect(() => {
     let active = true;
     supabase.from('tournament_match_clocks').select('*').eq('share_token', token).maybeSingle()
@@ -55,10 +61,12 @@ export default function ChessClockSharePage() {
   if (loading) return <div style={styles.shell}><div style={styles.message}>Loading chess clock…</div></div>;
   if (error || !clock) return <div style={styles.shell}><div style={styles.message}>{error || 'Clock unavailable.'}</div></div>;
 
-  return <main style={styles.shell}><section style={styles.card}>
+  const activeSide = clock.status === 'running' ? clock.chess_active_side : null;
+  return <main className="chess-clock-share-shell" style={styles.shell}><section className="chess-clock-share-card" style={styles.card}>
     <div style={styles.header}><div style={styles.eyebrow}>♟ LIVE CHESS CLOCK</div><h1 style={styles.title}>{clock.public_match_title || 'Chess match'}</h1><div style={styles.status}>{clock.status === 'running' ? '● LIVE' : clock.status.toUpperCase()}</div></div>
-    <div style={styles.board}>{['A', 'B'].map((side) => { const active = clock.status === 'running' && clock.chess_active_side === side; return <div key={side} style={{ ...styles.player, ...(active ? styles.active : {}) }}><div style={styles.playerLabel}>{side === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</div><div style={styles.time}>{formatClock(side === 'A' ? values.a : values.b)}</div><div style={styles.turn}>{active ? 'YOUR TURN' : 'WAITING'}</div></div>; })}</div>
-    <div style={styles.footer}>Read-only shared view · controls are managed from the tournament screen</div>
+    <div className="chess-clock-share-board" style={styles.board}>{['A', 'B'].map((side) => { const active = activeSide === side; return <div key={side} style={{ ...styles.player, ...(active ? styles.active : {}) }}><div style={styles.playerLabel}>{side === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</div><div style={styles.time}>{formatClock(side === 'A' ? values.a : values.b)}</div><div style={styles.turn}>{active ? 'YOUR TURN' : 'WAITING'}</div></div>; })}</div>
+    {clock.status === 'running' && <button onClick={completeMove} style={styles.moveButton}>✓ Move Complete — {activeSide === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</button>}
+    <div style={styles.footer}>Tap Move Complete after your move · start and reset are managed from the tournament screen</div>
   </section></main>;
 }
 
@@ -76,5 +84,6 @@ const styles = {
   time: { margin: '12px 0', fontFamily: 'Roboto Mono, monospace', fontSize: 'clamp(2.4rem, 12vw, 5rem)', lineHeight: 1, fontWeight: 800, letterSpacing: '.04em' },
   turn: { fontSize: 11, fontWeight: 800, letterSpacing: '.1em', opacity: .75 },
   footer: { padding: '0 18px 20px', color: '#76849b', textAlign: 'center', fontSize: 12 },
+  moveButton: { margin: '0 16px 16px', minHeight: 58, border: 0, borderRadius: 14, color: '#fff', background: '#173d73', fontSize: 16, fontWeight: 800, cursor: 'pointer' },
   message: { maxWidth: 420, padding: 24, borderRadius: 18, color: '#14294d', background: '#fff', textAlign: 'center', fontWeight: 700 },
 };

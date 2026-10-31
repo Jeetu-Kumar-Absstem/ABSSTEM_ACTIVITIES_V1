@@ -4220,7 +4220,7 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
     let remainingB = Number(clock.chess_remaining_b_seconds ?? defaultSeconds);
     if (clock.status === 'running' && clock.started_at) {
       const elapsed = Math.max(0, Math.floor((now - new Date(clock.started_at).getTime()) / 1000));
-      if (clock.mode === 'chess') {
+      if (isChess || clock.mode === 'chess') {
         if (clock.chess_active_side === 'A') remainingA = Math.max(0, remainingA - elapsed);
         if (clock.chess_active_side === 'B') remainingB = Math.max(0, remainingB - elapsed);
       } else {
@@ -4228,7 +4228,7 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
       }
     }
     return { remaining, remainingA, remainingB };
-  }, [clock, defaultSeconds, now]);
+  }, [clock, defaultSeconds, isChess, now]);
 
   const sidePlayerIds = (side) => {
     const normalizedSide = String(side).toLowerCase();
@@ -4277,6 +4277,7 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
     const base = await ensureClock();
     if (!base) return;
     await saveClock({
+      mode: isChess ? 'chess' : 'countdown',
       status: 'paused',
       started_at: null,
       stopped_at: null,
@@ -4309,6 +4310,7 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const data = await saveClock({
+      mode: 'chess',
       share_token: token,
       public_match_title: `${tournament?.name || 'Chess'} · ${selectedMatch?.match_code || 'Match'}`,
       public_side_a: sideName('A'),
@@ -4328,9 +4330,9 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
     if (!base) return;
     const values = liveValues || { remaining: base.remaining_seconds, remainingA: base.chess_remaining_a_seconds, remainingB: base.chess_remaining_b_seconds };
     if (base.status === 'running') {
-      await saveClock({ status: 'paused', started_at: null, remaining_seconds: values.remaining, chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB });
+      await saveClock({ mode: isChess ? 'chess' : 'countdown', status: 'paused', started_at: null, remaining_seconds: values.remaining, chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB });
     } else if ((isChess ? values.remainingA : values.remaining) > 0) {
-      await saveClock({ status: 'running', started_at: new Date().toISOString() });
+      await saveClock({ mode: isChess ? 'chess' : 'countdown', status: 'running', started_at: new Date().toISOString() });
     }
   };
 
@@ -4360,15 +4362,15 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
   };
 
   const completeMove = async (side) => {
-    if (!clock || clock.status !== 'running' || clock.mode !== 'chess' || clock.chess_active_side !== side) return;
+    if (!clock || clock.status !== 'running' || (!isChess && clock.mode !== 'chess') || clock.chess_active_side !== side) return;
     const values = liveValues;
     const nextSide = side === 'A' ? 'B' : 'A';
-    await saveClock({ chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB, chess_active_side: nextSide, started_at: new Date().toISOString(), status: values[side === 'A' ? 'remainingA' : 'remainingB'] <= 0 ? 'stopped' : 'running' });
+    await saveClock({ mode: 'chess', chess_remaining_a_seconds: values.remainingA, chess_remaining_b_seconds: values.remainingB, chess_active_side: nextSide, started_at: new Date().toISOString(), status: values[side === 'A' ? 'remainingA' : 'remainingB'] <= 0 ? 'stopped' : 'running' });
   };
 
   useEffect(() => {
     if (!clock || clock.status !== 'running' || !liveValues) return;
-    const expired = clock.mode === 'chess'
+    const expired = isChess || clock.mode === 'chess'
       ? (clock.chess_active_side === 'A' ? liveValues.remainingA : liveValues.remainingB) <= 0
       : liveValues.remaining <= 0;
     if (!expired) return;
@@ -4380,7 +4382,7 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
       chess_remaining_b_seconds: liveValues.remainingB,
       stopped_at: new Date().toISOString(),
     });
-  }, [clock, liveValues]);
+  }, [clock, isChess, liveValues]);
 
   if (!currentUser) return <div className="clay-card" style={{ ...styles.card, textAlign: 'center' }}>Please log in to use the shared match clock.</div>;
 
