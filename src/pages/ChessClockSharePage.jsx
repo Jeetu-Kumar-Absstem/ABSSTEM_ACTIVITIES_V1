@@ -14,11 +14,19 @@ export default function ChessClockSharePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const completeMove = async () => {
-    if (!clock || clock.status !== 'running') return;
+  const completeMove = async (side) => {
+    if (!clock || clock.status !== 'running' || clock.chess_active_side !== side) return;
     const { data, error: moveError } = await supabase.rpc('public_chess_clock_move', { p_share_token: token });
     if (!moveError && data) setClock(data);
   };
+
+  useEffect(() => {
+    // Browsers only allow orientation locking in some fullscreen/PWA modes;
+    // when allowed, prefer landscape for the chess-clock experience.
+    if (typeof window !== 'undefined' && window.screen?.orientation?.lock) {
+      window.screen.orientation.lock('landscape').catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -65,8 +73,14 @@ export default function ChessClockSharePage() {
   return <main className="chess-clock-share-shell" style={styles.shell}><section className="chess-clock-share-card" style={styles.card}>
     <div style={styles.header}><div style={styles.eyebrow}>♟ LIVE CHESS CLOCK</div><h1 style={styles.title}>{clock.public_match_title || 'Chess match'}</h1><div style={styles.status}>{clock.status === 'running' ? '● LIVE' : clock.status.toUpperCase()}</div></div>
     <div className="chess-clock-share-board" style={styles.board}>{['A', 'B'].map((side) => { const active = activeSide === side; return <div key={side} style={{ ...styles.player, ...(active ? styles.active : {}) }}><div style={styles.playerLabel}>{side === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</div><div style={styles.time}>{formatClock(side === 'A' ? values.a : values.b)}</div><div style={styles.turn}>{active ? 'YOUR TURN' : 'WAITING'}</div></div>; })}</div>
-    {clock.status === 'running' && <button onClick={completeMove} style={styles.moveButton}>✓ Move Complete — {activeSide === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</button>}
-    <div style={styles.footer}>Tap Move Complete after your move · start and reset are managed from the tournament screen</div>
+    <div className="chess-clock-move-buttons">
+      {['A', 'B'].map((side) => {
+        const enabled = clock.status === 'running' && activeSide === side;
+        return <button key={side} className="chess-clock-move-button" onClick={() => completeMove(side)} disabled={!enabled} style={{ ...styles.moveButton, opacity: enabled ? 1 : .45 }}>
+          ✓ Move Complete
+        </button>;
+      })}
+    </div>
   </section></main>;
 }
 
@@ -77,13 +91,12 @@ const styles = {
   eyebrow: { fontSize: 12, fontWeight: 800, letterSpacing: '.12em', opacity: .8 },
   title: { margin: '9px 0 5px', fontSize: 'clamp(1.2rem, 5vw, 2rem)' },
   status: { fontSize: 12, fontWeight: 800, opacity: .9 },
-  board: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, padding: 16 },
-  player: { minWidth: 0, padding: '22px 10px', borderRadius: 18, textAlign: 'center', background: '#e8edf4', color: '#14294d' },
+  board: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, padding: 12 },
+  player: { minWidth: 0, padding: '14px 8px', borderRadius: 18, textAlign: 'center', background: '#e8edf4', color: '#14294d' },
   active: { color: '#fff', background: 'linear-gradient(145deg, #173d73, #245a9b)', boxShadow: '0 10px 24px rgba(23,61,115,.24)' },
   playerLabel: { minHeight: 42, display: 'grid', placeItems: 'center', fontSize: 'clamp(.75rem, 3vw, 1rem)', fontWeight: 800 },
-  time: { margin: '12px 0', fontFamily: 'Roboto Mono, monospace', fontSize: 'clamp(2.4rem, 12vw, 5rem)', lineHeight: 1, fontWeight: 800, letterSpacing: '.04em' },
+  time: { margin: '8px 0', fontFamily: 'Roboto Mono, monospace', fontSize: 'clamp(2rem, 9vw, 4rem)', lineHeight: 1, fontWeight: 800, letterSpacing: '.04em' },
   turn: { fontSize: 11, fontWeight: 800, letterSpacing: '.1em', opacity: .75 },
-  footer: { padding: '0 18px 20px', color: '#76849b', textAlign: 'center', fontSize: 12 },
-  moveButton: { margin: '0 16px 16px', minHeight: 58, border: 0, borderRadius: 14, color: '#fff', background: '#173d73', fontSize: 16, fontWeight: 800, cursor: 'pointer' },
+  moveButton: { minHeight: 64, border: 0, borderRadius: 16, color: '#fff', background: '#173d73', fontSize: 'clamp(.85rem, 3.5vw, 1.1rem)', fontWeight: 900, cursor: 'pointer', boxShadow: '0 10px 26px rgba(0,0,0,.35)' },
   message: { maxWidth: 420, padding: 24, borderRadius: 18, color: '#14294d', background: '#fff', textAlign: 'center', fontWeight: 700 },
 };

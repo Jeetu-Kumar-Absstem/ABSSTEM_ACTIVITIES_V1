@@ -247,7 +247,21 @@
   .chess-clock-share-card > div:first-child { grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; }
   .chess-clock-share-board { align-self: center; padding: 10px !important; }
   .chess-clock-share-card button { align-self: center; width: calc(100% - 20px); margin: 0 10px 8px !important; }
+  .chess-clock-move-buttons .chess-clock-move-button { width: 100%; margin: 0 !important; }
   .chess-clock-share-card > div:last-child { padding: 0 8px 8px !important; }
+}
+
+.chess-clock-share-shell { align-items: stretch !important; }
+.chess-clock-share-card { min-height: min(560px, calc(100vh - 32px)); }
+.chess-clock-move-buttons { position: fixed; z-index: 10; left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.chess-clock-move-button span { display: block; margin-top: 4px; font-size: .72em; font-weight: 700; opacity: .85; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .chess-clock-share-shell { padding: 8px !important; }
+  .chess-clock-share-card { min-height: calc(100vh - 16px); border-radius: 18px !important; }
+  .chess-clock-share-card > div:first-child { padding: 18px 16px !important; }
+  .chess-clock-share-card > div:first-child h1 { font-size: 1.15rem !important; }
+  .chess-clock-share-board { padding: 10px !important; gap: 8px !important; }
+  .chess-clock-move-buttons { left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
 }
 .dashboard-flow-stage > i { display: none; }
 .dashboard-flow-stage:not(:last-child)::after { content: ''; position: absolute; top: 50%; right: -16px; width: 16px; height: 2px; z-index: 3; background: #6e86ad; }
