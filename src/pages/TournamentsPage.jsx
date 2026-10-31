@@ -3398,6 +3398,7 @@ const renderMatch = (m) => {
             <div style={{ padding: '1rem' }}>
               {(() => {
                 const ppt = activeTournamentRecord?.players_per_team || 1;
+                const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
                 const allSelected = [
                   ...(eForm.team_a || []),
                   ...(eForm.team_b || []),

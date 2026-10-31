@@ -2925,9 +2925,11 @@ const loadTournamentMatches = async () => {
         }
       }
 
-      // Store one score row per player in the match. If two players belong to
-      // the same global team, both rows intentionally contribute to that
-      // team's total. Re-saving a result replaces the match rows.
+      // Store one contribution row per player in the match. The entered score
+      // is the score for the whole side, so doubles/team scores are divided
+      // across that side's players before they are stored. This means a team
+      // score of 10 for two players becomes 5 + 5, and the Dashboard still
+      // shows 10 rather than 20. Re-saving a result replaces the match rows.
       if (!isMultiTeamMatch) try {
         const resultTournament = tournaments.find((t) => t.id === match.tournament_id);
         const isReusableTeamTournament = String(resultTournament?.participant_mode || '').toLowerCase() === 'team';
@@ -2942,8 +2944,29 @@ const loadTournamentMatches = async () => {
               { team_id: match.reusable_team_b_id, tournament_id: match.tournament_id, match_id: match.id, employee_id: teamB[0] || match.player_b_employee_id, side: 'B', score: Math.max(0, Number(resultData.score_b) || 0) },
             ].filter((row) => row.team_id != null && row.employee_id)
           : [
-              ...teamA.map((employeeId) => ({ team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null, tournament_id: match.tournament_id, match_id: match.id, employee_id: employeeId, side: 'A', score: Math.max(0, Number(resultData.score_a) || 0) })),
-              ...teamB.map((employeeId) => ({ team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null, tournament_id: match.tournament_id, match_id: match.id, employee_id: employeeId, side: 'B', score: Math.max(0, Number(resultData.score_b) || 0) })),
+              ...[
+                ['A', teamA, Math.max(0, Number(resultData.score_a) || 0)],
+                ['B', teamB, Math.max(0, Number(resultData.score_b) || 0)],
+              ].flatMap(([side, playerIdsForSide, sideScore]) => {
+                const playerCount = playerIdsForSide.length;
+                if (!playerCount) return [];
+
+                // Keep the stored values integral because the score-entry
+                // schema uses integer scores. If a score is not evenly
+                // divisible, distribute the remainder to the first players;
+                // the stored player values always add back to the entered team
+                // score exactly.
+                const baseScore = Math.floor(sideScore / playerCount);
+                const remainder = sideScore % playerCount;
+                return playerIdsForSide.map((employeeId, index) => ({
+                  team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null,
+                  tournament_id: match.tournament_id,
+                  match_id: match.id,
+                  employee_id: employeeId,
+                  side,
+                  score: baseScore + (index < remainder ? 1 : 0),
+                }));
+              }),
             ].filter((row) => row.team_id != null);
         if (scoreRows.length) {
           const { error: scoreInsertError } = await supabase.from('team_match_score_entries').insert(scoreRows);
