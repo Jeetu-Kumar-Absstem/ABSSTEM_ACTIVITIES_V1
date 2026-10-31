@@ -4121,9 +4121,15 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
   const [loading, setLoading] = useState(false);
   const [durationChoice, setDurationChoice] = useState('tournament');
   const [customMinutes, setCustomMinutes] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareLink, setShareLink] = useState('');
 
   const selectedMatch = matches.find((m) => String(m.id) === String(selectedMatchId)) || null;
-  const isChess = String(tournament?.game || '').trim().toLowerCase() === 'chess';
+  // Older tournaments may store a custom game label or have the game name in
+  // the tournament title. Treat any chess-labelled tournament as a chess
+  // clock so it never falls back to the ordinary countdown UI.
+  const isChess = [tournament?.game, tournament?.name]
+    .some((value) => String(value || '').trim().toLowerCase().includes('chess'));
   const defaultMinutes = Math.max(5, Number(tournament?.match_duration_minutes) || 10);
   const defaultSeconds = defaultMinutes * 60;
   const selectedDurationSeconds = Math.max(
@@ -4163,6 +4169,12 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
   }, [currentUser, selectedMatchId, showToast]);
 
   useEffect(() => { loadClock(); }, [loadClock]);
+
+  useEffect(() => {
+    setShareLink(clock?.share_token && typeof window !== 'undefined'
+      ? `${window.location.origin}/chess-clock/${clock.share_token}`
+      : '');
+  }, [clock]);
 
   useEffect(() => {
     if (!clock) {
@@ -4289,6 +4301,28 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
     return data;
   };
 
+  const createShareLink = async () => {
+    setShareLoading(true);
+    const base = await ensureClock();
+    if (!base) { setShareLoading(false); return; }
+    const token = base.share_token || (typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const data = await saveClock({
+      share_token: token,
+      public_match_title: `${tournament?.name || 'Chess'} · ${selectedMatch?.match_code || 'Match'}`,
+      public_side_a: sideName('A'),
+      public_side_b: sideName('B'),
+    });
+    if (data && typeof window !== 'undefined') {
+      const link = `${window.location.origin}/chess-clock/${token}`;
+      setShareLink(link);
+      try { await navigator.clipboard.writeText(link); showToast('Stopwatch link copied'); }
+      catch { showToast('Stopwatch link created'); }
+    }
+    setShareLoading(false);
+  };
+
   const pauseOrStart = async () => {
     const base = await ensureClock();
     if (!base) return;
@@ -4354,7 +4388,8 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={{ padding: '1rem 1.15rem', background: 'linear-gradient(120deg, #173d73, #245a9b 58%, #3478b8)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <div><div style={{ fontSize: '1rem', fontWeight: 800 }}>⏱ Shared Match Clock</div><div style={{ fontSize: '0.7rem', opacity: 0.82, marginTop: 4 }}>{tournament?.name || 'Tournament'} · synchronized for all logged-in users</div></div>
+          <div><div style={{ fontSize: '1rem', fontWeight: 800 }}>⏱ Shared Match Clock</div><div style={{ fontSize: '0.7rem', opacity: 0.82, marginTop: 4 }}>{tournament?.name || 'Tournament'} · live across the website and shared phones</div></div>
+          {isChess && <button onClick={createShareLink} disabled={shareLoading || !selectedMatch} style={{ ...styles.outlineBtn, color: '#fff', borderColor: 'rgba(255,255,255,.45)', background: 'rgba(255,255,255,.12)', whiteSpace: 'nowrap', opacity: shareLoading || !selectedMatch ? 0.6 : 1 }}>{shareLoading ? 'Creating…' : '🔗 Phone link'}</button>}
           <span style={{ padding: '0.35rem 0.55rem', borderRadius: 999, background: 'rgba(255,255,255,0.16)', fontSize: '0.65rem', fontWeight: 800 }}>{isChess ? '♟ CHESS CLOCK' : '⏳ COUNTDOWN'}</span>
         </div>
         <div style={{ padding: '1rem 1.15rem' }}>
@@ -4391,6 +4426,10 @@ export const SharedStopwatchPanel = ({ matches, tournament, getEmployeeName, cur
               <button onClick={stopClock} disabled={!clock || clock.status === 'stopped'} style={{ ...styles.outlineBtn, opacity: !clock || clock.status === 'stopped' ? 0.5 : 1 }}>⏹ Stop</button>
               <button onClick={resetToDefault} disabled={!selectedMatch} style={{ ...styles.outlineBtn, opacity: !selectedMatch ? 0.5 : 1 }}>↺ Reset to Default</button>
             </div>
+            {isChess && <div style={{ marginTop: '0.9rem', display: 'grid', gap: '0.45rem' }}>
+              <button onClick={createShareLink} disabled={shareLoading} style={{ ...styles.outlineBtn, width: '100%' }}>{shareLoading ? 'Creating link…' : '🔗 Copy phone stopwatch link'}</button>
+              {shareLink && <input readOnly value={shareLink} onFocus={(e) => e.target.select()} style={{ ...styles.formInput, fontSize: '0.7rem' }} aria-label="Shared stopwatch link" />}
+            </div>}
             <div style={{ textAlign: 'center', marginTop: '0.7rem', color: 'var(--muted)', fontSize: '0.68rem' }}>Shared for all logged-in users · refresh-safe</div>
           </>
         )}

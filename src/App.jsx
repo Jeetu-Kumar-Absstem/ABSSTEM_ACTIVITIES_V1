@@ -26,6 +26,7 @@ const ActivityPlanner = lazy(() => import('./pages/ActivityPlanner'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailOtp = lazy(() => import('./pages/VerifyEmailOtp'));
+const ChessClockSharePage = lazy(() => import('./pages/ChessClockSharePage'));
 
 // Loading Component
 const PageLoader = () => (
@@ -272,6 +273,11 @@ function App() {
               <Route
                 path="/verify-email-otp"
                 element={<VerifyEmailOtp />}
+              />
+
+              <Route
+                path="/chess-clock/:token"
+                element={<ChessClockSharePage />}
               />
 
               <Route
