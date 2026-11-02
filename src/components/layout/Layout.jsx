@@ -1,5 +1,6 @@
 // src/components/layout/Layout.jsx
 import React, { useEffect, useState, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import MobileDrawer from './MobileDrawer';
 import BottomNav from './BottomNav';
@@ -56,6 +57,10 @@ const Layout = ({ children, user, onLogout }) => {
     };
   }, [drawerOpen]);
 
+  // Wrap MobileDrawer call to allow AnimatePresence to handle its mounting/unmounting
+  // This is handled in the return block below.
+
+
   // Calculate padding based on sidebar state (desktop only)
   const sidebarWidth = sidebarCollapsed ? 72 : 280;
   const shellBgImage = themeMode === 'dark' ? bgImageDark : bgImageLight;
@@ -97,12 +102,16 @@ const Layout = ({ children, user, onLogout }) => {
         <BottomNav />
 
         {/* Drawer (hamburger) */}
-        <MobileDrawer
-          open={drawerOpen}
-          onClose={closeDrawer}
-          user={user}
-          onLogout={onLogout}
-        />
+        <AnimatePresence>
+          {drawerOpen && (
+            <MobileDrawer
+              open={drawerOpen}
+              onClose={closeDrawer}
+              user={user}
+              onLogout={onLogout}
+            />
+          )}
+        </AnimatePresence>
       </div>
     );
   }

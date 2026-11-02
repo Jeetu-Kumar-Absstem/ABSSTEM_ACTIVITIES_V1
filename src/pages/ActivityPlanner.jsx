@@ -1,7 +1,9 @@
 // src/pages/ActivityPlanner.jsx
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Layout from '../components/layout/Layout';
 import { useApp } from '../context/AppContext';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import DashboardPage from './DashboardPage';
 import BookingGridPage from './BookingGridPage';
 import GameMasterPage from './GameMasterPage';
@@ -21,6 +23,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const ActivityPlanner = ({ user, onLogout }) => {
   const { activeTab } = useApp();
+  const reducedMotion = useReducedMotion();
 
   // Initialize Push Notifications
   usePushNotifications(user);
@@ -49,7 +52,17 @@ const ActivityPlanner = ({ user, onLogout }) => {
   return (
     <Layout user={user} onLogout={onLogout}>
       <div style={{ paddingBottom: '20px' }}>
-        {renderTab()}
+        <AnimatePresence mode="popLayout">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: reducedMotion ? 0 : 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reducedMotion ? 0 : -5 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+          >
+            {renderTab()}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </Layout>
   );

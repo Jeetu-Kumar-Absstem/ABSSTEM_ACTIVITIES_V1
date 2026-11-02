@@ -1,6 +1,8 @@
 // src/components/common/BottomSheet.jsx
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const BottomSheet = ({
   open,
@@ -12,6 +14,8 @@ const BottomSheet = ({
   maxHeight = '85vh',
   ariaLabel,
 }) => {
+  const reducedMotion = useReducedMotion();
+
   // Esc-to-close
   useEffect(() => {
     if (!open) return;
@@ -24,13 +28,17 @@ const BottomSheet = ({
 
   const panel = (
     <div className="bottom-sheet-backdrop" onClick={onClose} role="presentation">
-      <div
+      <motion.div
         className="bottom-sheet-panel"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel || title || 'Dialog'}
         style={{ maxHeight }}
+        initial={{ y: reducedMotion ? 0 : '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: reducedMotion ? 0 : '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       >
         <div className="bottom-sheet-grabber" aria-hidden />
         {(title || icon) && (
@@ -57,7 +65,7 @@ const BottomSheet = ({
             {footer}
           </footer>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 

@@ -2,6 +2,8 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ShieldCheck, LogOut, Settings, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 const DynamicCalendarIcon = () => {
   const now = new Date();
@@ -53,6 +55,7 @@ const DrawerDivider = ({ label }) => (
 
 const MobileDrawer = ({ open, onClose, user: propUser, onLogout }) => {
   const { activeTab, setActiveTab, isAdmin, currentUser } = useApp();
+  const reducedMotion = useReducedMotion();
   const user = propUser || currentUser;
 
   const getUserName = () =>
@@ -92,12 +95,16 @@ const MobileDrawer = ({ open, onClose, user: propUser, onLogout }) => {
       onClick={onClose}
       role="presentation"
     >
-      <aside
+      <motion.aside
         className="drawer-panel"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation"
+        initial={{ x: reducedMotion ? 0 : '-100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: reducedMotion ? 0 : '-100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       >
         <header className="drawer-header">
           <div className="drawer-user-info">
@@ -149,7 +156,7 @@ const MobileDrawer = ({ open, onClose, user: propUser, onLogout }) => {
             <span>Secure & Protected</span>
           </div>
         </footer>
-      </aside>
+      </motion.aside>
     </div>
   );
 };
