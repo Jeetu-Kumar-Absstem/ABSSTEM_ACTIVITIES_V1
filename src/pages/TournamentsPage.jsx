@@ -333,6 +333,7 @@ export const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onCl
 };
 
 const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeName }) => {
+  const AUTO_TEAM_GIRL_NAMES = ['Anshita Verma', 'Arifa', 'Nikita', 'Ritu', 'Nandani', 'Ritika'];
   const { showToast } = useToast();
   const [teams, setTeams] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
@@ -354,6 +355,10 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const [userForm, setUserForm] = useState({ employee_code: '', name: '', email: '', department: '', is_active: true });
   const [editingEmployeeCode, setEditingEmployeeCode] = useState(null);
   const [openUserMenu, setOpenUserMenu] = useState(null);
+  const [autoTeamCount, setAutoTeamCount] = useState('');
+  const [autoPlayersPerTeam, setAutoPlayersPerTeam] = useState('');
+  const [autoCreating, setAutoCreating] = useState(false);
+  const teamWorkspaceRef = useRef(null);
 
   const loadTeams = useCallback(async () => {
     setLoading(true);
@@ -434,7 +439,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     setParentTeamId(team.parent_team_id || '');
     setSelectedMembers(new Set(membersFor(team.id).map((member) => member.employee_id)));
     setPlayerSearch('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    teamWorkspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const deleteTeam = async (team) => {
@@ -523,7 +528,112 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     }
     setShuffledEmployeeIds(ids);
   };
+
+  const createTeamsAutomatically = async () => {
+    if (!isAdminUser) return showToast('Only admins can create reusable teams', 'error');
+    const teamCount = Number.parseInt(autoTeamCount, 10);
+    const playersPerTeam = Number.parseInt(autoPlayersPerTeam, 10);
+    if (!Number.isInteger(teamCount) || teamCount < 1) return showToast('Enter a valid number of teams', 'error');
+    if (!Number.isInteger(playersPerTeam) || playersPerTeam < 1) return showToast('Enter a valid players-per-team number', 'error');
+
+    const assignedIds = new Set(teamMembers.map((member) => String(member.employee_id).toUpperCase()));
+    const available = employeeDirectory.filter((employee) => !assignedIds.has(String(employee.employee_code).toUpperCase()));
+    if (available.length < teamCount) {
+      return showToast(`At least ${teamCount} available players are required; only ${available.length} are available`, 'error');
+    }
+
+    const normalizeName = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const availableByName = new Map(available.map((employee) => [normalizeName(employee.name), employee]));
+    const girls = AUTO_TEAM_GIRL_NAMES.map((girlName) => availableByName.get(normalizeName(girlName))).filter(Boolean);
+    const missingGirls = AUTO_TEAM_GIRL_NAMES.filter((girlName) => !availableByName.has(normalizeName(girlName)));
+    if (missingGirls.length > 0) {
+      return showToast(`Required girls must be available in Users Management: ${missingGirls.join(', ')}`, 'error');
+    }
+    if (girls.length < teamCount) {
+      return showToast(`${teamCount} teams require at least ${teamCount} available girls`, 'error');
+    }
+
+    const randomize = (items) => {
+      const result = [...items];
+      for (let index = result.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [result[index], result[randomIndex]] = [result[randomIndex], result[index]];
+      }
+      return result;
+    };
+
+    const teamSizes = Array.from({ length: teamCount }, () => playersPerTeam);
+    let difference = available.length - (teamCount * playersPerTeam);
+    const sizeOrder = randomize(Array.from({ length: teamCount }, (_, index) => index));
+    if (difference > 0) {
+      for (let index = 0; index < difference; index += 1) teamSizes[sizeOrder[index % teamCount]] += 1;
+    } else if (difference < 0) {
+      const removableOrder = randomize(Array.from({ length: teamCount }, (_, index) => index));
+      let cursor = 0;
+      while (difference < 0 && cursor < 100000) {
+        const teamIndex = removableOrder[cursor % teamCount];
+        if (teamSizes[teamIndex] > 1) {
+          teamSizes[teamIndex] -= 1;
+          difference += 1;
+        }
+        cursor += 1;
+        if (cursor >= 100000 && difference < 0) return showToast('Players cannot be distributed across these teams', 'error');
+      }
+    }
+
+    const shuffledGirls = randomize(girls).slice(0, teamCount);
+    const girlIds = new Set(shuffledGirls.map((girl) => String(girl.employee_code).toUpperCase()));
+    const remainingPlayers = randomize(available.filter((employee) => !girlIds.has(String(employee.employee_code).toUpperCase())));
+    const assignments = Array.from({ length: teamCount }, (_, index) => ({
+      name: `Team ${index + 1}`,
+      members: [shuffledGirls[index]],
+    }));
+    let remainingIndex = 0;
+    assignments.forEach((assignment, index) => {
+      const slots = Math.max(0, teamSizes[index] - assignment.members.length);
+      assignment.members.push(...remainingPlayers.slice(remainingIndex, remainingIndex + slots));
+      remainingIndex += slots;
+    });
+
+    const existingNames = new Set(teams.map((team) => normalizeName(team.name)));
+    assignments.forEach((assignment) => {
+      let suffix = 1;
+      const baseName = assignment.name;
+      while (existingNames.has(normalizeName(assignment.name))) assignment.name = `${baseName} (${++suffix})`;
+      existingNames.add(normalizeName(assignment.name));
+    });
+
+    setAutoCreating(true);
+    const createdTeamIds = [];
+    try {
+      for (const assignment of assignments) {
+        const { data: team, error: teamError } = await supabase
+          .from('teams')
+          .insert({ name: assignment.name })
+          .select()
+          .single();
+        if (teamError) throw teamError;
+        createdTeamIds.push(team.id);
+        const { error: memberError } = await supabase.from('team_members').insert(
+          assignment.members.map((employee, memberIndex) => ({ team_id: team.id, employee_id: employee.employee_code, role: memberIndex === 0 ? 'captain' : 'member' }))
+        );
+        if (memberError) throw memberError;
+      }
+      setAutoTeamCount('');
+      setAutoPlayersPerTeam('');
+      await loadTeams();
+      showToast(`${assignments.length} teams created automatically`);
+    } catch (error) {
+      if (createdTeamIds.length > 0) await supabase.from('teams').delete().in('id', createdTeamIds);
+      showToast(error.message || 'Automatic team creation failed', 'error');
+    } finally {
+      setAutoCreating(false);
+    }
+  };
   const pointsFor = (teamId) => teamPoints.find((row) => String(row.team_id) === String(teamId));
+  const displayEmployeeName = (employeeId) => employeeDirectory.find(
+    (employee) => String(employee.employee_code || '').toUpperCase() === String(employeeId || '').toUpperCase()
+  )?.name || getEmployeeName(employeeId);
   const visibleEmployees = orderedEmployees.filter((employee) => {
     const query = userSearch.trim().toLowerCase();
     return !query || `${employee.name} ${employee.employee_code} ${employee.department}`.toLowerCase().includes(query);
@@ -531,7 +641,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
-      <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
+      <div ref={teamWorkspaceRef} className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={styles.cardHeader}>
           <div><div style={styles.cardHeaderTitle}>👤 Users Management</div><div style={{ color: 'var(--muted)', fontSize: '0.68rem', marginTop: 3 }}>{employeeDirectory.length} active users</div></div>
           {isAdminUser && <button onClick={() => setShowUserForm((current) => !current)} style={styles.navyBtn}>{showUserForm ? '✕ Close' : '+ Add User'}</button>}
@@ -574,6 +684,17 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}><span style={{ fontSize: '0.7rem', color: 'var(--text-soft)' }}>{selectedMembers.size} player{selectedMembers.size === 1 ? '' : 's'} selected</span><div style={{ display: 'flex', gap: '0.4rem' }}>{editingTeamId && <button onClick={() => { setEditingTeamId(null); setName(''); setParentTeamId(''); setSelectedMembers(new Set()); }} style={styles.outlineBtn}>Cancel</button>}<button onClick={createTeam} style={styles.navyBtn}>{editingTeamId ? 'Save Changes' : '+ Create Team'}</button></div></div>
         </div>}
+        {isAdminUser && <div style={{ marginTop: '0.75rem', background: 'rgba(255,255,255,0.38)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.65rem' }}>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)' }}>⚡ Create teams automatically</div>
+            <div style={{ color: 'var(--text-soft)', fontSize: '0.67rem', marginTop: 3 }}>Uses active, currently unassigned users and places one required girl in every team.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
+            <div style={styles.formRow}><label style={styles.formLabel}>Number of teams *</label><input type="number" min="1" step="1" value={autoTeamCount} onChange={(e) => setAutoTeamCount(e.target.value)} placeholder="6" style={styles.formInput} /></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Players per team *</label><input type="number" min="1" step="1" value={autoPlayersPerTeam} onChange={(e) => setAutoPlayersPerTeam(e.target.value)} placeholder="6" style={styles.formInput} /></div>
+          </div>
+          <div><button onClick={createTeamsAutomatically} disabled={autoCreating} style={{ ...styles.navyBtn, opacity: autoCreating ? 0.65 : 1 }}>{autoCreating ? 'Creating teams…' : '⚡ Create Teams Automatically'}</button></div>
+        </div>}
       </div>
       <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={{ padding: '1rem 1.1rem', background: 'linear-gradient(120deg, #173d73, #245a9b 58%, #3478b8)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
@@ -589,7 +710,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
             const accent = ['#2e7d32', '#6a1b9a', '#1565c0', '#ef6c00', '#00838f'][index % 5];
             return <div key={team.id} onClick={() => setExpandedTeams((current) => { const next = new Set(current); if (next.has(team.id)) next.delete(team.id); else next.add(team.id); return next; })} style={{ border: '1px solid var(--border)', borderTop: `4px solid ${accent}`, borderRadius: 12, background: 'var(--bg-surface-strong)', cursor: 'pointer', overflow: 'hidden', boxShadow: '0 7px 18px rgba(28,48,82,0.08)', transition: 'transform 150ms ease, box-shadow 150ms ease' }}>
               <div style={{ padding: '0.8rem 0.85rem 0.65rem', background: `linear-gradient(135deg, ${accent}12, transparent)` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>{team.parent_team_id && <span style={{ display: 'inline-block', marginTop: 4, color: accent, fontSize: '0.62rem', fontWeight: 700 }}>CHILD TEAM</span>}</div><div style={{ textAlign: 'right' }}><div style={{ color: accent, fontSize: '0.9rem', fontWeight: 800 }}>{point?.total_points || 0}</div><div style={{ color: 'var(--muted)', fontSize: '0.58rem', fontWeight: 700 }}>POINTS</div></div></div><div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: `${accent}14`, color: accent, fontSize: '0.63rem', fontWeight: 700 }}>👤 {members.length} members</span><span style={{ padding: '0.28rem 0.45rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.63rem', fontWeight: 700 }}>🏆 {point?.tournaments_played || 0} tournaments</span><span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '0.65rem', fontWeight: 700 }}>{expanded ? 'Hide roster ▲' : 'View roster ▼'}</span></div></div>
-              {expanded && <div style={{ borderTop: '1px solid var(--border)', padding: '0.45rem 0.85rem 0.75rem', display: 'grid', gap: '0.15rem' }}>{members.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.68rem', padding: '0.5rem 0' }}>No players assigned.</div> : displayMembersFor(team.id).map((member, memberIndex) => { const memberName = getEmployeeName(member.employee_id); return <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0', borderBottom: memberIndex < members.length - 1 ? '1px solid var(--border)' : 'none' }}><span style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: `${accent}22`, color: accent, fontSize: '0.62rem', fontWeight: 800, flexShrink: 0 }}>{String(memberName || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</strong><small style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>{member.employee_id}</small></span><span style={{ color: accent, fontSize: '0.68rem', fontWeight: 800 }}>{pointsForPlayer(member.employee_id)} pts</span></div>; })}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', borderColor: accent, color: accent }}>✎ Edit team</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Delete</button></div>}</div>}
+              {expanded && <div style={{ borderTop: '1px solid var(--border)', padding: '0.45rem 0.85rem 0.75rem', display: 'grid', gap: '0.15rem' }}>{members.length === 0 ? <div style={{ color: 'var(--muted)', fontSize: '0.68rem', padding: '0.5rem 0' }}>No players assigned.</div> : displayMembersFor(team.id).map((member, memberIndex) => { const memberName = displayEmployeeName(member.employee_id); const normalizedMemberName = String(memberName || '').trim().toLowerCase().replace(/\s+/g, ' '); const isCaptain = member.role === 'captain' || AUTO_TEAM_GIRL_NAMES.some((girlName) => girlName.toLowerCase() === normalizedMemberName); return <div key={member.employee_id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.5rem', borderRadius: 7, background: isCaptain ? 'rgba(255,193,7,0.2)' : 'transparent', borderBottom: memberIndex < members.length - 1 ? '1px solid var(--border)' : 'none' }}><span style={{ width: 25, height: 25, borderRadius: '50%', display: 'grid', placeItems: 'center', background: isCaptain ? '#f9a825' : `${accent}22`, color: isCaptain ? '#fff' : accent, fontSize: '0.62rem', fontWeight: 800, flexShrink: 0 }}>{String(memberName || '?').trim().charAt(0).toUpperCase()}</span><span style={{ minWidth: 0, flex: 1 }}><strong style={{ display: 'block', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</strong><small style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>{member.employee_id}</small></span><span style={{ color: accent, fontSize: '0.68rem', fontWeight: 800 }}>{pointsForPlayer(member.employee_id)} pts</span></div>; })}{isAdminUser && <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={(event) => event.stopPropagation()}><button onClick={() => editTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', borderColor: accent, color: accent }}>✎ Edit team</button><button onClick={() => deleteTeam(team)} style={{ ...styles.outlineBtn, fontSize: '0.65rem', color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Delete</button></div>}</div>}
             </div>;
           })}</div>}
         </div>
