@@ -70,22 +70,30 @@ export default function ChessClockSharePage() {
   if (error || !clock) return <div style={styles.shell}><div style={styles.message}>{error || 'Clock unavailable.'}</div></div>;
 
   const activeSide = clock.status === 'running' ? clock.chess_active_side : null;
-  return <main className="chess-clock-share-shell" style={styles.shell}><section className="chess-clock-share-card" style={styles.card}>
-    <div style={styles.header}><div style={styles.eyebrow}>♟ LIVE CHESS CLOCK</div><h1 style={styles.title}>{clock.public_match_title || 'Chess match'}</h1><div style={styles.status}>{clock.status === 'running' ? '● LIVE' : clock.status.toUpperCase()}</div></div>
-    <div className="chess-clock-share-board" style={styles.board}>{['A', 'B'].map((side) => { const active = activeSide === side; return <div key={side} style={{ ...styles.player, ...(active ? styles.active : {}) }}><div style={styles.playerLabel}>{side === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</div><div style={styles.time}>{formatClock(side === 'A' ? values.a : values.b)}</div><div style={styles.turn}>{active ? 'YOUR TURN' : 'WAITING'}</div></div>; })}</div>
-    <div className="chess-clock-move-buttons">
+  return <main style={styles.shell}>
+    <div style={styles.buttons}>
       {['A', 'B'].map((side) => {
-        const enabled = clock.status === 'running' && activeSide === side;
-        return <button key={side} className="chess-clock-move-button" onClick={() => completeMove(side)} disabled={!enabled} style={{ ...styles.moveButton, opacity: enabled ? 1 : .45 }}>
-          ✓ Move Complete
+        const active = activeSide === side;
+        const enabled = clock.status === 'running' && active;
+        return <button key={side} onClick={() => completeMove(side)} disabled={!enabled} style={{ ...styles.clockButton, ...(side === 'B' ? styles.clockButtonB : {}), ...(active ? styles.clockButtonActive : {}), opacity: enabled ? 1 : 0.72 }}>
+          <span style={styles.buttonName}>{side === 'A' ? (clock.public_side_a || 'Player A') : (clock.public_side_b || 'Player B')}</span>
+          <span style={styles.buttonTime}>{formatClock(side === 'A' ? values.a : values.b)}</span>
+          <span style={styles.buttonHint}>{active ? 'TAP TO END TURN' : clock.status === 'running' ? 'WAITING' : 'READY'}</span>
         </button>;
       })}
     </div>
-  </section></main>;
+  </main>;
 }
 
 const styles = {
-  shell: { minHeight: '100vh', padding: 16, display: 'grid', placeItems: 'center', background: 'linear-gradient(145deg, #071326, #16375f)', fontFamily: 'Inter, system-ui, sans-serif' },
+  shell: { minHeight: '100vh', padding: 12, display: 'grid', placeItems: 'center', background: 'linear-gradient(145deg, #071326, #16375f)', fontFamily: 'Inter, system-ui, sans-serif' },
+  buttons: { width: '100%', maxWidth: 900, minHeight: 'calc(100vh - 24px)', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
+  clockButton: { minWidth: 0, border: 0, borderRadius: 22, padding: 16, color: '#fff', background: 'linear-gradient(145deg, #173d73, #245a9b)', display: 'grid', placeItems: 'center', alignContent: 'center', gap: 12, cursor: 'pointer', boxShadow: '0 16px 34px rgba(0,0,0,.3)' },
+  clockButtonB: { background: 'linear-gradient(145deg, #7f4315, #c97924)' },
+  clockButtonActive: { boxShadow: '0 0 0 4px rgba(255,255,255,.55), 0 18px 40px rgba(0,0,0,.38)' },
+  buttonName: { width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', fontSize: 'clamp(.9rem, 3.5vw, 1.35rem)', fontWeight: 800 },
+  buttonTime: { fontFamily: 'Roboto Mono, monospace', fontSize: 'clamp(3rem, 13vw, 7rem)', lineHeight: 1, fontWeight: 900, letterSpacing: '.03em' },
+  buttonHint: { fontSize: 'clamp(.65rem, 2.5vw, .85rem)', fontWeight: 800, letterSpacing: '.1em', opacity: .82 },
   card: { width: '100%', maxWidth: 760, overflow: 'hidden', borderRadius: 24, background: '#f7f9fc', boxShadow: '0 22px 60px rgba(0,0,0,.28)' },
   header: { padding: '24px 20px 20px', color: '#fff', background: 'linear-gradient(120deg, #173d73, #245a9b)' },
   eyebrow: { fontSize: 12, fontWeight: 800, letterSpacing: '.12em', opacity: .8 },

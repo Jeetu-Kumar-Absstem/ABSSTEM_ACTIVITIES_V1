@@ -795,7 +795,7 @@ const TournamentsPage = () => {
     return () => { active = false; };
   }, []);
     const [tForm, setTForm] = useState({
-      name: '', game: 'Carrom', customGame: '', format: 'knockout',
+      name: '', game: 'Carrom', customGame: '', format: 'knockout', competition_mode: 'single_match',
       participant_mode: 'individual', lineup_mode: 'variable', lineup_size: '', team_ids: [],
       players_per_team: 1,
       start_date: '', end_date: '', max_participants: 8,
@@ -2772,6 +2772,7 @@ const renderMatch = (m) => {
       max_participants: parseInt(tForm.max_participants, 10) || 8,
       players_per_team: parseInt(tForm.players_per_team, 10) || 1,
       participant_mode: tForm.participant_mode,
+      competition_mode: tForm.competition_mode,
       lineup_mode: tForm.lineup_mode,
       lineup_size: tForm.lineup_mode === 'fixed' ? parseInt(tForm.lineup_size, 10) || null : null,
       team_ids: tForm.team_ids,
@@ -2781,7 +2782,7 @@ const renderMatch = (m) => {
       showToast(`Tournament "${tForm.name}" created!`);
       if (result.warning) showToast(result.warning, 'error');
       setShowNewTournamentModal(false);
-      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', participant_mode: 'individual', lineup_mode: 'variable', lineup_size: '', team_ids: [], players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 10 });
+      setTForm({ name: '', game: 'Carrom', customGame: '', format: 'knockout', competition_mode: 'single_match', participant_mode: 'individual', lineup_mode: 'variable', lineup_size: '', team_ids: [], players_per_team: 1, start_date: '', end_date: '', max_participants: 8, prize_pool: '', description: '', playoff_mode: 'auto', match_duration_minutes: 10 });
       if (result.data?.id) setActiveTournament(result.data.id);
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
@@ -3206,7 +3207,7 @@ const renderMatch = (m) => {
                     )}
                   </div>
                 </div>
-                {tForm.participant_mode !== 'team' && <div style={styles.formRow}>
+                {(tForm.participant_mode !== 'team' || tForm.competition_mode === 'format') && <div style={styles.formRow}>
                   <label style={styles.formLabel}>Format</label>
                   <select style={styles.formInput} value={tForm.format}
                           onChange={(e) => setTForm(f => ({ ...f, format: e.target.value }))}>
@@ -3228,6 +3229,7 @@ const renderMatch = (m) => {
                   <div style={{ ...styles.formRow, gridColumn: 'span 2', display: 'grid', gap: '0.55rem' }}>
                     <div style={{ padding: '0.55rem 0.65rem', border: '1px dashed var(--border-strong)', borderRadius: 8, color: 'var(--text-soft)', fontSize: '0.7rem' }}>Create the tournament first. You can select existing teams afterwards from <strong>Manage Teams</strong> in the tournament list.</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                      <div style={styles.formRow}><label style={styles.formLabel}>Team competition</label><select style={styles.formInput} value={tForm.competition_mode} onChange={(e) => setTForm(f => ({ ...f, competition_mode: e.target.value }))}><option value="single_match">Single match (current)</option><option value="format">Tournament format</option></select></div>
                       <div style={styles.formRow}><label style={styles.formLabel}>Lineup rule</label><select style={styles.formInput} value={tForm.lineup_mode} onChange={(e) => setTForm(f => ({ ...f, lineup_mode: e.target.value }))}><option value="variable">Variable lineup per match</option><option value="fixed">Fixed players per side</option><option value="full_team">Full team</option></select></div>
                       {tForm.lineup_mode === 'fixed' && <div style={styles.formRow}><label style={styles.formLabel}>Players per side</label><input style={styles.formInput} type="number" min="1" value={tForm.lineup_size} onChange={(e) => setTForm(f => ({ ...f, lineup_size: e.target.value }))} /></div>}
                     </div>
@@ -3329,7 +3331,7 @@ const renderMatch = (m) => {
               <button onClick={() => setShowNewMatchModal(false)} style={styles.modalClose}>✕</button>
             </div>
             <div style={{ padding: '1rem' }}>
-              {activeTournamentRecord?.participant_mode === 'team' && <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.7rem', borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--text-soft)', fontSize: '0.7rem', lineHeight: 1.45 }}><strong>Team game:</strong> one added match can include any number of registered teams. Select every team that will play in this game; the admin enters points for each team and chooses one winner. Add another match later to run another game with the same or different teams.</div>}
+                {activeTournamentRecord?.participant_mode === 'team' && <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.7rem', borderRadius: 8, background: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--text-soft)', fontSize: '0.7rem', lineHeight: 1.45 }}><strong>{activeTournamentRecord.competition_mode === 'format' ? 'Team tournament:' : 'Team game:'}</strong> {activeTournamentRecord.competition_mode === 'format' ? `registered teams play a ${normalizeTournamentFormat(activeTournamentRecord.format).replace('_', ' ')} competition. Team lineups are selected per match.` : 'one added match can include any number of registered teams. Select every team that will play in this game; the admin enters points for each team and chooses one winner. Add another match later to run another game with the same or different teams.'}</div>}
               {(() => {
                 const editingMatch = matchesForActive.find((match) => match.id === editMatchId);
                 const isTeamTournament = activeTournamentRecord?.participant_mode === 'team';
@@ -3636,6 +3638,7 @@ const renderMatch = (m) => {
       {/* Generate Fixtures dialog (plan summary + leftover / formation / scheduling options) */}
       {showGenModal && activeTournamentRecord && (() => {
         const isTeamTournament = activeTournamentRecord.participant_mode === 'team';
+        const isFormattedTeamTournament = isTeamTournament && activeTournamentRecord.competition_mode === 'format';
         const registeredTeamRows = tournamentTeamEntries.filter((entry) => String(entry.tournament_id) === String(activeTournamentRecord.id));
         const registeredTeamPlayers = registeredTeamRows.reduce((sum, entry) => sum + (teamEntryPlayerCounts[entry.id] ?? teamMemberCounts[entry.team_id] ?? 0), 0);
         const gFormat = normalizeTournamentFormat(activeTournamentRecord.format);
@@ -3676,9 +3679,9 @@ const renderMatch = (m) => {
               </div>
               <div style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
                 {hasExistingFixtures && <div style={{ border: '1px solid rgba(249,168,37,0.4)', borderRadius: 10, padding: '0.75rem', background: 'rgba(249,168,37,0.10)', fontSize: '0.74rem', lineHeight: 1.5 }}><strong>Existing fixtures will be replaced.</strong><span style={{ display: 'block', color: 'var(--text-soft)' }}>This is allowed because no match has a result yet. Updated registrations and the new participant limit will be used.</span></div>}
-                {isTeamTournament ? <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0.75rem', background: 'var(--accent-soft)', fontSize: '0.74rem', display: 'grid', gap: '0.35rem' }}><strong>Team fixture readiness</strong><span>{registeredTeamRows.length} teams · {registeredTeamPlayers} roster players</span><span style={{ color: 'var(--text-soft)' }}>Fixtures will be generated between registered teams. Player lineups are selected separately for each match.</span>{registeredTeamRows.length < 2 && <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Add at least two teams from Manage Teams before generating fixtures.</span>}</div> : <PlanPanel
+                {isTeamTournament && !isFormattedTeamTournament ? <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '0.75rem', background: 'var(--accent-soft)', fontSize: '0.74rem', display: 'grid', gap: '0.35rem' }}><strong>Team fixture readiness</strong><span>{registeredTeamRows.length} teams · {registeredTeamPlayers} roster players</span><span style={{ color: 'var(--text-soft)' }}>Fixtures will be generated between registered teams. Player lineups are selected separately for each match.</span>{registeredTeamRows.length < 2 && <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Add at least two teams from Manage Teams before generating fixtures.</span>}</div> : <PlanPanel
                   plan={gPlan}
-                  registered={partsList.length}
+                  registered={isTeamTournament ? registeredTeamRows.length : partsList.length}
                   maxPlayers={activeTournamentRecord.max_participants || null}
                   onApply={async (patch) => {
                     if (patch.leftoverPolicy) setGenOpts((o) => ({ ...o, leftoverPolicy: patch.leftoverPolicy }));

@@ -1569,6 +1569,9 @@ const loadTournamentMatches = async () => {
           game: tournamentData.game,
           event_id: tournamentData.event_id || null,
           format: tournamentData.format || 'knockout',
+          competition_mode: participantMode === 'team'
+            ? (tournamentData.competition_mode === 'format' ? 'format' : 'single_match')
+            : 'format',
           start_date: tournamentData.start_date,
           end_date: tournamentData.end_date || null,
           registration_open: tournamentData.registration_open !== false,
@@ -1777,6 +1780,8 @@ const loadTournamentMatches = async () => {
 
       const format = normalizeTournamentFormat(tournament.format);
       const isTeamTournament = String(tournament.participant_mode || 'individual').toLowerCase() === 'team';
+      const isFormattedTeamTournament = isTeamTournament
+        && String(tournament.competition_mode || 'single_match').toLowerCase() === 'format';
       const participants = isTeamTournament ? [] : getTournamentApprovedParticipants(tournamentId);
       let teamEntries = [];
       if (isTeamTournament) {
@@ -1975,7 +1980,7 @@ const loadTournamentMatches = async () => {
       const payloads = [];
       let roundPlan = null;
 
-      if (isTeamTournament) {
+      if (isTeamTournament && !isFormattedTeamTournament) {
         // A reusable-team event is a single multi-team game by default. All
         // registered teams participate in the same match; the admin enters
         // each team's points and selects the winner afterward.
