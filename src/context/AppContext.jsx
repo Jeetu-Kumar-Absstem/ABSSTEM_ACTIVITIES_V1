@@ -2956,20 +2956,17 @@ const loadTournamentMatches = async () => {
                 const playerCount = playerIdsForSide.length;
                 if (!playerCount) return [];
 
-                // Keep the stored values integral because the score-entry
-                // schema uses integer scores. If a score is not evenly
-                // divisible, distribute the remainder to the first players;
-                // the stored player values always add back to the entered team
-                // score exactly.
-                const baseScore = Math.floor(sideScore / playerCount);
-                const remainder = sideScore % playerCount;
-                return playerIdsForSide.map((employeeId, index) => ({
+                // Split the entered side score evenly across the selected
+                // players. Decimal shares are supported so 25 points in a
+                // doubles side becomes 12.5 + 12.5 rather than 13 + 12.
+                const playerShare = Number((sideScore / playerCount).toFixed(2));
+                return playerIdsForSide.map((employeeId) => ({
                   team_id: members?.find((member) => String(member.employee_id).toUpperCase() === String(employeeId).toUpperCase())?.team_id || null,
                   tournament_id: match.tournament_id,
                   match_id: match.id,
                   employee_id: employeeId,
                   side,
-                  score: baseScore + (index < remainder ? 1 : 0),
+                  score: playerShare,
                 }));
               }),
             ].filter((row) => row.team_id != null);

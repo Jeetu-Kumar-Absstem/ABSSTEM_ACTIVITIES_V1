@@ -10,7 +10,7 @@ create table if not exists public.team_match_score_entries (
   match_id bigint not null references public.tournament_matches(id) on update cascade on delete cascade,
   employee_id text not null references public.employees(employee_code) on update cascade on delete restrict,
   side text not null check (side in ('A', 'B')),
-  score integer not null default 0 check (score >= 0),
+  score numeric(10,2) not null default 0 check (score >= 0),
   created_at timestamptz not null default now(),
   unique (match_id, employee_id, side)
 );
@@ -25,7 +25,7 @@ create or replace view public.team_cumulative_points as
 select
   t.id as team_id,
   t.name as team_name,
-  coalesce(sum(s.score), 0)::integer as total_points,
+  coalesce(sum(s.score), 0)::numeric(12,2) as total_points,
   count(distinct s.tournament_id)::integer as tournaments_played
 from public.teams t
 left join public.team_match_score_entries s on s.team_id = t.id
