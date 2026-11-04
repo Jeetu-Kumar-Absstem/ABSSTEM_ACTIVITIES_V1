@@ -87,8 +87,8 @@ export default function ChessClockSharePage() {
 
 const styles = {
   shell: { minHeight: '100vh', padding: 12, display: 'grid', placeItems: 'center', background: 'linear-gradient(145deg, #071326, #16375f)', fontFamily: 'Inter, system-ui, sans-serif' },
-  buttons: { width: '100%', maxWidth: 900, minHeight: 'calc(100vh - 24px)', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
-  clockButton: { minWidth: 0, border: 0, borderRadius: 22, padding: 16, color: '#fff', background: 'linear-gradient(145deg, #173d73, #245a9b)', display: 'grid', placeItems: 'center', alignContent: 'center', gap: 12, cursor: 'pointer', boxShadow: '0 16px 34px rgba(0,0,0,.3)' },
+  buttons: { width: '100%', maxWidth: 900, height: 'calc(100vh - 24px)', display: 'grid', gridTemplateColumns: '1fr', gridTemplateRows: 'repeat(2, minmax(0, 1fr))', gap: 8 },
+  clockButton: { width: '100%', minWidth: 0, minHeight: 0, border: 0, borderRadius: 22, padding: 16, color: '#fff', background: 'linear-gradient(145deg, #173d73, #245a9b)', display: 'grid', placeItems: 'center', alignContent: 'center', gap: 12, cursor: 'pointer', boxShadow: '0 16px 34px rgba(0,0,0,.3)' },
   clockButtonB: { background: 'linear-gradient(145deg, #7f4315, #c97924)' },
   clockButtonActive: { boxShadow: '0 0 0 4px rgba(255,255,255,.55), 0 18px 40px rgba(0,0,0,.38)' },
   buttonName: { width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', fontSize: 'clamp(.9rem, 3.5vw, 1.35rem)', fontWeight: 800 },
