@@ -1458,6 +1458,14 @@ const renderMatch = (m) => {
   const b = hasMultiTeams ? 'Admin enters points for each team' : isPhantom ? 'TBD' : teamLabel(m.player_b_employee_id, m.team_b_players, m.team_b_name);
   
   const hasScore = m.score_a !== null && m.score_b !== null;
+  const winnerSide = isTeamTournament
+    ? (m.winner_team_id != null && String(m.winner_team_id) === String(m.team_a_id) ? 'A'
+      : m.winner_team_id != null && String(m.winner_team_id) === String(m.team_b_id) ? 'B' : null)
+    : (m.winner_employee_id && m.winner_employee_id === m.player_a_employee_id ? 'A'
+      : m.winner_employee_id && m.winner_employee_id === m.player_b_employee_id ? 'B' : null);
+  const hasRecordedWinner = Boolean(winnerSide);
+  const aWon = winnerSide === 'A';
+  const bWon = winnerSide === 'B';
   const isFinal  = String(m.round || '').toUpperCase() === 'F';
 
   const explicitStatus = String(m.status || '').toLowerCase();
@@ -1531,13 +1539,13 @@ const renderMatch = (m) => {
       <div style={{
         ...styles.matchPlayer,
         display: hasMultiTeams ? 'none' : undefined,
-        background: hasScore && m.score_a > m.score_b ? 'rgba(46,125,50,0.14)' :
+        background: aWon ? 'rgba(46,125,50,0.14)' : hasRecordedWinner ? 'rgba(211,47,47,0.12)' : hasScore && m.score_a > m.score_b ? 'rgba(46,125,50,0.14)' :
                     waitingForWinnerA ? 'rgba(230,81,0,0.10)' : 'transparent',
         color: isPhantom ? 'var(--muted)'
-              : hasScore && m.score_a > m.score_b ? 'var(--success)'
+              : aWon ? 'var(--success)' : hasRecordedWinner ? 'var(--danger)' : hasScore && m.score_a > m.score_b ? 'var(--success)'
               : waitingForWinnerA ? '#e65100'
               : 'var(--text)',
-        fontWeight: hasScore && m.score_a > m.score_b ? 700 :
+        fontWeight: aWon || (hasScore && m.score_a > m.score_b) ? 700 :
                     waitingForWinnerA ? 600 : 500,
         fontStyle: isPhantom || waitingForWinnerA ? 'italic' : 'normal',
       }}>
@@ -1563,13 +1571,13 @@ const renderMatch = (m) => {
       <div style={{
         ...styles.matchPlayer,
         display: hasMultiTeams ? 'none' : undefined,
-        background: hasScore && m.score_b > m.score_a ? 'rgba(46,125,50,0.14)' :
+        background: bWon ? 'rgba(46,125,50,0.14)' : hasRecordedWinner ? 'rgba(211,47,47,0.12)' : hasScore && m.score_b > m.score_a ? 'rgba(46,125,50,0.14)' :
                     waitingForWinnerB ? 'rgba(230,81,0,0.10)' : 'transparent',
         color: isPhantom ? 'var(--muted)'
-              : hasScore && m.score_b > m.score_a ? 'var(--success)'
+              : bWon ? 'var(--success)' : hasRecordedWinner ? 'var(--danger)' : hasScore && m.score_b > m.score_a ? 'var(--success)'
               : waitingForWinnerB ? '#e65100'
               : (isBye && !m.player_b_employee_id) ? 'var(--muted)' : 'var(--text)',
-        fontWeight: hasScore && m.score_b > m.score_a ? 700 :
+        fontWeight: bWon || (hasScore && m.score_b > m.score_a) ? 700 :
                     waitingForWinnerB ? 600 : 500,
         fontStyle: isPhantom || (isBye && !m.player_b_employee_id) || waitingForWinnerB ? 'italic' : 'normal',
       }}>
@@ -3453,6 +3461,9 @@ const renderMatch = (m) => {
                           <option value="">— select team —</option>
                           {registeredTeamOptions.map((team) => <option key={team.tournamentId} value={team.tournamentId}>{team.name}</option>)}
                         </select>
+                        {rForm.winner && !isMultiTeamMatch && <div style={{ marginTop: '0.35rem', padding: '0.35rem 0.5rem', borderRadius: 6, background: rForm.winner === teamAOption ? 'rgba(46,125,50,0.12)' : 'rgba(211,47,47,0.10)', color: rForm.winner === teamAOption ? 'var(--success)' : 'var(--danger)', fontSize: '0.68rem', fontWeight: 700 }}>
+                          Team {rForm.winner === teamAOption ? 'A' : 'B'} is selected as winner — Team {rForm.winner === teamAOption ? 'B' : 'A'} will be shown as the losing team.
+                        </div>}
                       </div>
                       <div style={{ ...styles.formRow, display: 'none' }}>
                         <label style={styles.formLabel}>Registered Team B *</label>
@@ -3863,7 +3874,7 @@ const renderMatch = (m) => {
                     ) : showScoreFields && (
                       <>
                         <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Team A Score</label>
+                          <label style={{ ...styles.formLabel, color: rForm.winner === teamAOption ? 'var(--success)' : rForm.winner === teamBOption ? 'var(--danger)' : 'var(--text-soft)' }}>Team A Score {rForm.winner === teamAOption ? '· WINNER' : rForm.winner === teamBOption ? '· LOSER' : ''}</label>
                           <input
                             style={styles.formInput}
                             type="number"
@@ -3873,7 +3884,7 @@ const renderMatch = (m) => {
                           />
                         </div>
                         <div style={styles.formRow}>
-                          <label style={styles.formLabel}>Team B Score</label>
+                          <label style={{ ...styles.formLabel, color: rForm.winner === teamBOption ? 'var(--success)' : rForm.winner === teamAOption ? 'var(--danger)' : 'var(--text-soft)' }}>Team B Score {rForm.winner === teamBOption ? '· WINNER' : rForm.winner === teamAOption ? '· LOSER' : ''}</label>
                           <input
                             style={styles.formInput}
                             type="number"
