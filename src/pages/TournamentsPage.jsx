@@ -3802,9 +3802,7 @@ const renderMatch = (m) => {
                           value={rForm.winner}
                           onChange={(e) => {
                             const picked = e.target.value;
-                            const newScoreA = picked === teamAOption ? 5 : picked === teamBOption ? 0 : '';
-                            const newScoreB = picked === teamBOption ? 5 : picked === teamAOption ? 0 : '';
-                            setRForm(f => ({ ...f, winner: picked, score_a: newScoreA, score_b: newScoreB }));
+                            setRForm(f => ({ ...f, winner: picked }));
                           }}
                         >
                           <option value="">— select —</option>
