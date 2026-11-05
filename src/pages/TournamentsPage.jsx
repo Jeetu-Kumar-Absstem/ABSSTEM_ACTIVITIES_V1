@@ -455,6 +455,38 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     showToast(count > 0 ? 'Team archived to preserve history' : 'Team deleted');
   };
 
+  const deleteAllTeams = async () => {
+    if (!isAdminUser) return showToast('Only admins can delete reusable teams', 'error');
+    const { data: activeTeams, error: teamsError } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('is_active', true);
+    if (teamsError) return showToast(teamsError.message, 'error');
+    const teamIds = (activeTeams || []).map((team) => team.id).filter(Boolean);
+    if (!teamIds.length) return showToast('There are no active teams to remove');
+    if (!window.confirm(`Remove all ${teamIds.length} active teams? Teams with tournament history will be archived to preserve their records.`)) return;
+
+    const [{ data: entries, error: entriesError }, { data: scoreEntries, error: scoresError }] = await Promise.all([
+      supabase.from('tournament_team_entries').select('team_id').in('team_id', teamIds),
+      supabase.from('team_match_score_entries').select('team_id').in('team_id', teamIds),
+    ]);
+    if (entriesError || scoresError) return showToast((entriesError || scoresError).message, 'error');
+
+    const preservedIds = new Set([...(entries || []), ...(scoreEntries || [])].map((row) => String(row.team_id)));
+    const archiveIds = teamIds.filter((id) => preservedIds.has(String(id)));
+    const deleteIds = teamIds.filter((id) => !preservedIds.has(String(id)));
+    if (archiveIds.length) {
+      const { error } = await supabase.from('teams').update({ is_active: false }).in('id', archiveIds);
+      if (error) return showToast(error.message, 'error');
+    }
+    if (deleteIds.length) {
+      const { error } = await supabase.from('teams').delete().in('id', deleteIds);
+      if (error) return showToast(error.message, 'error');
+    }
+    await loadTeams();
+    showToast(`${deleteIds.length} team${deleteIds.length === 1 ? '' : 's'} deleted${archiveIds.length ? `, ${archiveIds.length} archived` : ''}`);
+  };
+
   const saveUser = async () => {
     if (!isAdminUser) return showToast('Only admins can manage users', 'error');
     const payload = {
@@ -668,7 +700,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
       <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={styles.cardHeader}>
           <div><div style={styles.cardHeaderTitle}>👥 Team workspace</div><div style={{ color: 'var(--text-soft)', fontSize: '0.7rem', marginTop: 3 }}>One player can belong to one reusable team. Teams can be entered into multiple tournaments.</div></div>
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button><button onClick={shuffleEmployees} title="Randomise the order of all employees in this workspace" style={styles.outlineBtn}>🔀 Shuffle employees</button></div>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button><button onClick={shuffleEmployees} title="Randomise the order of all employees in this workspace" style={styles.outlineBtn}>🔀 Shuffle employees</button>{isAdminUser && <button onClick={deleteAllTeams} style={{ ...styles.outlineBtn, color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Remove all teams</button>}</div>
         </div>
         {isAdminUser && <div style={{ background: 'rgba(255,255,255,0.38)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.7rem' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)' }}>{editingTeamId ? 'Edit team' : 'Create a team'}</div>
