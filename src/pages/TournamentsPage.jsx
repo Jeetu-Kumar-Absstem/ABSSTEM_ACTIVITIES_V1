@@ -332,13 +332,14 @@ export const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onCl
   );
 };
 
-const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeName }) => {
+const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeName, currentUser }) => {
   const AUTO_TEAM_GIRL_NAMES = ['Anshita Verma', 'Arifa', 'Nikita', 'Ritu', 'Nandani', 'Ritika'];
   const { showToast } = useToast();
   const [teams, setTeams] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [teamPoints, setTeamPoints] = useState([]);
   const [playerPoints, setPlayerPoints] = useState([]);
+  const [pointAwards, setPointAwards] = useState([]);
   const [employeeDirectory, setEmployeeDirectory] = useState(employees || []);
   const [name, setName] = useState('');
   const [parentTeamId, setParentTeamId] = useState('');
@@ -358,15 +359,21 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const [autoTeamCount, setAutoTeamCount] = useState('');
   const [autoPlayersPerTeam, setAutoPlayersPerTeam] = useState('');
   const [autoCreating, setAutoCreating] = useState(false);
+  const [awardTournamentId, setAwardTournamentId] = useState('');
+  const [awardEmployeeId, setAwardEmployeeId] = useState('');
+  const [awardPoints, setAwardPoints] = useState('');
+  const [awardReason, setAwardReason] = useState('');
+  const [awardSaving, setAwardSaving] = useState(false);
   const teamWorkspaceRef = useRef(null);
 
   const loadTeams = useCallback(async () => {
     setLoading(true);
-    const [teamResult, memberResult, pointResult, playerPointResult, employeeResult] = await Promise.all([
+    const [teamResult, memberResult, pointResult, playerPointResult, awardsResult, employeeResult] = await Promise.all([
       supabase.from('teams').select('*').order('name'),
       supabase.from('team_members').select('*'),
       supabase.from('team_cumulative_points').select('*').order('total_points', { ascending: false }),
       supabase.from('team_match_score_entries').select('employee_id, score'),
+      supabase.from('player_point_awards').select('id, tournament_id, employee_id, team_id, points, reason, created_at').order('created_at', { ascending: false }),
       supabase.from('employees').select('*').eq('is_active', true).order('name'),
     ]);
     setLoading(false);
@@ -377,7 +384,11 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     setTeams((teamResult.data || []).filter((team) => team.is_active !== false));
     setTeamMembers(memberResult.data || []);
     setTeamPoints(pointResult.data || []);
-    setPlayerPoints((playerPointResult.data || []).map((row) => ({ employee_id: row.employee_id, points: row.score })));
+    setPointAwards(awardsResult.data || []);
+    setPlayerPoints([
+      ...(playerPointResult.data || []).map((row) => ({ employee_id: row.employee_id, points: row.score })),
+      ...(awardsResult.data || []).map((row) => ({ employee_id: row.employee_id, points: row.points })),
+    ]);
     if (!employeeResult.error) {
       const nextEmployees = employeeResult.data || [];
       setEmployeeDirectory(nextEmployees);
@@ -402,6 +413,48 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
   const pointsForPlayer = (employeeId) => playerPoints
     .filter((row) => String(row.employee_id).toUpperCase() === String(employeeId).toUpperCase())
     .reduce((sum, row) => sum + (Number(row.points) || 0), 0);
+
+  const savePlayerPointAward = async () => {
+    if (!isAdminUser) return showToast('Only admins can award player points', 'error');
+    const points = Number(awardPoints);
+    if (!awardEmployeeId || !Number.isFinite(points) || points <= 0) {
+      return showToast('Select a player and enter positive points', 'error');
+    }
+    const selectedMember = teamMembers.find((member) => String(member.employee_id).toUpperCase() === String(awardEmployeeId).toUpperCase());
+    const teamId = selectedMember?.team_id || null;
+    const teamRoster = teamId ? teamMembers.filter((member) => String(member.team_id) === String(teamId)) : [];
+    const captainByRole = teamRoster.find((member) => String(member.role || '').toLowerCase() === 'captain');
+    const captainByList = teamRoster.find((member) => {
+      const employee = employeeDirectory.find((entry) => String(entry.employee_code).toUpperCase() === String(member.employee_id).toUpperCase());
+      return AUTO_TEAM_GIRL_NAMES.some((name) => String(name).toLowerCase() === String(employee?.name || '').trim().toLowerCase());
+    });
+    const recipientEmployeeId = (captainByRole || captainByList)?.employee_id || awardEmployeeId;
+    setAwardSaving(true);
+    const submitter = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.email || null;
+    const { error } = await supabase.from('player_point_awards').insert({
+      tournament_id: awardTournamentId || null,
+      employee_id: recipientEmployeeId,
+      team_id: teamId,
+      points: Number(points.toFixed(2)),
+      reason: awardReason.trim() || null,
+      created_by: submitter,
+    });
+    setAwardSaving(false);
+    if (error) return showToast(error.message, 'error');
+    setAwardEmployeeId(''); setAwardPoints(''); setAwardReason('');
+    await loadTeams();
+    showToast(teamId && recipientEmployeeId !== awardEmployeeId
+      ? `Points awarded to captain ${getEmployeeName(recipientEmployeeId)} and added to the team`
+      : teamId ? 'Player points awarded and added to the player’s team' : 'Player points awarded');
+  };
+
+  const deletePlayerPointAward = async (award) => {
+    if (!isAdminUser || !window.confirm('Delete this player point award?')) return;
+    const { error } = await supabase.from('player_point_awards').delete().eq('id', award.id);
+    if (error) return showToast(error.message, 'error');
+    await loadTeams();
+    showToast('Player point award deleted');
+  };
   const toggleMember = (employeeId) => setSelectedMembers((current) => {
     const next = new Set(current);
     if (next.has(employeeId)) next.delete(employeeId); else next.add(employeeId);
@@ -728,6 +781,20 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
           <div><button onClick={createTeamsAutomatically} disabled={autoCreating} style={{ ...styles.navyBtn, opacity: autoCreating ? 0.65 : 1 }}>{autoCreating ? 'Creating teams…' : '⚡ Create Teams Automatically'}</button></div>
         </div>}
       </div>
+      {isAdminUser && <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(46,125,50,0.08))' }}>
+        <div style={{ padding: '0.85rem 1.1rem', background: 'linear-gradient(120deg, #2e7d32, #43a047)', color: '#fff' }}><div style={{ fontSize: '1rem', fontWeight: 800 }}>🏅 Award player points</div><div style={{ marginTop: 4, fontSize: '0.7rem', opacity: 0.86 }}>Tournament selection is optional, and player registration is not required. If the player belongs to a reusable team, the same points are added to that team.</div></div>
+        <div style={{ padding: '0.9rem 1rem', display: 'grid', gap: '0.65rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
+            <div style={styles.formRow}><label style={styles.formLabel}>Tournament (optional)</label><select style={styles.formInput} value={awardTournamentId} onChange={(e) => setAwardTournamentId(e.target.value)}><option value="">General award — no tournament</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Player *</label><select style={styles.formInput} value={awardEmployeeId} onChange={(e) => setAwardEmployeeId(e.target.value)}><option value="">— select any player —</option>{employeeDirectory.map((employee) => <option key={employee.employee_code} value={employee.employee_code}>{employee.name} · {employee.employee_code}</option>)}</select></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Points *</label><input style={styles.formInput} type="number" min="0.01" step="0.01" value={awardPoints} onChange={(e) => setAwardPoints(e.target.value)} placeholder="e.g. 5" /></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Reason (optional)</label><input style={styles.formInput} value={awardReason} onChange={(e) => setAwardReason(e.target.value)} placeholder="Best performer, bonus, etc." /></div>
+          </div>
+          {awardEmployeeId && <div style={{ color: 'var(--text-soft)', fontSize: '0.68rem' }}>Current team: <strong>{teamMembers.find((member) => String(member.employee_id).toUpperCase() === String(awardEmployeeId).toUpperCase())?.team_id ? teams.find((team) => String(team.id) === String(teamMembers.find((member) => String(member.employee_id).toUpperCase() === String(awardEmployeeId).toUpperCase())?.team_id))?.name || 'Assigned team' : 'No reusable team — player points only'}</strong></div>}
+          <div><button onClick={savePlayerPointAward} disabled={awardSaving} style={{ ...styles.navyBtn, background: '#2e7d32', opacity: awardSaving ? 0.65 : 1 }}>{awardSaving ? 'Saving…' : 'Award points'}</button></div>
+          {pointAwards.length > 0 && <div style={{ display: 'grid', gap: '0.35rem', borderTop: '1px solid var(--border)', paddingTop: '0.65rem' }}>{pointAwards.slice(0, 8).map((award) => <div key={award.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.68rem' }}><span style={{ flex: 1 }}><strong>{getEmployeeName(award.employee_id)}</strong> · {Number(award.points)} pts · {award.tournament_id ? (tournaments.find((tournament) => String(tournament.id) === String(award.tournament_id))?.name || 'Tournament') : 'General award'}{award.reason ? ` · ${award.reason}` : ''}</span><button onClick={() => deletePlayerPointAward(award)} style={{ ...styles.outlineBtn, color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)', padding: '0.25rem 0.45rem', fontSize: '0.62rem' }}>Delete</button></div>)}</div>}
+        </div>
+      </div>}
       <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={{ padding: '1rem 1.1rem', background: 'linear-gradient(120deg, #173d73, #245a9b 58%, #3478b8)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
           <div><div style={{ fontSize: '1rem', fontWeight: 800, letterSpacing: '-0.01em' }}>👥 Team Directory</div><div style={{ marginTop: 4, fontSize: '0.7rem', opacity: 0.82 }}>Reusable teams, player membership and tournament performance</div></div>
@@ -3126,7 +3193,7 @@ const renderMatch = (m) => {
       {sub === 'results' && renderResults()}
       {sub === 'stopwatch' && renderStopwatch()}
       {sub === 'final' && renderFinalResults()}
-      {sub === 'teams' && <ReusableTeamsPanel employees={employees} tournaments={tournaments} isAdminUser={isAdmin()} getEmployeeName={getEmployeeName} />}
+      {sub === 'teams' && <ReusableTeamsPanel employees={employees} tournaments={tournaments} isAdminUser={isAdmin()} getEmployeeName={getEmployeeName} currentUser={currentUser} />}
 
       {/* Admin: Edit Tournament Status / Registration Modal */}
       {editTournamentId && isAdmin() && (() => {

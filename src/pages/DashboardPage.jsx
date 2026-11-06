@@ -75,6 +75,7 @@ const DashboardPage = () => {
   const [teamDirectory, setTeamDirectory] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [teamScoreEntries, setTeamScoreEntries] = useState([]);
+  const [playerPointAwards, setPlayerPointAwards] = useState([]);
   const [expandedTeam, setExpandedTeam] = useState(null);
   useEffect(() => {
     let active = true;
@@ -82,11 +83,20 @@ const DashboardPage = () => {
       supabase.from('teams').select('*').eq('is_active', true).order('name'),
       supabase.from('team_members').select('*'),
       supabase.from('team_match_score_entries').select('team_id, tournament_id, employee_id, score'),
-    ]).then(([teams, members, scores]) => {
+      supabase.from('player_point_awards').select('team_id, tournament_id, employee_id, points'),
+    ]).then(([teams, members, scores, awards]) => {
       if (!active) return;
       setTeamDirectory(teams.data || []);
       setTeamMembers(members.data || []);
-      setTeamScoreEntries(scores.data || []);
+      setTeamScoreEntries([
+        ...(scores.data || []),
+        ...(awards.data || []).filter((award) => award.team_id != null).map((award) => ({
+          team_id: award.team_id,
+          tournament_id: award.tournament_id,
+          employee_id: award.employee_id,
+          score: award.points,
+        })),
+      ]);
     });
     return () => { active = false; };
   }, []);
