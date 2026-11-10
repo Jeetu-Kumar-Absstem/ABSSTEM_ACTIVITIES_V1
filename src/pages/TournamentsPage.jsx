@@ -254,7 +254,7 @@ const SUB_TABS = [
   { id: 'results',    label: 'Match Results',      icon: '⚽' },
   { id: 'stopwatch',  label: 'Stopwatch',          icon: '⏱' },
   { id: 'final',      label: 'Final Results',      icon: '🏅' },
-  { id: 'teams',      label: 'Teams',             icon: '👥' },
+  { id: 'teams',      label: 'Team Management',   icon: '👥' },
 ];
 
 const STATUS_BADGE = {
@@ -332,7 +332,7 @@ export const TournamentFlowModal = ({ tournament, matches, getEmployeeName, onCl
   );
 };
 
-const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeName, currentUser }) => {
+const ReusableTeamsPanel = ({ employees, tournaments, events, selectedEventId, onEventChange, onOpenSection, isAdminUser, getEmployeeName, currentUser }) => {
   const AUTO_TEAM_GIRL_NAMES = ['Anshita Verma', 'Arifa', 'Nikita', 'Ritu', 'Nandani', 'Ritika'];
   const { showToast } = useToast();
   const [teams, setTeams] = useState([]);
@@ -368,12 +368,16 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
 
   const loadTeams = useCallback(async () => {
     setLoading(true);
+    const teamQuery = supabase.from('teams').select('*').order('name');
+    if (selectedEventId !== 'all') teamQuery.eq('event_id', selectedEventId);
+    const awardsQuery = supabase.from('player_point_awards').select('id, event_id, tournament_id, employee_id, team_id, points, reason, created_at').order('created_at', { ascending: false });
+    if (selectedEventId !== 'all') awardsQuery.eq('event_id', selectedEventId);
     const [teamResult, memberResult, pointResult, playerPointResult, awardsResult, employeeResult] = await Promise.all([
-      supabase.from('teams').select('*').order('name'),
+      teamQuery,
       supabase.from('team_members').select('*'),
       supabase.from('team_cumulative_points').select('*').order('total_points', { ascending: false }),
       supabase.from('team_match_score_entries').select('employee_id, score'),
-      supabase.from('player_point_awards').select('id, tournament_id, employee_id, team_id, points, reason, created_at').order('created_at', { ascending: false }),
+      awardsQuery,
       supabase.from('employees').select('*').eq('is_active', true).order('name'),
     ]);
     setLoading(false);
@@ -399,11 +403,14 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
         return [...retainedIds, ...newIds];
       });
     }
-  }, [showToast]);
+  }, [selectedEventId, showToast]);
 
   useEffect(() => { loadTeams(); }, [loadTeams]);
 
-  const assignedEmployeeIds = useMemo(() => new Set(teamMembers.map((member) => String(member.employee_id).toUpperCase())), [teamMembers]);
+  const visibleTeamIds = useMemo(() => new Set(teams.map((team) => String(team.id))), [teams]);
+  const assignedEmployeeIds = useMemo(() => selectedEventId === 'all'
+    ? new Set()
+    : new Set(teamMembers.filter((member) => visibleTeamIds.has(String(member.team_id))).map((member) => String(member.employee_id).toUpperCase())), [selectedEventId, teamMembers, visibleTeamIds]);
   const availableEmployees = employeeDirectory.filter((employee) => {
     const query = playerSearch.trim().toLowerCase();
     const belongsToEditingTeam = editingTeamId && teamMembers.some((member) => member.team_id === editingTeamId && member.employee_id === employee.employee_code);
@@ -432,6 +439,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     setAwardSaving(true);
     const submitter = currentUser?.user_metadata?.emp_id || currentUser?.user_metadata?.employee_code || currentUser?.email || null;
     const { error } = await supabase.from('player_point_awards').insert({
+      event_id: selectedEventId === 'all' ? null : selectedEventId,
       tournament_id: awardTournamentId || null,
       employee_id: recipientEmployeeId,
       team_id: teamId,
@@ -446,6 +454,16 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     showToast(teamId && recipientEmployeeId !== awardEmployeeId
       ? `Points awarded to captain ${getEmployeeName(recipientEmployeeId)} and added to the team`
       : teamId ? 'Player points awarded and added to the player’s team' : 'Player points awarded');
+  };
+
+  const assignUnassignedAwards = async () => {
+    if (!isAdminUser || selectedEventId === 'all') return;
+    const event = (events || []).find((item) => String(item.id) === String(selectedEventId));
+    if (!event || !window.confirm(`Assign all unassigned player awards to ${event.title}?`)) return;
+    const { error } = await supabase.from('player_point_awards').update({ event_id: selectedEventId }).is('event_id', null);
+    if (error) return showToast(error.message, 'error');
+    await loadTeams();
+    showToast(`Unassigned player awards attached to ${event.title}`);
   };
 
   const deletePlayerPointAward = async (award) => {
@@ -467,7 +485,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     if (selectedMembers.size === 0) return showToast('Select at least one player', 'error');
     const teamQuery = editingTeamId
       ? supabase.from('teams').update({ name: name.trim(), parent_team_id: parentTeamId || null }).eq('id', editingTeamId)
-      : supabase.from('teams').insert({ name: name.trim(), parent_team_id: parentTeamId || null });
+      : supabase.from('teams').insert({ name: name.trim(), parent_team_id: parentTeamId || null, event_id: selectedEventId === 'all' ? null : selectedEventId });
     const { data: team, error: teamError } = await teamQuery.select().single();
     if (teamError) return showToast(teamError.message, 'error');
 
@@ -510,10 +528,9 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
 
   const deleteAllTeams = async () => {
     if (!isAdminUser) return showToast('Only admins can delete reusable teams', 'error');
-    const { data: activeTeams, error: teamsError } = await supabase
-      .from('teams')
-      .select('id')
-      .eq('is_active', true);
+    const activeTeamsQuery = supabase.from('teams').select('id').eq('is_active', true);
+    if (selectedEventId !== 'all') activeTeamsQuery.eq('event_id', selectedEventId);
+    const { data: activeTeams, error: teamsError } = await activeTeamsQuery;
     if (teamsError) return showToast(teamsError.message, 'error');
     const teamIds = (activeTeams || []).map((team) => team.id).filter(Boolean);
     if (!teamIds.length) return showToast('There are no active teams to remove');
@@ -538,6 +555,16 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
     }
     await loadTeams();
     showToast(`${deleteIds.length} team${deleteIds.length === 1 ? '' : 's'} deleted${archiveIds.length ? `, ${archiveIds.length} archived` : ''}`);
+  };
+
+  const assignUnassignedTeams = async () => {
+    if (!isAdminUser || selectedEventId === 'all') return;
+    const event = (events || []).find((item) => String(item.id) === String(selectedEventId));
+    if (!event || !window.confirm(`Assign all unassigned teams to ${event.title}?`)) return;
+    const { error } = await supabase.from('teams').update({ event_id: selectedEventId }).is('event_id', null);
+    if (error) return showToast(error.message, 'error');
+    await loadTeams();
+    showToast(`Unassigned teams attached to ${event.title}`);
   };
 
   const saveUser = async () => {
@@ -694,7 +721,7 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
       for (const assignment of assignments) {
         const { data: team, error: teamError } = await supabase
           .from('teams')
-          .insert({ name: assignment.name })
+          .insert({ name: assignment.name, event_id: selectedEventId === 'all' ? null : selectedEventId })
           .select()
           .single();
         if (teamError) throw teamError;
@@ -750,10 +777,13 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
           </div>
         </div>}
       </div>
+      <EventWorkspaceCard events={events} tournaments={tournaments} selectedEventId={selectedEventId} onSelectEvent={onEventChange} onOpenSection={onOpenSection} />
+      {selectedEventId !== 'all' && <>
       <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, var(--bg-surface-strong), rgba(63,81,181,0.08))' }}>
         <div style={styles.cardHeader}>
-          <div><div style={styles.cardHeaderTitle}>👥 Team workspace</div><div style={{ color: 'var(--text-soft)', fontSize: '0.7rem', marginTop: 3 }}>One player can belong to one reusable team. Teams can be entered into multiple tournaments.</div></div>
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button><button onClick={shuffleEmployees} title="Randomise the order of all employees in this workspace" style={styles.outlineBtn}>🔀 Shuffle employees</button>{isAdminUser && <button onClick={deleteAllTeams} style={{ ...styles.outlineBtn, color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Remove all teams</button>}</div>
+          <div><div style={styles.cardHeaderTitle}>👥 Team workspace</div><div style={{ color: 'var(--text-soft)', fontSize: '0.7rem', marginTop: 3 }}>Teams are grouped by event while historical tournament snapshots stay preserved.</div></div>
+          <select value={selectedEventId} onChange={(event) => onEventChange(event.target.value)} aria-label="Filter teams by event" style={{ ...styles.formInput, width: 'auto', minWidth: 170, padding: '0.45rem 0.55rem', fontSize: '0.68rem', fontWeight: 700 }}><option value="all">All events</option>{(events || []).map((event) => <option key={event.id} value={event.id}>{event.icon || '🎉'} {event.title}</option>)}</select>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>{isAdminUser && selectedEventId !== 'all' && <button onClick={assignUnassignedTeams} style={{ ...styles.outlineBtn, color: 'var(--accent)', borderColor: 'var(--accent)' }}>↳ Assign unassigned teams</button>}<button onClick={loadTeams} style={styles.outlineBtn}>↻ Refresh</button><button onClick={shuffleEmployees} title="Randomise the order of all employees in this workspace" style={styles.outlineBtn}>🔀 Shuffle employees</button>{isAdminUser && <button onClick={deleteAllTeams} style={{ ...styles.outlineBtn, color: 'var(--danger)', borderColor: 'rgba(229,57,53,0.35)' }}>🗑 Remove all teams</button>}</div>
         </div>
         {isAdminUser && <div style={{ background: 'rgba(255,255,255,0.38)', border: '1px solid var(--border)', borderRadius: 10, padding: '0.8rem', display: 'grid', gap: '0.7rem' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-strong)' }}>{editingTeamId ? 'Edit team' : 'Create a team'}</div>
@@ -781,11 +811,11 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
           <div><button onClick={createTeamsAutomatically} disabled={autoCreating} style={{ ...styles.navyBtn, opacity: autoCreating ? 0.65 : 1 }}>{autoCreating ? 'Creating teams…' : '⚡ Create Teams Automatically'}</button></div>
         </div>}
       </div>
-      {isAdminUser && <div className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(46,125,50,0.08))' }}>
-        <div style={{ padding: '0.85rem 1.1rem', background: 'linear-gradient(120deg, #2e7d32, #43a047)', color: '#fff' }}><div style={{ fontSize: '1rem', fontWeight: 800 }}>🏅 Award player points</div><div style={{ marginTop: 4, fontSize: '0.7rem', opacity: 0.86 }}>Tournament selection is optional, and player registration is not required. If the player belongs to a reusable team, the same points are added to that team.</div></div>
+      {isAdminUser && <div id="event-award-points" className="clay-card" style={{ ...styles.card, padding: 0, overflow: 'hidden', background: 'linear-gradient(145deg, var(--bg-surface-strong), rgba(46,125,50,0.08))' }}>
+        <div style={{ padding: '0.85rem 1.1rem', background: 'linear-gradient(120deg, #2e7d32, #43a047)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}><div><div style={{ fontSize: '1rem', fontWeight: 800 }}>🏅 Award player points</div><div style={{ marginTop: 4, fontSize: '0.7rem', opacity: 0.86 }}>Points are saved inside the selected event. Tournament selection is optional.</div></div>{selectedEventId !== 'all' && <button onClick={assignUnassignedAwards} style={{ ...styles.outlineBtn, color: '#fff', borderColor: 'rgba(255,255,255,0.65)', background: 'rgba(255,255,255,0.12)', fontSize: '0.65rem' }}>↳ Assign unassigned points</button>}</div>
         <div style={{ padding: '0.9rem 1rem', display: 'grid', gap: '0.65rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.6rem' }}>
-            <div style={styles.formRow}><label style={styles.formLabel}>Tournament (optional)</label><select style={styles.formInput} value={awardTournamentId} onChange={(e) => setAwardTournamentId(e.target.value)}><option value="">General award — no tournament</option>{tournaments.map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></div>
+            <div style={styles.formRow}><label style={styles.formLabel}>Tournament (optional)</label><select style={styles.formInput} value={awardTournamentId} onChange={(e) => setAwardTournamentId(e.target.value)}><option value="">General award — no tournament</option>{tournaments.filter((tournament) => String(tournament.event_id) === String(selectedEventId)).map((tournament) => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}</select></div>
             <div style={styles.formRow}><label style={styles.formLabel}>Player *</label><select style={styles.formInput} value={awardEmployeeId} onChange={(e) => setAwardEmployeeId(e.target.value)}><option value="">— select any player —</option>{employeeDirectory.map((employee) => <option key={employee.employee_code} value={employee.employee_code}>{employee.name} · {employee.employee_code}</option>)}</select></div>
             <div style={styles.formRow}><label style={styles.formLabel}>Points *</label><input style={styles.formInput} type="number" min="0.01" step="0.01" value={awardPoints} onChange={(e) => setAwardPoints(e.target.value)} placeholder="e.g. 5" /></div>
             <div style={styles.formRow}><label style={styles.formLabel}>Reason (optional)</label><input style={styles.formInput} value={awardReason} onChange={(e) => setAwardReason(e.target.value)} placeholder="Best performer, bonus, etc." /></div>
@@ -814,6 +844,40 @@ const ReusableTeamsPanel = ({ employees, tournaments, isAdminUser, getEmployeeNa
           })}</div>}
         </div>
       </div>
+      </>}
+    </div>
+  );
+};
+
+const EventWorkspaceCard = ({ events = [], tournaments = [], selectedEventId, onSelectEvent, onOpenSection }) => {
+  const eventCards = events.filter((event) => event.event_status !== 'cancelled');
+  return (
+    <div className="clay-card" style={{ ...styles.card, background: 'linear-gradient(135deg, #eef4ff 0%, var(--bg-surface-strong) 58%, #f5f8ff 100%)', border: '1px solid rgba(36, 90, 155, 0.18)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+        <div>
+          <div style={{ color: 'var(--accent)', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase' }}>Event workspace</div>
+          <div style={{ ...styles.cardHeaderTitle, marginTop: 4 }}>Choose an event to manage</div>
+          <div style={{ color: 'var(--muted)', fontSize: '0.7rem', marginTop: 4 }}>Every team, tournament, and player award can stay inside the selected event.</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <select value={selectedEventId} onChange={(event) => onSelectEvent(event.target.value)} aria-label="Select event workspace" style={{ minWidth: 210, width: 'auto', padding: '0.58rem 2rem 0.58rem 0.8rem', border: '1px solid rgba(36,90,155,0.28)', borderRadius: 999, background: 'rgba(36,90,155,0.1)', color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+            <option value="all">Select an event…</option>
+            {eventCards.map((event) => <option key={event.id} value={event.id}>{event.icon || '🎉'} {event.title}</option>)}
+          </select>
+          <span style={{ padding: '0.35rem 0.6rem', borderRadius: 999, background: 'rgba(36,90,155,0.1)', color: 'var(--accent)', fontSize: '0.67rem', fontWeight: 800 }}>{eventCards.length} event{eventCards.length === 1 ? '' : 's'}</span>
+        </div>
+      </div>
+      {eventCards.length === 0 ? <div style={{ padding: '0.9rem', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: '0.72rem' }}>Create an event first to start its teams and tournaments.</div> : selectedEventId === 'all' ? <div style={{ padding: '1.1rem', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--muted)', fontSize: '0.72rem', textAlign: 'center' }}>Select an event above to manage its teams, tournaments, and player points.</div> : <div style={{ display: 'block' }}>
+        {eventCards.filter((event) => String(event.id) === String(selectedEventId)).map((event) => {
+          const isSelected = String(selectedEventId) === String(event.id);
+          const eventTournaments = tournaments.filter((tournament) => String(tournament.event_id) === String(event.id));
+          return <div key={event.id} onClick={() => onSelectEvent(String(event.id))} style={{ padding: '0.85rem', borderRadius: 12, border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`, background: isSelected ? 'rgba(36,90,155,0.1)' : 'var(--bg-surface-strong)', boxShadow: isSelected ? '0 8px 18px rgba(36,90,155,0.14)' : 'var(--surface-shadow-soft)', cursor: 'pointer', transition: 'all 0.15s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.6rem' }}><div style={{ minWidth: 0 }}><div style={{ fontSize: '0.92rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.icon || '🎉'} {event.title}</div><div style={{ color: 'var(--muted)', fontSize: '0.65rem', marginTop: 4 }}>{formatDate(event.start_date)}{event.end_date ? ` – ${formatDate(event.end_date)}` : ''}</div></div>{isSelected && <span style={{ color: 'var(--accent)', fontSize: '0.65rem', fontWeight: 800 }}>SELECTED</span>}</div>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.75rem' }}><span style={{ padding: '0.25rem 0.42rem', borderRadius: 999, background: 'rgba(36,90,155,0.1)', color: 'var(--accent)', fontSize: '0.62rem', fontWeight: 700 }}>🏆 {eventTournaments.length} tournaments</span><span style={{ padding: '0.25rem 0.42rem', borderRadius: 999, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.62rem', fontWeight: 700 }}>{event.event_status || 'scheduled'}</span></div>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.8rem' }} onClick={(clickEvent) => clickEvent.stopPropagation()}><button onClick={() => onOpenSection(event.id, 'teams')} style={{ ...styles.outlineBtn, padding: '0.32rem 0.48rem', fontSize: '0.62rem', color: 'var(--accent)', borderColor: 'var(--accent)' }}>👥 Teams</button><button onClick={() => onOpenSection(event.id, 'tournaments')} style={{ ...styles.outlineBtn, padding: '0.32rem 0.48rem', fontSize: '0.62rem' }}>🏆 Tournaments</button><button onClick={() => onOpenSection(event.id, 'awards')} style={{ ...styles.outlineBtn, padding: '0.32rem 0.48rem', fontSize: '0.62rem', color: '#2e7d32', borderColor: '#2e7d32' }}>🏅 Award points</button></div>
+          </div>;
+        })}
+      </div>}
     </div>
   );
 };
@@ -829,6 +893,7 @@ const formatDate = (dateStr) => {
 
 const TournamentsPage = () => {
   const {
+    events,
     tournaments,
     tournamentParticipants,
     tournamentRegistrationRequests,
@@ -866,6 +931,7 @@ const TournamentsPage = () => {
   const [certPrinting, setCertPrinting] = useState(null); // tracks which row is printing
 
   const [sub, setSub] = useState('active');
+  const [selectedEventId, setSelectedEventId] = useState('all');
   const [tournamentCategory, setTournamentCategory] = useState('live');
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
   const [reusableTeams, setReusableTeams] = useState([]);
@@ -1101,7 +1167,10 @@ const canEditMatch = (m) => {
       { id: 'completed', label: 'Completed Tournaments', eyebrow: 'PAST EVENTS', description: 'Review finished competitions and results', icon: '✓', color: '#1565c0', matches: (t) => ['completed', 'cancelled'].includes(String(t.status).toLowerCase()) },
     ];
     const selectedCategory = categoryConfig.find((category) => category.id === tournamentCategory) || categoryConfig[1];
-    const visibleTournaments = tournaments.filter(selectedCategory.matches);
+    const eventTournaments = selectedEventId === 'all'
+      ? tournaments
+      : tournaments.filter((tournament) => String(tournament.event_id) === String(selectedEventId));
+    const visibleTournaments = eventTournaments.filter(selectedCategory.matches);
 
     return (
       <div className="clay-card" style={{ background: 'linear-gradient(145deg, var(--bg-surface-strong) 0%, var(--bg-surface) 100%)', border: '1px solid rgba(42, 78, 132, 0.12)' }}>
@@ -1115,6 +1184,18 @@ const canEditMatch = (m) => {
             <div style={{ padding: '0.5rem 0.7rem', borderRadius: 10, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.68rem', fontWeight: 700 }}>
               <span style={{ color: 'var(--muted)', marginRight: 5 }}>VIEWING</span>{selectedCategory.label.replace(' Tournaments', '')} · {visibleTournaments.length}
             </div>
+            <select
+              value={selectedEventId}
+              onChange={(event) => setSelectedEventId(event.target.value)}
+              aria-label="Filter tournaments by event"
+              style={{ ...styles.formInput, width: 'auto', minWidth: 180, padding: '0.48rem 0.65rem', fontSize: '0.7rem', fontWeight: 700 }}
+            >
+              <option value="all">All events</option>
+              {(events || []).map((event) => <option key={event.id} value={event.id}>{event.icon || '🎉'} {event.title}</option>)}
+            </select>
+            {isAdmin() && selectedEventId !== 'all' && (
+              <button onClick={assignUnassignedTournaments} style={{ ...styles.outlineBtn, color: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.68rem' }} title="Attach existing tournaments without an event to the selected event">↳ Assign unassigned</button>
+            )}
             {isAdmin() && (
               <button onClick={() => setShowNewTournamentModal(true)} style={{ ...styles.navyBtn, boxShadow: '0 6px 14px rgba(28, 67, 119, 0.18)' }}>+ New Tournament</button>
             )}
@@ -1124,7 +1205,7 @@ const canEditMatch = (m) => {
         <div className="tournament-category-grid" style={{ display: 'flex', gap: '0.55rem', marginBottom: '1.1rem', flexWrap: 'wrap' }}>
           {categoryConfig.map((category) => {
             const isSelected = category.id === selectedCategory.id;
-            const count = tournaments.filter(category.matches).length;
+            const count = eventTournaments.filter(category.matches).length;
             return (
               <button
                 key={category.id}
@@ -2916,6 +2997,7 @@ const renderMatch = (m) => {
     }
     const result = await addTournament({
       ...tForm,
+      event_id: selectedEventId === 'all' ? null : selectedEventId,
       game: finalGame,
       max_participants: parseInt(tForm.max_participants, 10) || 8,
       players_per_team: parseInt(tForm.players_per_team, 10) || 1,
@@ -2935,6 +3017,16 @@ const renderMatch = (m) => {
     } else {
       showToast(result.error || 'Failed to create tournament', 'error');
     }
+  };
+
+  const assignUnassignedTournaments = async () => {
+    if (!isAdmin() || selectedEventId === 'all') return;
+    const event = (events || []).find((item) => String(item.id) === String(selectedEventId));
+    if (!event || !window.confirm(`Assign all unassigned tournaments to ${event.title}?`)) return;
+    const { error } = await supabase.from('tournaments').update({ event_id: selectedEventId }).is('event_id', null);
+    if (error) return showToast(error.message, 'error');
+    await refreshTournamentData();
+    showToast(`Unassigned tournaments attached to ${event.title}`);
   };
 
   // ── Edit match (admin) — pre-fills eForm from the existing match ─────────
@@ -3197,6 +3289,15 @@ const renderMatch = (m) => {
     }
   };
 
+  const openEventSection = (eventId, section) => {
+    setSelectedEventId(String(eventId));
+    if (section === 'tournaments') setSub('active');
+    else {
+      setSub('teams');
+      if (section === 'awards') window.setTimeout(() => document.getElementById('event-award-points')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
+  };
+
   return (
     <div className="tournaments-page" style={{  fontWeight: 400, fontSize: 13, color: 'var(--text)' }}>
       <style>{`
@@ -3249,7 +3350,7 @@ const renderMatch = (m) => {
       {sub === 'results' && renderResults()}
       {sub === 'stopwatch' && renderStopwatch()}
       {sub === 'final' && renderFinalResults()}
-      {sub === 'teams' && <ReusableTeamsPanel employees={employees} tournaments={tournaments} isAdminUser={isAdmin()} getEmployeeName={getEmployeeName} currentUser={currentUser} />}
+      {sub === 'teams' && <ReusableTeamsPanel employees={employees} tournaments={tournaments} events={events} selectedEventId={selectedEventId} onEventChange={setSelectedEventId} onOpenSection={openEventSection} isAdminUser={isAdmin()} getEmployeeName={getEmployeeName} currentUser={currentUser} />}
 
       {/* Admin: Edit Tournament Status / Registration Modal */}
       {editTournamentId && isAdmin() && (() => {
@@ -3353,6 +3454,14 @@ const renderMatch = (m) => {
                   <label style={styles.formLabel}>Tournament Name *</label>
                   <input style={styles.formInput} value={tForm.name}
                          onChange={(e) => setTForm(f => ({ ...f, name: e.target.value }))} />
+                </div>
+                <div style={{ ...styles.formRow, gridColumn: 'span 2' }}>
+                  <label style={styles.formLabel}>Event</label>
+                  <select style={styles.formInput} value={selectedEventId} onChange={(e) => setSelectedEventId(e.target.value)}>
+                    <option value="all">No event selected</option>
+                    {(events || []).map((event) => <option key={event.id} value={event.id}>{event.icon || '🎉'} {event.title}</option>)}
+                  </select>
+                  <small style={{ color: 'var(--muted)', fontSize: '0.65rem' }}>This tournament will appear under the selected event on the dashboard.</small>
                 </div>
                 <div style={styles.formRow}>
                   <label style={styles.formLabel}>Game</label>
