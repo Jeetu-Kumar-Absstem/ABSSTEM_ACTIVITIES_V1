@@ -249,7 +249,7 @@ const BatchRegisterModal = ({ tournaments, currentEmpId, partsByTournament, pend
 };
 
 const SUB_TABS = [
-  { id: 'active',     label: 'Active Tournaments', icon: '🏆' },
+  { id: 'active',     label: 'Tournaments',       icon: '🏆' },
   { id: 'bracket',    label: 'Bracket / Fixtures', icon: '📊' },
   { id: 'results',    label: 'Match Results',      icon: '⚽' },
   { id: 'stopwatch',  label: 'Stopwatch',          icon: '⏱' },
@@ -866,6 +866,7 @@ const TournamentsPage = () => {
   const [certPrinting, setCertPrinting] = useState(null); // tracks which row is printing
 
   const [sub, setSub] = useState('active');
+  const [tournamentCategory, setTournamentCategory] = useState('live');
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
   const [reusableTeams, setReusableTeams] = useState([]);
   const [reusableTeamMembers, setReusableTeamMembers] = useState([]);
@@ -1094,16 +1095,56 @@ const canEditMatch = (m) => {
 
   // ── Sub-tab renderers ─────────────────────────────────────────────────
   const renderActiveTournaments = () => {
+    const categoryConfig = [
+      { id: 'upcoming', label: 'Upcoming Tournaments', eyebrow: 'NEXT UP', description: 'Discover what is coming up next', icon: '↗', color: '#e65100', matches: (t) => !['completed', 'cancelled', 'live'].includes(String(t.status).toLowerCase()) },
+      { id: 'live', label: 'Live Tournaments', eyebrow: 'HAPPENING NOW', description: 'Follow games currently in progress', icon: '●', color: '#2e7d32', matches: (t) => String(t.status).toLowerCase() === 'live' },
+      { id: 'completed', label: 'Completed Tournaments', eyebrow: 'PAST EVENTS', description: 'Review finished competitions and results', icon: '✓', color: '#1565c0', matches: (t) => ['completed', 'cancelled'].includes(String(t.status).toLowerCase()) },
+    ];
+    const selectedCategory = categoryConfig.find((category) => category.id === tournamentCategory) || categoryConfig[1];
+    const visibleTournaments = tournaments.filter(selectedCategory.matches);
+
     return (
-      <div className="clay-card" style={{background:'var(--bg-surface-strong)'}}>
-        <div style={styles.cardHeader}>
-          <div style={styles.cardHeaderTitle}>Active & Upcoming Tournaments</div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={styles.recordCount}>Total Record(s) Found: {tournaments.filter(t => t.status !== 'completed').length}</span>
+      <div className="clay-card" style={{ background: 'linear-gradient(145deg, var(--bg-surface-strong) 0%, var(--bg-surface) 100%)', border: '1px solid rgba(42, 78, 132, 0.12)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', marginBottom: '1.15rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: 'var(--accent)', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 5 }}>Events hub</div>
+            <div style={{ ...styles.cardHeaderTitle, fontSize: '1.25rem', letterSpacing: '-0.025em' }}>Tournaments</div>
+            <div style={{ color: 'var(--muted)', fontSize: '0.72rem', marginTop: 5 }}>Explore every Diwali competition across its journey.</div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+            <div style={{ padding: '0.5rem 0.7rem', borderRadius: 10, background: 'var(--bg-muted)', color: 'var(--text-soft)', fontSize: '0.68rem', fontWeight: 700 }}>
+              <span style={{ color: 'var(--muted)', marginRight: 5 }}>VIEWING</span>{selectedCategory.label.replace(' Tournaments', '')} · {visibleTournaments.length}
+            </div>
             {isAdmin() && (
-              <button onClick={() => setShowNewTournamentModal(true)} style={styles.navyBtn}>+ New Tournament</button>
+              <button onClick={() => setShowNewTournamentModal(true)} style={{ ...styles.navyBtn, boxShadow: '0 6px 14px rgba(28, 67, 119, 0.18)' }}>+ New Tournament</button>
             )}
           </div>
+        </div>
+
+        <div className="tournament-category-grid" style={{ display: 'flex', gap: '0.55rem', marginBottom: '1.1rem', flexWrap: 'wrap' }}>
+          {categoryConfig.map((category) => {
+            const isSelected = category.id === selectedCategory.id;
+            const count = tournaments.filter(category.matches).length;
+            return (
+              <button
+                key={category.id}
+                onClick={() => setTournamentCategory(category.id)}
+                className="tournament-category-card"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7, textAlign: 'left', padding: '0.58rem 0.8rem', borderRadius: 8,
+                  border: `1px solid ${category.color}`,
+                  background: isSelected ? category.color : `${category.color}16`,
+                  boxShadow: isSelected ? `0 5px 12px ${category.color}38` : 'none',
+                  color: isSelected ? '#fff' : category.color, cursor: 'pointer', transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                }}
+                aria-pressed={isSelected}
+              >
+                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>{category.icon}</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>{category.label.replace(' Tournaments', '')}</span>
+                <span style={{ minWidth: 20, padding: '0.12rem 0.32rem', borderRadius: 999, background: isSelected ? 'rgba(255,255,255,0.2)' : `${category.color}20`, color: isSelected ? '#fff' : category.color, textAlign: 'center', fontSize: '0.66rem', fontWeight: 900 }}>{count}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ overflowX: 'auto', width: '100%', display: 'block' }}>
@@ -1116,13 +1157,13 @@ const canEditMatch = (m) => {
               </tr>
             </thead>
             <tbody>
-              {tournaments.length === 0 ? (
+              {visibleTournaments.length === 0 ? (
                 <tr>
                   <td colSpan="11" style={{ ...styles.td, textAlign: 'center', color: 'var(--muted)', padding: '1.4rem' }}>
-                    No tournaments yet. {isAdmin() && 'Click "New Tournament" to create one.'}
+                    No {selectedCategory.label.toLowerCase()} found. {isAdmin() && selectedCategory.id === 'upcoming' && 'Click "New Tournament" to create one.'}
                   </td>
                 </tr>
-              ) : tournaments.map((t) => {
+              ) : visibleTournaments.map((t) => {
                 const status = STATUS_BADGE[t.status] || STATUS_BADGE.draft;
                 const format = FORMAT_BADGE[t.format] || FORMAT_BADGE.knockout;
                 const isTeamTournament = t.participant_mode === 'team';
@@ -1158,9 +1199,9 @@ const canEditMatch = (m) => {
                           ? (isFull ? '🔒 Full' : '🏆 Register')
                           : '📝 Request';
                 return (
-                  <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={styles.td}><strong>{t.code}</strong></td>
-                    <td style={styles.td}><strong>{t.name}</strong></td>
+                  <tr key={t.id} className="tournament-data-row" style={{ borderBottom: '1px solid var(--border)', boxShadow: `inset 3px 0 0 ${selectedCategory.color}` }}>
+                    <td style={{ ...styles.td, color: 'var(--muted)', fontSize: '0.68rem', fontWeight: 800 }}>{t.code}</td>
+                    <td style={{ ...styles.td, minWidth: 150 }}><strong style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text)' }}>{t.name}</strong><small style={{ display: 'block', marginTop: 3, color: 'var(--muted)', fontSize: '0.62rem' }}>{t.game} · {isTeamTournament ? 'Team event' : 'Individual event'}</small></td>
                     <td style={styles.td}>{t.game}</td>
                     <td style={styles.td}>{isTeamTournament ? <span style={{ ...styles.tinyChip, background: 'rgba(106,27,154,0.12)', color: '#6a1b9a' }}>Team event</span> : <span style={{ ...format, ...styles.tinyChip }}>{format.label}</span>}</td>
                     <td style={styles.td}>{formatDate(t.start_date)}</td>
@@ -3163,6 +3204,21 @@ const renderMatch = (m) => {
           min-width: 0 !important;
           overflow: hidden !important;
           max-width: 100% !important;
+        }
+        .tournament-category-card:hover {
+          transform: translateY(-1px);
+          filter: brightness(0.97);
+          box-shadow: 0 5px 12px rgba(20, 49, 87, 0.14) !important;
+        }
+        .tournament-data-row { transition: background 0.15s ease, transform 0.15s ease; }
+        .tournament-data-row:hover { background: rgba(21, 101, 192, 0.045); }
+        .tournament-category-card:focus-visible {
+          outline: 3px solid rgba(21, 101, 192, 0.28);
+          outline-offset: 2px;
+        }
+        @media (max-width: 760px) {
+          .tournament-category-grid { gap: 0.4rem !important; }
+          .tournament-category-card { flex: 1 1 auto; }
         }
       `}</style>
       <EventsTopBar active="tournaments" />
